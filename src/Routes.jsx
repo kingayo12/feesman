@@ -26,6 +26,7 @@ import Discounts from "./pages/discount/Discounts.jsx";
 
 import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
 import MasterLayout from "./Layout/MasterLayout.jsx";
+import ForgotPassword from "./pages/auth/ForgotPassword.jsx";
 
 export default function AppRoutes() {
   return (
@@ -35,6 +36,7 @@ export default function AppRoutes() {
         <Route path='/' element={<Navigate to='/login' replace />} />
         <Route path='/login' element={<Login />} />
         <Route path='/register' element={<Register />} />
+        <Route path='/forgot-password' element={<ForgotPassword />} />
 
         {/* All protected pages live inside MasterLayout */}
         <Route
