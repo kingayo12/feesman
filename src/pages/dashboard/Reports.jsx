@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getClasses } from "../classes/classService";
 import { getAllStudents } from "../students/studentService";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/Usesettings";
 import { calculateStudentBalance } from "../../hooks/Usestudentbalance"; // ✅ fixed: was Usestudentbalance
 import {
   HiChartBar,

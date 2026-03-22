@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { getPaymentsByTerm } from "./paymentService";
 import { getAllStudents } from "../students/studentService";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/Usesettings";
 import { formatDate } from "../../utils/helpers";
 import {
   HiCash,
