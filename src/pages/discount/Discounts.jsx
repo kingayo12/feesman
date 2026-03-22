@@ -15,7 +15,7 @@ import {
   removeAssignment,
   getAllAssignmentsForSession,
   getActiveDiscounts,
-} from "./discountService";
+} from "./Discountservice";
 import { getFamilies } from "../families/familyService";
 import { getAllStudents } from "../students/studentService";
 import { getSettings } from "../settings/settingService";
