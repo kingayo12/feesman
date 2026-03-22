@@ -1,0 +1,444 @@
+/* ============================================================
+   DARK MODE — append this to the bottom of global.css
+   Variables are set by TopNav.jsx via data-theme="dark"
+   on document.documentElement
+   ============================================================ */
+
+/* ── Base ────────────────────────────────────────────────── */
+[data-theme="dark"] body,
+[data-theme="dark"] html {
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] main {
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+[data-theme="dark"] aside {
+  background: var(--nav-bg);
+}
+
+/* ── Top Nav ─────────────────────────────────────────────── */
+[data-theme="dark"] .top-nav {
+  background: #0f172a !important;
+  border-bottom-color: #1e293b !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Cards / surfaces ────────────────────────────────────── */
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .finance-card,
+[data-theme="dark"] .profile-hero,
+[data-theme="dark"] .content-card,
+[data-theme="dark"] .insight-card,
+[data-theme="dark"] .recent-activity,
+[data-theme="dark"] .billing-card,
+[data-theme="dark"] .history-card,
+[data-theme="dark"] .table-card,
+[data-theme="dark"] .form-container,
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .info-card,
+[data-theme="dark"] .academic-status-card {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+/* ── Table ───────────────────────────────────────────────── */
+[data-theme="dark"] .data-table th,
+[data-theme="dark"] .ledger-table th,
+[data-theme="dark"] .mini-table th,
+[data-theme="dark"] .receipt-table th {
+  background: #0f172a !important;
+  color: #94a3b8 !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .data-table td,
+[data-theme="dark"] .ledger-table td,
+[data-theme="dark"] .mini-table td,
+[data-theme="dark"] .receipt-table td {
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .data-table tr:hover td {
+  background: #0f172a;
+}
+
+[data-theme="dark"] .total-row td {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .empty-row {
+  color: #64748b !important;
+}
+
+/* ── Form inputs ─────────────────────────────────────────── */
+[data-theme="dark"] .input-wrapper input,
+[data-theme="dark"] .input-wrapper select,
+[data-theme="dark"] .input-wrapper textarea,
+[data-theme="dark"] .search-box input,
+[data-theme="dark"] .search-wrapper input {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .input-wrapper input:focus,
+[data-theme="dark"] .input-wrapper select:focus {
+  border-color: #818cf8 !important;
+  box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.15) !important;
+}
+
+[data-theme="dark"] .input-wrapper input::placeholder {
+  color: #475569;
+}
+[data-theme="dark"] .disabled-input {
+  background: #1e293b !important;
+  color: #64748b !important;
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+[data-theme="dark"] .submit-btn {
+  background: #818cf8;
+}
+[data-theme="dark"] .submit-btn:hover {
+  background: #6366f1;
+}
+[data-theme="dark"] .filter-btn {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+[data-theme="dark"] .toggle-form-btn.add {
+  background: #818cf8;
+}
+[data-theme="dark"] .logout-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+[data-theme="dark"] .back-btn,
+[data-theme="dark"] .back-link {
+  color: #94a3b8;
+}
+[data-theme="dark"] .back-btn:hover {
+  color: #818cf8;
+}
+[data-theme="dark"] .outline-btn {
+  border-color: #334155;
+  color: #f1f5f9;
+}
+[data-theme="dark"] .outline-btn:hover {
+  background: #0f172a;
+}
+[data-theme="dark"] .pay-toggle-btn {
+  background: #818cf8;
+}
+[data-theme="dark"] .view-btn {
+  border-color: #334155;
+  color: #94a3b8;
+}
+[data-theme="dark"] .view-btn:hover {
+  background: #0f172a;
+  border-color: #818cf8;
+  color: #818cf8;
+}
+[data-theme="dark"] .receipt-btn-small {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+[data-theme="dark"] .upload-btn {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+/* ── Typography ──────────────────────────────────────────── */
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4,
+[data-theme="dark"] .form-header h3,
+[data-theme="dark"] .card-top h4,
+[data-theme="dark"] .header-title h2 {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .form-header p,
+[data-theme="dark"] .header-title p,
+[data-theme="dark"] .stat-label,
+[data-theme="dark"] .sub-info,
+[data-theme="dark"] .user-role,
+[data-theme="dark"] .id-sub,
+[data-theme="dark"] .toggle-desc,
+[data-theme="dark"] .hint,
+[data-theme="dark"] small {
+  color: #64748b !important;
+}
+
+[data-theme="dark"] .app-title {
+  color: #818cf8 !important;
+}
+
+/* ── Badges / pills / tags ───────────────────────────────── */
+[data-theme="dark"] .class-tag,
+[data-theme="dark"] .section-badge,
+[data-theme="dark"] .count-badge,
+[data-theme="dark"] .method-tag,
+[data-theme="dark"] .method-pill {
+  background: #0f172a !important;
+  color: #94a3b8 !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .stat-pill {
+  background: #4f46e5;
+}
+
+[data-theme="dark"] .term-badge {
+  color: #818cf8 !important;
+}
+
+[data-theme="dark"] .status-badge.active {
+  background: #052e16;
+  color: #4ade80;
+}
+[data-theme="dark"] .status-pill.paid {
+  background: #052e16;
+  color: #4ade80;
+  border-color: #14532d;
+}
+[data-theme="dark"] .status-pill.partial {
+  background: #422006;
+  color: #fbbf24;
+  border-color: #713f12;
+}
+[data-theme="dark"] .status-pill.unpaid {
+  background: #3f0000;
+  color: #f87171;
+  border-color: #7f1d1d;
+}
+
+/* ── Finance cards ───────────────────────────────────────── */
+[data-theme="dark"] .f-icon.blue {
+  background: #1e3a5f;
+  color: #60a5fa;
+}
+[data-theme="dark"] .f-icon.green {
+  background: #052e16;
+  color: #4ade80;
+}
+[data-theme="dark"] .f-icon.red {
+  background: #3f0000;
+  color: #f87171;
+}
+
+[data-theme="dark"] .students {
+  border-left-color: #3b82f6;
+}
+[data-theme="dark"] .fees {
+  border-left-color: #10b981;
+}
+[data-theme="dark"] .payments {
+  border-left-color: #8b5cf6;
+}
+[data-theme="dark"] .outstanding {
+  border-left-color: #f59e0b;
+}
+
+[data-theme="dark"] .students .stat-icon-wrapper {
+  background: #1e3a5f;
+  color: #60a5fa;
+}
+[data-theme="dark"] .fees .stat-icon-wrapper {
+  background: #052e16;
+  color: #4ade80;
+}
+[data-theme="dark"] .payments .stat-icon-wrapper {
+  background: #2e1065;
+  color: #a78bfa;
+}
+[data-theme="dark"] .outstanding .stat-icon-wrapper {
+  background: #431407;
+  color: #fbbf24;
+}
+
+/* ── Term tabs ───────────────────────────────────────────── */
+[data-theme="dark"] .term-selector-tabs {
+  background: #0f172a;
+}
+[data-theme="dark"] .term-tab {
+  color: #64748b;
+}
+[data-theme="dark"] .term-tab.active {
+  background: #1e293b;
+  color: #818cf8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Student items ───────────────────────────────────────── */
+[data-theme="dark"] .student-item:hover {
+  background: #0f172a;
+}
+[data-theme="dark"] .student-avatar {
+  background: #1e3a5f;
+  color: #60a5fa;
+}
+[data-theme="dark"] .student-initials {
+  background: #4f46e5;
+}
+[data-theme="dark"] .avatar-small {
+  background: #1e1b4b;
+  color: #818cf8;
+}
+[data-theme="dark"] .family-badge {
+  background: #4f46e5;
+}
+
+/* ── Profile & details ───────────────────────────────────── */
+[data-theme="dark"] .pill {
+  background: #0f172a;
+  color: #94a3b8;
+}
+[data-theme="dark"] .hero-avatar {
+  color: #334155;
+}
+
+/* ── Toggle / switch ─────────────────────────────────────── */
+[data-theme="dark"] .slider {
+  background: #334155;
+}
+[data-theme="dark"] .toggle-row {
+  border-color: #334155;
+}
+
+/* ── Dashboard ───────────────────────────────────────────── */
+[data-theme="dark"] .progress-bar-large {
+  background: #1e293b;
+}
+[data-theme="dark"] .percentage-badge {
+  background: #052e16;
+  color: #4ade80;
+}
+[data-theme="dark"] .student-name-small {
+  color: #f1f5f9;
+}
+[data-theme="dark"] .block-date {
+  color: #64748b;
+}
+
+/* ── Settings ────────────────────────────────────────────── */
+[data-theme="dark"] .settings-content {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+[data-theme="dark"] .settings-nav {
+  border-color: #334155 !important;
+}
+[data-theme="dark"] .settings-nav-item {
+  color: #94a3b8;
+}
+[data-theme="dark"] .settings-nav-item:hover {
+  background: #0f172a;
+}
+[data-theme="dark"] .settings-nav-item.active {
+  background: var(--primary-color);
+  color: #fff;
+}
+[data-theme="dark"] .section-divider {
+  border-color: #334155;
+}
+[data-theme="dark"] .academic-status-item .status-label {
+  color: #64748b;
+}
+[data-theme="dark"] .academic-status-divider {
+  background: #334155;
+}
+[data-theme="dark"] .data-action-card {
+  border-color: #334155;
+}
+[data-theme="dark"] .data-action-icon {
+  color: #64748b;
+}
+[data-theme="dark"] .info-row {
+  background: #0f172a;
+}
+[data-theme="dark"] .logo-upload-area {
+  border-color: #334155;
+}
+[data-theme="dark"] .theme-preview {
+  border-color: #334155;
+}
+[data-theme="dark"] .theme-option {
+  border-color: #334155;
+  color: #f1f5f9;
+}
+[data-theme="dark"] .search-hint-chip {
+  background: #0f172a;
+  color: #94a3b8;
+}
+
+/* ── Dividers / borders ──────────────────────────────────── */
+[data-theme="dark"] .card-header {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+[data-theme="dark"] .summary-item {
+  border-color: #334155 !important;
+}
+[data-theme="dark"] .profile-header {
+  background: #1e293b;
+}
+[data-theme="dark"] .section-header p {
+  color: #64748b;
+}
+
+/* ── Receipt / print ─────────────────────────────────────── */
+[data-theme="dark"] .printable-receipt,
+[data-theme="dark"] .receipt-header,
+[data-theme="dark"] .receipt-footer,
+[data-theme="dark"] .receipt-summary {
+  color: #f1f5f9;
+}
+[data-theme="dark"] .divider {
+  border-color: #334155;
+}
+
+/* ── Row disabled (fee exclusion) ────────────────────────── */
+[data-theme="dark"] .row-disabled {
+  background: #0f172a !important;
+}
+
+/* ── Loading spinner ─────────────────────────────────────── */
+[data-theme="dark"] .spinner {
+  border-color: #334155;
+  border-top-color: #818cf8;
+}
+
+/* ── DataTables (if still used on some pages) ─────────────── */
+[data-theme="dark"] .dataTables_wrapper .dataTables_filter input,
+[data-theme="dark"] .dataTables_wrapper .dataTables_length select {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+[data-theme="dark"] .dataTables_wrapper .dataTables_info,
+[data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button {
+  color: #94a3b8 !important;
+}
+[data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+  background: #4f46e5 !important;
+  color: #fff !important;
+  border-color: #4f46e5 !important;
+}
+
+[data-theme="dark"] .class-avatar {
+  background: var(--nav-bg);
+}

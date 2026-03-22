@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import "./styles/index.css";
+import "./styles/darkmode.css";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext";

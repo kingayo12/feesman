@@ -1318,7 +1318,7 @@ main {
 }
 
 /* Optional: Different colors for different terms */
-.term-badge:contains("First") {
+/* .term-badge:contains("First") {
   color: #f59e0b;
 }
 .term-badge:contains("Second") {
@@ -1326,7 +1326,7 @@ main {
 }
 .term-badge:contains("Third") {
   color: #3b82f6;
-}
+} */
 
 /* .class-list-container {
   max-width: 1000px;
