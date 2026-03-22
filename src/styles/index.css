@@ -54,6 +54,14 @@ html {
   height: 100vh;
 }
 
+button {
+  cursor: pointer !important;
+}
+
+a {
+  cursor: pointer !important;
+}
+
 .r-container {
   width: 100%;
   height: 100dvh;
@@ -133,64 +141,205 @@ aside {
   background: var(--bg-primary);
   height: 100vh;
   padding-left: 10px;
+  max-height: calc(100% - 200px);
+  /* scrollbar-width: thin;
+  scrollbar-color: var(--primary-color) !important;
+  scrollbar-gutter: 0px; */
 }
 
-aside .logo {
+aside .scroll_wrapper {
+  overflow-y: scroll;
+  max-height: calc(100% - 80px);
+  padding: 10px 0;
+  scrollbar-width: none;
+  scrollbar-color: var(--primary-color) !important;
+}
+
+aside .scroll_wrapper:hover {
+  /* scrollbar-width: thin; */
+  scrollbar-color: var(--primary-color) !important;
+}
+
+aside::-webkit-scrollbar {
+  width: 5px;
+}
+
+/* ── Side navigation ──────────────────────────────────────────────────── */
+
+/* aside.side-nav {
+  width: 80px;
+  background: var(--bg-primary);
+  height: 100vh;
+  padding: 0 8px 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; 
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+} */
+
+/* ── Logo ─────────────────────────────────────────────────────────────── */
+aside.side-nav .logo {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 10px;
+  padding: 12px 8px;
+  height: 64px;
+  flex-shrink: 0;
 }
 
-aside .logo img {
+aside.side-nav .logo img {
   width: 100%;
+  max-width: 48px;
   object-fit: contain;
 }
 
-aside ul {
+/* ── Nav list ─────────────────────────────────────────────────────────── */
+aside.side-nav ul.nav-list {
   list-style: none;
-  /* border: 1px solid green; */
-  border-radius: 8px;
-  /* box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1); */
-  margin-top: 20px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   overflow: hidden;
 }
 
-aside ul li {
-  margin-bottom: 10px;
+aside.side-nav ul.nav-list li {
+  margin: 0;
 }
 
-aside ul li a {
-  color: var(--text-tertiary);
-  text-decoration: none;
+/* ── Divider ──────────────────────────────────────────────────────────── */
+aside.side-nav .nav-divider {
+  height: 1px;
+  background: var(--border-light, rgba(0, 0, 0, 0.08));
+  margin: 6px 4px;
 }
-aside .nav-link {
+
+[data-theme="dark"] aside.side-nav .nav-divider {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Nav link (shared base) ───────────────────────────────────────────── */
+aside.side-nav .nav-link {
   display: flex;
-  align-items: center;
   flex-direction: column;
   align-items: center;
-  padding: 10px;
-  border-radius: 8px;
-  transition: background-color 0.3s;
-  border: 2px solid transparent;
-}
-
-aside .nav-link .icon {
-  font-size: 15px;
-  /* margin-right: 10px; */
   justify-content: center;
-  /* width: 25px; */
+  gap: 4px;
+  padding: 10px 4px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  text-decoration: none;
+  color: var(--text-tertiary, #94a3b8);
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    border-color 0.2s;
+  width: 100%;
+  cursor: pointer;
+  background: none;
+  font-family: inherit;
 }
 
-aside .nav-link .label {
-  font-size: 10px;
+aside.side-nav .nav-link:hover {
+  background-color: var(--bg-secondary, rgba(0, 0, 0, 0.05));
+  color: var(--text-primary, #1e293b);
 }
 
-aside .nav-link.active {
-  background-color: var(--bg-secondary);
-  border-color: #fff;
-  font-weight: bold;
-  color: var(--accent);
+[data-theme="dark"] aside.side-nav .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #f1f5f9;
+}
+
+/* ── Active state ─────────────────────────────────────────────────────── */
+aside.side-nav .nav-link.active {
+  background-color: var(--bg-secondary, #f1f5f9);
+  border-color: rgba(255, 255, 255, 0.8);
+  color: var(--accent, #4f46e5);
+  font-weight: 600;
+}
+
+[data-theme="dark"] aside.side-nav .nav-link.active {
+  background-color: rgba(79, 70, 229, 0.15);
+  border-color: rgba(79, 70, 229, 0.3);
+  color: #818cf8;
+}
+
+/* ── Icon + label ─────────────────────────────────────────────────────── */
+aside.side-nav .nav-link .icon {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative; /* for badge positioning */
+  line-height: 1;
+}
+
+aside.side-nav .nav-link .label {
+  font-size: 9px;
+  line-height: 1;
+  text-align: center;
+  white-space: wrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+}
+
+/* ── Toggle button (More / Less) ──────────────────────────────────────── */
+aside.side-nav .nav-toggle-btn {
+  color: var(--text-tertiary, #94a3b8);
+  border: 2px dashed var(--border-light, rgba(0, 0, 0, 0.12));
+}
+
+aside.side-nav .nav-toggle-btn:hover {
+  border-style: solid;
+  border-color: var(--accent, #4f46e5);
+  color: var(--accent, #4f46e5);
+  background-color: rgba(79, 70, 229, 0.06);
+}
+
+aside.side-nav .nav-toggle-btn.toggle-open {
+  border-style: solid;
+  border-color: var(--accent, #4f46e5);
+  color: var(--accent, #4f46e5);
+  background-color: rgba(79, 70, 229, 0.08);
+}
+
+[data-theme="dark"] aside.side-nav .nav-toggle-btn {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] aside.side-nav .nav-toggle-btn.toggle-open {
+  border-color: rgba(129, 140, 248, 0.4);
+  color: #818cf8;
+  background-color: rgba(79, 70, 229, 0.15);
+}
+
+/* ── Badge (hidden item count) ────────────────────────────────────────── */
+aside.side-nav .more-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background: var(--accent, #4f46e5);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* ── Toggle icon wrapper ──────────────────────────────────────────────── */
+aside.side-nav .toggle-icon {
+  font-size: 13px;
 }
 
 .row {
@@ -610,7 +759,6 @@ main {
 
 /* Table Styling */
 .table-container {
-  background: white;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
@@ -984,7 +1132,6 @@ main {
 
 /* Table Card */
 .table-card {
-  background: white;
   margin-top: 30px;
   border-radius: 16px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
@@ -2718,7 +2865,7 @@ a {
 }
 
 .icon-color {
-  color: #059669;
+  color: var(--primary-color);
 }
 
 .academic-status-item {
@@ -2734,4 +2881,9 @@ a {
 
 .stat-pill {
   padding: 5px 10px;
+}
+
+.theme-toggle-btn {
+  background: transparent;
+  padding: 0;
 }

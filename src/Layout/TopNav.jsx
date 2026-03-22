@@ -168,14 +168,14 @@ export default function TopNav() {
 
           {/* Theme toggle */}
           <button
-            className='icon-btn theme-toggle-btn'
+            className='theme-toggle-btn'
             onClick={toggleTheme}
             title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           >
             {theme === "dark" ? (
-              <LuSun className='icon-color' />
+              <LuSun className='icon-color' size={18} />
             ) : (
-              <LuMoon className='icon-color' />
+              <LuMoon className='icon-color' size={18} />
             )}
           </button>
 
