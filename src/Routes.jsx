@@ -1,42 +1,47 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
 import Login from "./pages/auth/Login.jsx";
 import Register from "./pages/auth/Register.jsx";
+
 import Dashboard from "./pages/dashboard/Dashboard.jsx";
 import Reports from "./pages/dashboard/Reports.jsx";
-import FamilyList from "./pages/families/FamilyList.jsx";
-import StudentList from "./pages/students/StudentList.jsx";
-import ClassList from "./pages/classes/ClassList.jsx";
-import FeeSetup from "./pages/fees/FeeSetup.jsx";
 
-import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
+import FamilyList from "./pages/families/FamilyList.jsx";
 import FamilyDetails from "./pages/families/FamilyDetails.jsx";
+
+import StudentList from "./pages/students/StudentList.jsx";
 import StudentDetails from "./pages/students/StudentDetails.jsx";
-import MasterLayout from "./Layout/MasterLayout.jsx";
+
+import ClassList from "./pages/classes/ClassList.jsx";
 import ClassDetails from "./pages/classes/ClassDetails.jsx";
+
+import FeeSetup from "./pages/fees/FeeSetup.jsx";
+import PaymentHistory from "./pages/fees/PaymentHistory.jsx";
+
 import SettingsPage from "./pages/settings/Setting.jsx";
 import MigrateTerms from "./pages/settings/MigrateTerms.jsx";
-import PaymentHistory from "./pages/fees/PaymentHistory.jsx";
+
 import PreviousBalances from "./pages/previous_balance/Previousbalances.jsx";
 import Discounts from "./pages/discount/Discounts.jsx";
+
+import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
+import MasterLayout from "./Layout/MasterLayout.jsx";
 
 export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public */}
-        <Route path='/' element={<Login />} />
+        {/* Public — bare root goes to login */}
+        <Route path='/' element={<Navigate to='/login' replace />} />
+        <Route path='/login' element={<Login />} />
         <Route path='/register' element={<Register />} />
 
-        {/* Redirect bare / → /dashboard */}
-        <Route path='/' element={<Navigate to='/dashboard' replace />} />
-
-        {/* Protected pages inside layout */}
+        {/* All protected pages live inside MasterLayout */}
         <Route
           path='/*'
           element={
             <MasterLayout>
               <Routes>
-                {/* ✅ dashboard route (was "/" before — broke nav links) */}
                 <Route
                   path='/dashboard'
                   element={
@@ -114,7 +119,6 @@ export default function AppRoutes() {
                   }
                 />
 
-                {/* ✅ reports route was missing entirely */}
                 <Route
                   path='/reports'
                   element={
@@ -123,7 +127,6 @@ export default function AppRoutes() {
                     </ProtectedRoute>
                   }
                 />
-
                 <Route
                   path='/balance'
                   element={
@@ -132,8 +135,6 @@ export default function AppRoutes() {
                     </ProtectedRoute>
                   }
                 />
-
-                {/* ✅ fixed capital D → lowercase */}
                 <Route
                   path='/discount'
                   element={
@@ -160,7 +161,7 @@ export default function AppRoutes() {
                   }
                 />
 
-                {/* Catch-all */}
+                {/* Anything unknown → dashboard */}
                 <Route path='*' element={<Navigate to='/dashboard' replace />} />
               </Routes>
             </MasterLayout>
