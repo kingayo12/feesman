@@ -20,6 +20,11 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
+    // Client-side validation first
+    if (!form.email.trim()) {
+      setError("Please enter your email address.");
+      return;
+    }
     if (form.password.length < 6) {
       setError("Password must be at least 6 characters.");
       return;
@@ -34,12 +39,23 @@ export default function Register() {
       await register(form.email.trim(), form.password, form.name.trim());
       navigate("/dashboard");
     } catch (err) {
+      // Log real error to console so you can debug in devtools
+      console.error("Registration error:", err?.code, err?.message);
+
       const map = {
         "auth/email-already-in-use": "An account with this email already exists.",
         "auth/invalid-email": "Please enter a valid email address.",
         "auth/weak-password": "Password is too weak. Use at least 6 characters.",
+        "auth/network-request-failed": "Network error. Check your internet connection.",
+        "auth/too-many-requests": "Too many attempts. Please try again later.",
+        "auth/operation-not-allowed":
+          "Email/password accounts are not enabled. Contact your administrator.",
       };
-      setError(map[err?.code] || "Registration failed. Please try again.");
+
+      setError(
+        map[err?.code] ||
+          `Registration failed (${err?.code || "unknown error"}). Please try again.`,
+      );
     } finally {
       setLoading(false);
     }
