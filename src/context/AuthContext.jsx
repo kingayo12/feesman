@@ -12,6 +12,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { auth } from "../firebase/auth";
+import { createUserProfile } from "../pages/roles/userService";
 
 const AuthContext = createContext(null);
 
@@ -29,13 +30,16 @@ export function AuthProvider({ children }) {
 
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
 
-  // ✅ Fixed: createUserWithEmailAndPassword returns a UserCredential,
-  //    not { user } directly — must access result.user
   const register = async (email, password, displayName = "") => {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
-    if (displayName) {
-      await updateProfile(credential.user, { displayName });
-    }
+    if (displayName) await updateProfile(credential.user, { displayName });
+
+    // ✅ Write user profile with role:"user" to Firestore immediately
+    await createUserProfile(credential.user.uid, {
+      email,
+      displayName,
+    });
+
     return credential.user;
   };
 

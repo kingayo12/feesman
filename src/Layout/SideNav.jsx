@@ -13,83 +13,128 @@ import {
   FaChartBar,
   FaChevronDown,
   FaChevronUp,
+  FaUserShield,
 } from "react-icons/fa";
 import Logo from "../assets/logo.png";
+import { useRole } from "../hooks/useRole";
+import { PERMISSIONS } from "../config/permissions";
 
-const ALL_NAV_ITEMS = [
-  { label: "Dashboard", path: "/dashboard", icon: <FaTachometerAlt /> },
-  { label: "Families", path: "/families", icon: <FaUsers /> },
-  { label: "Students", path: "/students", icon: <FaUserGraduate /> },
-  { label: "Classes", path: "/classes", icon: <FaSchool /> },
-  // ── everything below is hidden until expanded ──
-  { label: "Fees", path: "/fees", icon: <FaMoneyCheckAlt /> },
-  { label: "Payment History", path: "/payment-history", icon: <FaHistory /> },
-  { label: "Reports", path: "/reports", icon: <FaChartBar /> },
-  { label: "Balance", path: "/balance", icon: <FaCreditCard /> },
-  { label: "Discount", path: "/discount", icon: <FaPercent /> },
-  { label: "Settings", path: "/settings", icon: <FaToolbox /> },
+// All possible nav items with the permission needed to see them
+const NAV_CONFIG = [
+  {
+    label: "Dashboard",
+    path: "/dashboard",
+    icon: <FaTachometerAlt />,
+    permission: PERMISSIONS.VIEW_DASHBOARD,
+  },
+  {
+    label: "Families",
+    path: "/families",
+    icon: <FaUsers />,
+    permission: PERMISSIONS.VIEW_FAMILIES,
+  },
+  {
+    label: "Students",
+    path: "/students",
+    icon: <FaUserGraduate />,
+    permission: PERMISSIONS.VIEW_STUDENTS,
+  },
+  { label: "Classes", path: "/classes", icon: <FaSchool />, permission: PERMISSIONS.VIEW_CLASSES },
+  // ── hidden until expanded ──
+  { label: "Fees", path: "/fees", icon: <FaMoneyCheckAlt />, permission: PERMISSIONS.VIEW_FEES },
+  {
+    label: "Payment History",
+    path: "/payment-history",
+    icon: <FaHistory />,
+    permission: PERMISSIONS.VIEW_PAYMENTS,
+  },
+  {
+    label: "Reports",
+    path: "/reports",
+    icon: <FaChartBar />,
+    permission: PERMISSIONS.VIEW_REPORTS,
+  },
+  {
+    label: "Balance",
+    path: "/balance",
+    icon: <FaCreditCard />,
+    permission: PERMISSIONS.VIEW_BALANCES,
+  },
+  {
+    label: "Discount",
+    path: "/discount",
+    icon: <FaPercent />,
+    permission: PERMISSIONS.VIEW_DISCOUNTS,
+  },
+  { label: "Roles", path: "/roles", icon: <FaUserShield />, permission: PERMISSIONS.VIEW_ROLES },
+  {
+    label: "Settings",
+    path: "/settings",
+    icon: <FaToolbox />,
+    permission: PERMISSIONS.VIEW_SETTINGS,
+  },
 ];
 
-// How many items are always visible before the "More" button
-const ALWAYS_VISIBLE = 7;
+const ALWAYS_VISIBLE = 7; // how many items show before the More button
 
 export default function SideNav() {
   const location = useLocation();
+  const { can, loading } = useRole();
   const [expanded, setExpanded] = useState(false);
 
-  const hiddenItems = ALL_NAV_ITEMS.slice(ALWAYS_VISIBLE);
-  const hiddenCount = hiddenItems.length;
+  // Filter to only items the current user can see
+  const allowed = loading ? [] : NAV_CONFIG.filter((item) => can(item.permission));
 
-  // If the current page is a hidden item, auto-expand so it stays highlighted
-  const isOnHiddenPage = hiddenItems.some((item) => location.pathname.startsWith(item.path));
+  const visibleBase = allowed.slice(0, ALWAYS_VISIBLE);
+  const hidden = allowed.slice(ALWAYS_VISIBLE);
+  const hiddenCount = hidden.length;
 
-  const shouldShow = expanded || isOnHiddenPage;
+  // Auto-expand if current page is in the hidden list
+  const isOnHidden = hidden.some((item) => location.pathname.startsWith(item.path));
+  const shouldExpand = expanded || isOnHidden;
+  const visible = shouldExpand ? allowed : visibleBase;
 
   const isActive = (path) => {
     if (path === "/dashboard") return location.pathname === "/dashboard";
     return location.pathname.startsWith(path);
   };
 
-  const visibleItems = shouldShow ? ALL_NAV_ITEMS : ALL_NAV_ITEMS.slice(0, ALWAYS_VISIBLE);
-
   return (
     <aside className='side-nav'>
       <div className='logo'>
         <img src={Logo} alt='Logo' />
       </div>
-      <div className='scroll_wrapper'>
-        <ul className='nav-list'>
-          {/* Always-visible items */}
-          {visibleItems.map((item) => (
-            <li key={item.path}>
-              <Link to={item.path} className={isActive(item.path) ? "nav-link active" : "nav-link"}>
-                <span className='icon'>{item.icon}</span>
-                <span className='label'>{item.label}</span>
-              </Link>
-            </li>
-          ))}
 
-          {/* Divider before toggle button */}
-          <li className='nav-divider' />
-
-          {/* More / Less toggle */}
-          <li>
-            <button
-              className={`nav-link nav-toggle-btn ${shouldShow ? "toggle-open" : ""}`}
-              onClick={() => setExpanded((prev) => !prev)}
-              aria-expanded={shouldShow}
-              aria-label={shouldShow ? "Show fewer items" : `Show ${hiddenCount} more items`}
-            >
-              <span className='icon toggle-icon'>
-                {shouldShow ? <FaChevronUp /> : <FaChevronDown />}
-                {/* Badge — only shown when collapsed and not on a hidden page */}
-                {!shouldShow && <span className='more-badge'>{hiddenCount}</span>}
-              </span>
-              <span className='label'>{shouldShow ? "Less" : "More"}</span>
-            </button>
+      <ul className='nav-list'>
+        {visible.map((item) => (
+          <li key={item.path}>
+            <Link to={item.path} className={isActive(item.path) ? "nav-link active" : "nav-link"}>
+              <span className='icon'>{item.icon}</span>
+              <span className='label'>{item.label}</span>
+            </Link>
           </li>
-        </ul>
-      </div>
+        ))}
+
+        {/* Only show More button if there are hidden items */}
+        {hiddenCount > 0 && (
+          <>
+            <li className='nav-divider' />
+            <li>
+              <button
+                className={`nav-link nav-toggle-btn ${shouldExpand ? "toggle-open" : ""}`}
+                onClick={() => setExpanded((p) => !p)}
+                aria-expanded={shouldExpand}
+              >
+                <span className='icon toggle-icon'>
+                  {shouldExpand ? <FaChevronUp /> : <FaChevronDown />}
+                  {!shouldExpand && <span className='more-badge'>{hiddenCount}</span>}
+                </span>
+                <span className='label'>{shouldExpand ? "Less" : "More"}</span>
+              </button>
+            </li>
+          </>
+        )}
+      </ul>
     </aside>
   );
 }

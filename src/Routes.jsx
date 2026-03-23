@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/auth/Login.jsx";
 import Register from "./pages/auth/Register.jsx";
+import ForgotPassword from "./pages/auth/ForgotPassword.jsx";
 
 import Dashboard from "./pages/dashboard/Dashboard.jsx";
 import Reports from "./pages/dashboard/Reports.jsx";
@@ -23,10 +24,10 @@ import MigrateTerms from "./pages/settings/MigrateTerms.jsx";
 
 import PreviousBalances from "./pages/previous_balance/Previousbalances.jsx";
 import Discounts from "./pages/discount/Discounts.jsx";
+import RoleManagement from "./pages/roles/RoleManagement.jsx";
 
 import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
 import MasterLayout from "./Layout/MasterLayout.jsx";
-import ForgotPassword from "./pages/auth/ForgotPassword.jsx";
 
 export default function AppRoutes() {
   return (
@@ -142,6 +143,14 @@ export default function AppRoutes() {
                   element={
                     <ProtectedRoute>
                       <Discounts />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path='/roles'
+                  element={
+                    <ProtectedRoute>
+                      <RoleManagement />
                     </ProtectedRoute>
                   }
                 />
