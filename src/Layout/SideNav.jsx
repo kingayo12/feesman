@@ -104,37 +104,38 @@ export default function SideNav() {
       <div className='logo'>
         <img src={Logo} alt='Logo' />
       </div>
-
-      <ul className='nav-list'>
-        {visible.map((item) => (
-          <li key={item.path}>
-            <Link to={item.path} className={isActive(item.path) ? "nav-link active" : "nav-link"}>
-              <span className='icon'>{item.icon}</span>
-              <span className='label'>{item.label}</span>
-            </Link>
-          </li>
-        ))}
-
-        {/* Only show More button if there are hidden items */}
-        {hiddenCount > 0 && (
-          <>
-            <li className='nav-divider' />
-            <li>
-              <button
-                className={`nav-link nav-toggle-btn ${shouldExpand ? "toggle-open" : ""}`}
-                onClick={() => setExpanded((p) => !p)}
-                aria-expanded={shouldExpand}
-              >
-                <span className='icon toggle-icon'>
-                  {shouldExpand ? <FaChevronUp /> : <FaChevronDown />}
-                  {!shouldExpand && <span className='more-badge'>{hiddenCount}</span>}
-                </span>
-                <span className='label'>{shouldExpand ? "Less" : "More"}</span>
-              </button>
+      <div className='scroll_wrapper'>
+        <ul className='nav-list'>
+          {visible.map((item) => (
+            <li key={item.path}>
+              <Link to={item.path} className={isActive(item.path) ? "nav-link active" : "nav-link"}>
+                <span className='icon'>{item.icon}</span>
+                <span className='label'>{item.label}</span>
+              </Link>
             </li>
-          </>
-        )}
-      </ul>
+          ))}
+
+          {/* Only show More button if there are hidden items */}
+          {hiddenCount > 0 && (
+            <>
+              <li className='nav-divider' />
+              <li>
+                <button
+                  className={`nav-link nav-toggle-btn ${shouldExpand ? "toggle-open" : ""}`}
+                  onClick={() => setExpanded((p) => !p)}
+                  aria-expanded={shouldExpand}
+                >
+                  <span className='icon toggle-icon'>
+                    {shouldExpand ? <FaChevronUp /> : <FaChevronDown />}
+                    {!shouldExpand && <span className='more-badge'>{hiddenCount}</span>}
+                  </span>
+                  <span className='label'>{shouldExpand ? "Less" : "More"}</span>
+                </button>
+              </li>
+            </>
+          )}
+        </ul>
+      </div>
     </aside>
   );
 }
