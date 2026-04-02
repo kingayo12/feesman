@@ -19,6 +19,7 @@ import {
 import { getFamilies } from "../families/familyService";
 import { getAllStudents } from "../students/studentService";
 import { getSettings } from "../settings/settingService";
+import { useRole } from "../../hooks/useRole";
 import {
   HiTag,
   HiPlus,
@@ -76,6 +77,7 @@ export default function Discounts() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const { canEdit, canDelete } = useRole();
   const [assignForm, setAssignForm] = useState({
     discountId: "",
     targetType: "family",
@@ -667,16 +669,16 @@ export default function Discounts() {
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
-                      <button
-                        className='action-link'
-                        onClick={() => handleEdit(d)}
-                        style={{ border: "none", background: "none", cursor: "pointer" }}
-                      >
-                        <HiPencil /> Edit
-                      </button>
-                      <button className='delete-btn' onClick={() => handleDelete(d)}>
-                        <HiTrash />
-                      </button>
+                      {canEdit && (
+                        <button className='edit-btn' onClick={() => handleEdit(d)}>
+                          <HiPencil /> Edit
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button className='delete-btn' onClick={() => handleDelete(d)}>
+                          <HiTrash />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -883,9 +885,11 @@ export default function Discounts() {
                         {a.note || "—"}
                       </td>
                       <td>
-                        <button className='delete-btn' onClick={() => handleRemoveAssignment(a)}>
-                          <HiTrash />
-                        </button>
+                        {canDelete && (
+                          <button className='delete-btn' onClick={() => handleRemoveAssignment(a)}>
+                            <HiTrash />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

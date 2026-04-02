@@ -5,6 +5,7 @@ import { getStudentsByFamily } from "../students/studentService";
 import { getPaymentsByFamily } from "../fees/paymentService";
 import { getClasses } from "../classes/classService";
 import StudentForm from "../../components/forms/StudentForm";
+import { Bone } from "../../components/common/Skeleton";
 import { getSettings } from "../settings/settingService";
 import FamilyReceipt from "./FamilyReciept";
 import { formatDate } from "../../utils/helpers";
@@ -21,8 +22,74 @@ import {
   HiIdentification,
   HiCurrencyDollar,
   HiPrinter,
+  HiDocumentText,
   HiX,
 } from "react-icons/hi";
+
+function FamilyDetailsSkeleton() {
+  return (
+    <div className='details-container'>
+      <div
+        className='profile-header'
+        style={{ justifyContent: "space-between", alignItems: "flex-start", minHeight: 140 }}
+      >
+        <div style={{ display: "flex", gap: "1.5rem", flex: 1, alignItems: "center" }}>
+          <Bone w={80} h={80} r={18} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%" }}>
+            <Bone w='50%' h={24} />
+            <Bone w='30%' h={18} />
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
+              <Bone w={120} h={32} r={99} />
+              <Bone w={120} h={32} r={99} />
+              <Bone w={120} h={32} r={99} />
+            </div>
+          </div>
+        </div>
+        <Bone w={120} h={42} r={12} />
+      </div>
+
+      <div className='details-grid'>
+        <div className='content-card'>
+          <div className='card-header'>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Bone w={140} h={22} />
+            </div>
+            <Bone w={100} h={36} r={10} />
+          </div>
+          <div style={{ display: "grid", gap: 16 }}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div
+                key={index}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: 16,
+                  alignItems: "center",
+                  padding: "1rem 0",
+                  borderBottom: "1px solid var(--border-light,#f1f5f9)",
+                }}
+              >
+                <Bone w='100%' h={18} />
+                <Bone w='100%' h={18} />
+                <Bone w='100%' h={18} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className='content-card'>
+          <Bone w='60%' h={22} style={{ marginBottom: 16 }} />
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <Bone w='40%' h={18} />
+              <Bone w='30%' h={18} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function FamilyDetails() {
   const { id } = useParams();
@@ -37,51 +104,60 @@ export default function FamilyDetails() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [feesByStudent, setFeesByStudent] = useState({}); // term fees
   const [prevByStudent, setPrevByStudent] = useState({}); // previous balances
+  const [loading, setLoading] = useState(true);
 
   const loadAll = async () => {
-    const appSettings = await getSettings();
-    const session = appSettings?.academicYear;
-    const term = appSettings?.currentTerm;
+    setLoading(true);
 
-    if (!session || !term) {
-      console.error("Missing session or term in settings:", appSettings);
-      return;
-    }
+    try {
+      const appSettings = await getSettings();
+      const session = appSettings?.academicYear;
+      const term = appSettings?.currentTerm;
 
-    const [fam, studs, pays, cls] = await Promise.all([
-      getFamilyById(id),
-      getStudentsByFamily(id, session),
-      getPaymentsByFamily(id, session, term),
-      getClasses(),
-    ]);
+      if (!session || !term) {
+        console.error("Missing session or term in settings:", appSettings);
+        return;
+      }
 
-    const feeMap = {};
-    const prevMap = {};
-
-    for (const student of studs) {
-      const [studentFees, overrides, prevBal] = await Promise.all([
-        getFeesByClass(student.classId, session, term),
-        getStudentFeeOverrides(student.id),
-        getPreviousBalanceAmount(student.id, session), // ← fetch previous balance
+      const [fam, studs, pays, cls] = await Promise.all([
+        getFamilyById(id),
+        getStudentsByFamily(id, session),
+        getPaymentsByFamily(id, session, term),
+        getClasses(),
       ]);
 
-      const disabledFeeIds = new Set(overrides.map((o) => o.feeId));
-      const termTotal = studentFees.reduce(
-        (sum, fee) => (disabledFeeIds.has(fee.id) ? sum : sum + Number(fee.amount)),
-        0,
-      );
+      const feeMap = {};
+      const prevMap = {};
 
-      feeMap[student.id] = termTotal + prevBal; // term fees + arrears
-      prevMap[student.id] = prevBal;
+      for (const student of studs) {
+        const [studentFees, overrides, prevBal] = await Promise.all([
+          getFeesByClass(student.classId, session, term),
+          getStudentFeeOverrides(student.id),
+          getPreviousBalanceAmount(student.id, session), // ← fetch previous balance
+        ]);
+
+        const disabledFeeIds = new Set(overrides.map((o) => o.feeId));
+        const termTotal = studentFees.reduce(
+          (sum, fee) => (disabledFeeIds.has(fee.id) ? sum : sum + Number(fee.amount)),
+          0,
+        );
+
+        feeMap[student.id] = termTotal + prevBal; // term fees + arrears
+        prevMap[student.id] = prevBal;
+      }
+
+      setFeesByStudent(feeMap);
+      setPrevByStudent(prevMap);
+      setFamily(fam);
+      setStudents(studs);
+      setPayments(pays);
+      setClasses(cls);
+      setSettings(appSettings);
+    } catch (error) {
+      console.error("Failed to load family details:", error);
+    } finally {
+      setLoading(false);
     }
-
-    setFeesByStudent(feeMap);
-    setPrevByStudent(prevMap);
-    setFamily(fam);
-    setStudents(studs);
-    setPayments(pays);
-    setClasses(cls);
-    setSettings(appSettings);
   };
 
   useEffect(() => {
@@ -102,12 +178,7 @@ export default function FamilyDetails() {
 
   const totalArrears = students.reduce((sum, s) => sum + (prevByStudent[s.id] || 0), 0);
 
-  if (!family)
-    return (
-      <div className='loading-state'>
-        <div className='spinner' />
-      </div>
-    );
+  if (loading || !family) return <FamilyDetailsSkeleton />;
 
   return (
     <div className='details-container'>
@@ -136,6 +207,12 @@ export default function FamilyDetails() {
             )}
           </div>
         </div>
+        <button
+          className='outline-btn'
+          onClick={() => navigate(`/letters?context=family&id=${id}&template=fees`)}
+        >
+          <HiDocumentText /> Generate Letter
+        </button>
       </div>
 
       <div className='details-grid'>

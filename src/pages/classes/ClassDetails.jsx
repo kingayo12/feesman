@@ -95,7 +95,7 @@ export default function ClassDetails() {
                     <span className='status-badge active'>{student.status || "Active"}</span>
                   </td>
                   <td>
-                    <Link to={`/students/${student.id}`} className='action-link'>
+                    <Link to={`/students/${student.id}`} className='view-btn'>
                       View
                     </Link>
                   </td>

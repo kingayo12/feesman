@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/firestore";
 import { useAuth } from "../context/AuthContext";
-import { can as canFn, ROLE_PERMISSIONS } from "../config/permissions";
+import { can as canFn, ROLE_PERMISSIONS, ROLES } from "../config/permissions";
 
 export function useRole() {
   const { user } = useAuth();
@@ -43,6 +43,18 @@ export function useRole() {
   }, [user?.uid]);
 
   const can = (permission) => canFn(role, permission);
+  const isSuperAdmin = role === ROLES.super_admin;
+  const isAdminOrSuperAdmin = role === ROLES.super_admin || role === ROLES.admin;
+  const canEdit = isAdminOrSuperAdmin;
+  const canDelete = isSuperAdmin;
 
-  return { role, can, loading };
+  return {
+    role,
+    can,
+    loading,
+    isSuperAdmin,
+    isAdminOrSuperAdmin,
+    canEdit,
+    canDelete,
+  };
 }

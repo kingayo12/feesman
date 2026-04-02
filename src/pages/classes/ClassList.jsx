@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getClasses, deleteClass } from "./classService";
+import { useRole } from "../../hooks/useRole";
+import TableToolbar from "../../components/common/TableToolbar";
 import ClassForm from "../../components/forms/ClassForm";
 import { ClassListSkeleton } from "../../components/common/Skeleton";
 import {
@@ -16,6 +18,7 @@ export default function ClassList() {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const { canDelete } = useRole();
 
   const loadClasses = async () => {
     setLoading(true);
@@ -41,6 +44,9 @@ export default function ClassList() {
       alert("Unable to delete class. It may be in use.");
     }
   };
+
+  const exportHeaders = ["Class Name", "Section", "Academic Session"];
+  const exportRows = classes.map((cls) => [cls.name, cls.section || "N/A", cls.session || ""]);
 
   // ── Skeleton ─────────────────────────────────────────────────────────────
   if (loading) return <ClassListSkeleton />;
@@ -95,6 +101,7 @@ export default function ClassList() {
           <HiClipboardList />
           <h3>Class Directory</h3>
         </div>
+        <TableToolbar fileName='classes' headers={exportHeaders} rows={exportRows} />
         <table className='data-table'>
           <thead>
             <tr>
@@ -122,13 +129,15 @@ export default function ClassList() {
                     <Link to={`/classes/${cls.id}`} className='view-btn'>
                       <HiEye /> View
                     </Link>
-                    <button
-                      className='delete-btn'
-                      onClick={() => handleDelete(cls.id)}
-                      title='Delete Class'
-                    >
-                      <HiTrash />
-                    </button>
+                    {canDelete && (
+                      <button
+                        className='delete-btn'
+                        onClick={() => handleDelete(cls.id)}
+                        title='Delete Class'
+                      >
+                        <HiTrash />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

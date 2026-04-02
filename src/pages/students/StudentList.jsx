@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { getAllStudents, deleteStudent } from "./studentService";
 import { HiSearch, HiOutlineAcademicCap, HiEye, HiFilter, HiTrash } from "react-icons/hi";
 import { filterData } from "../../utils/helpers";
+import { useRole } from "../../hooks/useRole";
+import TableToolbar from "../../components/common/TableToolbar";
 import { getClasses } from "../classes/classService";
 import { getFamilies } from "../families/familyService";
 import { StudentListSkeleton } from "../../components/common/Skeleton";
@@ -13,6 +15,7 @@ export default function StudentList() {
   const [families, setFamilies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const { canDelete } = useRole();
 
   useEffect(() => {
     async function loadAllData() {
@@ -66,6 +69,15 @@ export default function StudentList() {
     "resolvedFamilyName",
   ]);
 
+  const exportHeaders = ["Student Name", "Class", "Session", "Family", "Status"];
+  const exportRows = filteredStudents.map((student) => [
+    `${student.firstName} ${student.lastName}`,
+    student.resolvedClassName,
+    student.session,
+    student.resolvedFamilyName,
+    "Active",
+  ]);
+
   // ── Skeleton ─────────────────────────────────────────────────────────────
   if (loading) return <StudentListSkeleton />;
 
@@ -98,6 +110,7 @@ export default function StudentList() {
           <HiFilter /> Filter
         </button>
       </div>
+      <TableToolbar fileName='students' headers={exportHeaders} rows={exportRows} />
 
       <div className='table-card'>
         <table className='data-table'>
@@ -138,16 +151,18 @@ export default function StudentList() {
                     <span className='status-badge active'>Active</span>
                   </td>
                   <td className='actions-cell'>
-                    <Link to={`/students/${student.id}`} className='action-link'>
+                    <Link to={`/students/${student.id}`} className='view-btn'>
                       <HiEye /> View
                     </Link>
-                    <button
-                      className='delete-btn'
-                      onClick={() => handleDelete(student.id)}
-                      title='Delete Student'
-                    >
-                      <HiTrash /> Delete
-                    </button>
+                    {canDelete && (
+                      <button
+                        className='delete-btn'
+                        onClick={() => handleDelete(student.id)}
+                        title='Delete Student'
+                      >
+                        <HiTrash /> Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

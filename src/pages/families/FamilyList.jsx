@@ -14,8 +14,10 @@ import {
 import { getSettings } from "../settings/settingService";
 import FamilyForm from "../../components/forms/FamilyForm";
 import { FamilyListSkeleton } from "../../components/common/Skeleton";
+import { useRole } from "../../hooks/useRole";
 import { Link } from "react-router-dom";
 import { HiOutlineUsers, HiChevronRight, HiPencilAlt, HiTrash } from "react-icons/hi";
+import TableToolbar from "../../components/common/TableToolbar";
 import $ from "jquery";
 import "datatables.net";
 
@@ -26,6 +28,7 @@ export default function FamilyList() {
   const [currentTerm, setCurrentTerm] = useState("");
   const tableRef = useRef(null);
   const dataTableRef = useRef(null);
+  const { canEdit, canDelete } = useRole();
 
   const calculateFamilyFinancials = async (familyId, settings, activeDiscounts) => {
     const { academicYear, currentTerm } = settings;
@@ -143,6 +146,25 @@ export default function FamilyList() {
     return d.toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" });
   };
 
+  const exportHeaders = [
+    "Family Name",
+    "Contact",
+    "Term Fees",
+    "Term Paid",
+    "Outstanding",
+    "Status",
+    "Created",
+  ];
+  const exportRows = families.map((family) => [
+    family.familyName,
+    [family.phone, family.email].filter(Boolean).join(" "),
+    family.totalAmount || 0,
+    family.totalPaid || 0,
+    family.outstanding || 0,
+    family.status || "",
+    formatDate(family.createdAt),
+  ]);
+
   if (loading) return <FamilyListSkeleton />;
 
   return (
@@ -163,6 +185,7 @@ export default function FamilyList() {
             Showing <strong>{currentTerm}</strong> figures (incl. arrears, discounts applied).
           </p>
         )}
+        <TableToolbar fileName='families' headers={exportHeaders} rows={exportRows} />
         <table ref={tableRef} className='data-table display'>
           <thead>
             <tr>
@@ -205,18 +228,22 @@ export default function FamilyList() {
                 <td>{formatDate(family.createdAt)}</td>
                 <td>
                   <div className='action-btn'>
-                    <button onClick={() => setEditingFamily(family)} className='edit-btn'>
-                      <HiPencilAlt />
-                    </button>
-                    <button
-                      className='delete-btn'
-                      onClick={() => {
-                        if (window.confirm("Delete family?"))
-                          deleteFamily(family.id).then(loadFamilies);
-                      }}
-                    >
-                      <HiTrash />
-                    </button>
+                    {canEdit && (
+                      <button onClick={() => setEditingFamily(family)} className='edit-btn'>
+                        <HiPencilAlt />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        className='delete-btn'
+                        onClick={() => {
+                          if (window.confirm("Delete family?"))
+                            deleteFamily(family.id).then(loadFamilies);
+                        }}
+                      >
+                        <HiTrash />
+                      </button>
+                    )}
                     <Link to={`/families/${family.id}`} className='view-link'>
                       <HiChevronRight />
                     </Link>

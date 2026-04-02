@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useRole } from "../../hooks/useRole";
+import TableToolbar from "../../components/common/TableToolbar";
 import { createFee, getFees, updateFee, deleteFee } from "./feesService";
 import { getClasses } from "../classes/classService";
 import { getSettings } from "../settings/settingService";
@@ -33,6 +35,7 @@ export default function FeeSetup() {
   const [filterTerm, setFilterTerm] = useState("");
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
+  const { canEdit, canDelete } = useRole();
 
   // ─── Load ──────────────────────────────────────────────────────────────
   const loadData = async () => {
@@ -145,6 +148,14 @@ export default function FeeSetup() {
 
   // Group by class for a cleaner summary line
   const totalVisible = visibleFees.reduce((sum, f) => sum + Number(f.amount || 0), 0);
+  const exportHeaders = ["Class", "Session", "Term", "Fee Type", "Amount"];
+  const exportRows = visibleFees.map((fee) => [
+    getClassName(fee.classId),
+    fee.session,
+    fee.term,
+    fee.feeType,
+    `₦${Number(fee.amount).toLocaleString()}`,
+  ]);
 
   // ─── Render ────────────────────────────────────────────────────────────
   return (
@@ -291,11 +302,16 @@ export default function FeeSetup() {
 
         {/* Summary line */}
         {visibleFees.length > 0 && (
-          <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: "0.5rem" }}>
-            {visibleFees.length} fee{visibleFees.length !== 1 ? "s" : ""} — total ₦
-            {totalVisible.toLocaleString()}
-            {filterTerm ? ` for ${filterTerm}` : ""}
-          </p>
+          <>
+            <TableToolbar fileName='fees' headers={exportHeaders} rows={exportRows} />
+            <p
+              style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: "0.5rem" }}
+            >
+              {visibleFees.length} fee{visibleFees.length !== 1 ? "s" : ""} — total ₦
+              {totalVisible.toLocaleString()}
+              {filterTerm ? ` for ${filterTerm}` : ""}
+            </p>
+          </>
         )}
 
         {/* Table — rendered by React only, no DataTables */}
@@ -331,9 +347,11 @@ export default function FeeSetup() {
                     <td>{fee.feeType}</td>
                     <td className='text-right'>₦{Number(fee.amount).toLocaleString()}</td>
                     <td className='actions-cell'>
-                      <button title='Edit' className='edit-btn' onClick={() => handleEdit(fee)}>
-                        <HiPencil />
-                      </button>
+                      {canEdit && (
+                        <button title='Edit' className='edit-btn' onClick={() => handleEdit(fee)}>
+                          <HiPencil />
+                        </button>
+                      )}
                       <button
                         title='Duplicate into form'
                         className='edit-btn'
@@ -341,13 +359,15 @@ export default function FeeSetup() {
                       >
                         <HiDuplicate />
                       </button>
-                      <button
-                        title='Delete'
-                        className='delete-btn'
-                        onClick={() => handleDelete(fee.id)}
-                      >
-                        <HiTrash />
-                      </button>
+                      {canDelete && (
+                        <button
+                          title='Delete'
+                          className='delete-btn'
+                          onClick={() => handleDelete(fee.id)}
+                        >
+                          <HiTrash />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

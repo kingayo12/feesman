@@ -3,14 +3,8 @@ import { getPaymentsByTerm } from "./paymentService";
 import { getAllStudents } from "../students/studentService";
 import { useSettings } from "../../hooks/Usesettings";
 import { formatDate } from "../../utils/helpers";
-import {
-  HiCash,
-  HiSearch,
-  HiDownload,
-  HiChevronUp,
-  HiChevronDown,
-  HiSelector,
-} from "react-icons/hi";
+import TableToolbar from "../../components/common/TableToolbar";
+import { HiCash, HiSearch, HiChevronUp, HiChevronDown, HiSelector } from "react-icons/hi";
 
 // ── Skeleton ──────────────────────────────────────────────────────────────
 function Bone({ w = "100%", h = 16, r = 6, style = {} }) {
@@ -78,18 +72,6 @@ function SortIcon({ col, sortCol, sortDir }) {
   ) : (
     <HiChevronDown style={{ width: 14, height: 14 }} />
   );
-}
-
-// ── CSV export ────────────────────────────────────────────────────────────
-function exportCSV(rows, session, term) {
-  const header = ["Date", "Student", "Term", "Method", "Amount (N)"];
-  const body = rows.map((r) => [r._dateStr, r._studentName, r.term, r.method, r.amount]);
-  const csv = [header, ...body].map((r) => r.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `payments_${session}_${term}`.replace(/\//g, "-").replace(/\s/g, "_") + ".csv";
-  a.click();
 }
 
 const PAGE_SIZE = 15;
@@ -221,6 +203,15 @@ export default function PaymentHistory() {
     return acc;
   }, {});
 
+  const exportHeaders = ["Date", "Student", "Term", "Method", "Amount (₦)"];
+  const exportRows = sorted.map((p) => [
+    p._dateStr,
+    p._studentName,
+    p.term,
+    p.method,
+    `₦${Number(p.amount).toLocaleString()}`,
+  ]);
+
   if (settingsLoading) return <Skeleton />;
 
   // Pagination page numbers with ellipsis
@@ -245,15 +236,10 @@ export default function PaymentHistory() {
             </p>
           </div>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           <span className='stat-pill'>₦{totalCollected.toLocaleString()}</span>
           {sorted.length > 0 && (
-            <button
-              className='filter-btn'
-              onClick={() => exportCSV(sorted, settings.academicYear, selectedTerm)}
-            >
-              <HiDownload /> CSV
-            </button>
+            <TableToolbar fileName='payments' headers={exportHeaders} rows={exportRows} />
           )}
         </div>
       </div>

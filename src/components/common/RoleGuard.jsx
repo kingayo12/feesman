@@ -2,76 +2,58 @@
  * RoleGuard.jsx
  * Place in: src/components/common/RoleGuard.jsx
  *
- * Usage — protect a route:
- *   <RoleGuard permission={PERMISSIONS.VIEW_REPORTS}>
- *     <Reports />
- *   </RoleGuard>
+ * Blocks route access BEFORE the page component mounts.
+ * Shows a spinner while the role is loading from Firestore,
+ * then redirects to /dashboard if the role lacks permission.
+ * The page component never renders — no data fetching happens.
  *
- * Usage — hide a button:
+ * Usage in routes.jsx:
+ *   <Route path="/reports" element={
+ *     <ProtectedRoute>
+ *       <RoleGuard permission={PERMISSIONS.VIEW_REPORTS}>
+ *         <Reports />
+ *       </RoleGuard>
+ *     </ProtectedRoute>
+ *   } />
+ *
+ * Usage to hide a button / element silently:
  *   <RoleGuard permission={PERMISSIONS.DELETE_STUDENT} silent>
  *     <button>Delete</button>
  *   </RoleGuard>
- *
- * Props:
- *   permission  string       — required permission key
- *   silent      boolean      — if true, render nothing (not an error page) when denied
- *   redirect    string       — redirect to this path instead of showing error (optional)
  */
 
 import { Navigate } from "react-router-dom";
 import { useRole } from "../../hooks/useRole";
-import { HiLockClosed } from "react-icons/hi";
 
-export default function RoleGuard({ permission, children, silent = false, redirect }) {
-  const { role, can, loading } = useRole();
+export default function RoleGuard({
+  permission,
+  children,
+  silent = false, // render nothing (no redirect) when denied — for inline UI
+  redirectTo = "/dashboard",
+}) {
+  const { can, loading } = useRole();
 
-  if (loading) return null;
-
-  if (!can(permission)) {
-    if (silent) return null;
-    if (redirect) return <Navigate to={redirect} replace />;
-    return <AccessDenied role={role} permission={permission} />;
-  }
-
-  return children;
-}
-
-function AccessDenied({ role }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "60vh",
-        gap: "1rem",
-        color: "var(--color-text-secondary)",
-        textAlign: "center",
-        padding: "2rem",
-      }}
-    >
+  // While Firestore role is loading, render nothing so page doesn't flash
+  if (loading) {
+    return (
       <div
         style={{
-          width: 56,
-          height: 56,
-          borderRadius: 14,
-          background: "#fee2e2",
-          color: "#dc2626",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          minHeight: "60vh",
         }}
       >
-        <HiLockClosed style={{ width: 24, height: 24 }} />
+        <div className='spinner' />
       </div>
-      <h2 style={{ margin: 0, fontSize: "1.25rem", color: "var(--color-text-primary)" }}>
-        Access denied
-      </h2>
-      <p style={{ margin: 0, maxWidth: 360, fontSize: 14 }}>
-        Your current role <strong style={{ color: "var(--color-text-primary)" }}>({role})</strong>{" "}
-        does not have permission to view this page. Contact your administrator to request access.
-      </p>
-    </div>
-  );
+    );
+  }
+
+  // Access denied — redirect immediately, page never mounts
+  if (!can(permission)) {
+    if (silent) return null;
+    return <Navigate to={redirectTo} replace />;
+  }
+
+  return children;
 }

@@ -14,6 +14,7 @@ import {
   FaChevronDown,
   FaChevronUp,
   FaUserShield,
+  FaEnvelopeOpenText,
 } from "react-icons/fa";
 import Logo from "../assets/logo.png";
 import { useRole } from "../hooks/useRole";
@@ -53,6 +54,12 @@ const NAV_CONFIG = [
     path: "/reports",
     icon: <FaChartBar />,
     permission: PERMISSIONS.VIEW_REPORTS,
+  },
+  {
+    label: "Letters",
+    path: "/letters",
+    icon: <FaEnvelopeOpenText />,
+    permission: PERMISSIONS.VIEW_LETTERS,
   },
   {
     label: "Balance",

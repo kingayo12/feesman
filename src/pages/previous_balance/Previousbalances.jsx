@@ -11,6 +11,8 @@ import { useEffect, useState } from "react";
 import { getAllStudents } from "../students/studentService";
 import { getFamilies } from "../families/familyService";
 import { getSettings } from "../settings/settingService";
+import { useRole } from "../../hooks/useRole";
+import TableToolbar from "../../components/common/TableToolbar";
 import {
   getAllPreviousBalancesForSession,
   setPreviousBalance,
@@ -38,6 +40,7 @@ export default function PreviousBalances() {
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState(null);
   const [editingId, setEditingId] = useState(null); // docId being edited
+  const { canEdit, canDelete } = useRole();
   const [showForm, setShowForm] = useState(false);
 
   const [form, setForm] = useState({
@@ -164,6 +167,20 @@ export default function PreviousBalances() {
   // ── Totals ────────────────────────────────────────────────────────────────
   const totalArrears = balances.reduce((s, b) => s + Number(b.amount || 0), 0);
   const studentsOwing = balances.filter((b) => Number(b.amount) > 0).length;
+
+  const exportHeaders = ["Student", "Family", "Admission No", "Previous Balance", "Note"];
+  const exportRows = filteredStudents.map((student) => {
+    const record = balanceMap[student.id];
+    const family = getFamily(student.familyId);
+
+    return [
+      `${student.firstName} ${student.lastName}`,
+      family?.familyName || "—",
+      student.admissionNo || "—",
+      record != null ? `₦${Number(record.amount).toLocaleString()}` : "Not set",
+      record?.note || "—",
+    ];
+  });
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -359,6 +376,11 @@ export default function PreviousBalances() {
             />
           </div>
         </div>
+        {filteredStudents.length > 0 && (
+          <div style={{ padding: "1rem 1.25rem" }}>
+            <TableToolbar fileName='previous_balances' headers={exportHeaders} rows={exportRows} />
+          </div>
+        )}
 
         {loading ? (
           <div className='empty-state-container' style={{ padding: "3rem" }}>
@@ -422,22 +444,25 @@ export default function PreviousBalances() {
                         {record?.note || "—"}
                       </td>
                       <td className='actions-cell'>
-                        <button
-                          className='action-link'
-                          style={{ border: "none", background: "none", cursor: "pointer" }}
-                          onClick={() => {
-                            if (record) {
-                              handleEdit(record);
-                            } else {
+                        {record ? (
+                          canEdit && (
+                            <button className='edit-btn' onClick={() => handleEdit(record)}>
+                              <HiPencil /> Edit
+                            </button>
+                          )
+                        ) : (
+                          <button
+                            className='edit-btn'
+                            onClick={() => {
                               setForm({ studentId: student.id, amount: "", note: "" });
                               setShowForm(true);
                               window.scrollTo({ top: 0, behavior: "smooth" });
-                            }
-                          }}
-                        >
-                          <HiPencil /> {record ? "Edit" : "Set"}
-                        </button>
-                        {record && (
+                            }}
+                          >
+                            <HiPencil /> Set
+                          </button>
+                        )}
+                        {record && canDelete && (
                           <button className='delete-btn' onClick={() => handleDelete(record)}>
                             <HiTrash />
                           </button>

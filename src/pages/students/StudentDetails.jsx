@@ -34,6 +34,7 @@ import {
   HiMinusCircle,
   HiExclamationCircle,
   HiTag,
+  HiDocumentText,
 } from "react-icons/hi";
 
 export default function StudentDetails() {
@@ -212,12 +213,20 @@ export default function StudentDetails() {
             </p>
           </div>
         </div>
-        <button
-          className={`pay-toggle-btn ${showPaymentForm ? "active" : ""}`}
-          onClick={() => setShowPaymentForm(!showPaymentForm)}
-        >
-          {showPaymentForm ? "Cancel" : "+ Record Payment"}
-        </button>
+        <div className='hero-actions'>
+          <button
+            className={`pay-toggle-btn ${showPaymentForm ? "active" : ""}`}
+            onClick={() => setShowPaymentForm(!showPaymentForm)}
+          >
+            {showPaymentForm ? "Cancel" : "+ Record Payment"}
+          </button>
+          <button
+            className='outline-btn'
+            onClick={() => navigate(`/letters?context=student&id=${id}&template=fees`)}
+          >
+            <HiDocumentText /> Generate Letter
+          </button>
+        </div>
       </div>
 
       {/* Banners */}

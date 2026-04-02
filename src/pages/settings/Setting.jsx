@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { getSettings, updateSettings } from "./settingService";
+import { collection, getDocs, deleteDoc, writeBatch, doc } from "firebase/firestore";
+import { db } from "../../firebase/firestore";
 import {
   HiOfficeBuilding,
   HiCalendar,
   HiMail,
   HiPhone,
   HiSave,
+  HiIdentification,
   HiClock,
   HiUser,
   HiColorSwatch,
@@ -64,6 +67,8 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState({
     // School Profile
     name: "",
+    abbr: "",
+    state: "",
     tagline: "",
     address: "",
     website: "",
@@ -102,6 +107,9 @@ export default function SettingsPage() {
   const [toast, setToast] = useState(null); // { type: "success"|"error", msg }
   const [showPin, setShowPin] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmWipe, setConfirmWipe] = useState(false); // "idle" | "confirm1" | "confirm2" | "wiping" | "done"
+  const [wipeStep, setWipeStep] = useState("idle");
+  const [wipeProgress, setWipeProgress] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -111,6 +119,48 @@ export default function SettingsPage() {
     }
     load();
   }, []);
+
+  // ── Clear all data except families ────────────────────────────────────
+  const COLLECTIONS_TO_WIPE = [
+    "students",
+    "fees",
+    "payments",
+    "classes",
+    "previousBalances",
+    "previous_balance",
+    "discounts",
+    "discountAssignments",
+    "studentFeeOverrides",
+  ];
+
+  const clearAllData = async () => {
+    setWipeStep("wiping");
+    try {
+      for (const col of COLLECTIONS_TO_WIPE) {
+        setWipeProgress(`Clearing ${col}...`);
+        const snap = await getDocs(collection(db, col));
+        if (snap.empty) continue;
+        // Delete in batches of 499 (Firestore limit is 500)
+        const chunks = [];
+        for (let i = 0; i < snap.docs.length; i += 499) {
+          chunks.push(snap.docs.slice(i, i + 499));
+        }
+        for (const chunk of chunks) {
+          const batch = writeBatch(db);
+          chunk.forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
+      }
+      setWipeStep("done");
+      setWipeProgress("");
+      showToast("success", "All data cleared. Families have been kept.");
+    } catch (err) {
+      console.error("Clear data error:", err);
+      setWipeStep("idle");
+      setWipeProgress("");
+      showToast("error", "Failed to clear data: " + (err.message || "Unknown error"));
+    }
+  };
 
   const showToast = (type, msg) => {
     setToast({ type, msg });
@@ -245,6 +295,42 @@ export default function SettingsPage() {
                       required
                     />
                   </div>
+                </div>
+
+                <div className='input-group'>
+                  <label>School Abbreviation</label>
+                  <div className='input-wrapper'>
+                    <HiIdentification className='input-icon' />
+                    <input
+                      name='abbr'
+                      value={settings.abbr || ""}
+                      onChange={handleChange}
+                      placeholder='e.g. GCI, EIS, FGCI'
+                      maxLength={6}
+                      style={{ textTransform: "uppercase" }}
+                      onInput={(e) => {
+                        e.target.value = e.target.value.toUpperCase();
+                      }}
+                    />
+                  </div>
+                  <small className='hint'>
+                    Used in auto-generating admission numbers (max 6 chars)
+                  </small>
+                </div>
+
+                <div className='input-group'>
+                  <label>State</label>
+                  <div className='input-wrapper'>
+                    <HiLocationMarker className='input-icon' />
+                    <input
+                      name='state'
+                      value={settings.state || ""}
+                      onChange={handleChange}
+                      placeholder='e.g. Oyo, Lagos, Abuja'
+                      maxLength={12}
+                    />
+                  </div>
+                  <small className='hint'>Used in admission number (first 2–3 letters)</small>
                 </div>
 
                 <div className='input-group full-width'>
@@ -865,11 +951,12 @@ export default function SettingsPage() {
               <div className='section-divider' />
               <h3 className='sub-section-title danger-title'>Danger Zone</h3>
               <div className='danger-zone'>
+                {/* ── Card 1: Clear fee overrides (existing) ── */}
                 <div className='danger-card'>
                   <div>
                     <p className='danger-title'>Clear all fee overrides</p>
                     <p className='danger-desc'>
-                      Remove all per-student fee exclusions. This cannot be undone.
+                      Remove all per-student fee exclusions. Cannot be undone.
                     </p>
                   </div>
                   {confirmClear ? (
@@ -878,7 +965,7 @@ export default function SettingsPage() {
                         className='danger-btn'
                         onClick={() => {
                           setConfirmClear(false);
-                          alert("Overrides cleared.");
+                          showToast("success", "Overrides cleared.");
                         }}
                       >
                         Confirm
@@ -893,6 +980,94 @@ export default function SettingsPage() {
                     </button>
                   )}
                 </div>
+
+                {/* ── Card 2: Wipe all data except families ── */}
+                <div className='danger-card wipe-card'>
+                  <div style={{ flex: 1 }}>
+                    <p className='danger-title'>Clear all data (keep families)</p>
+                    <p className='danger-desc'>
+                      Permanently deletes all{" "}
+                      <strong>students, fees, payments, classes, balances, discounts</strong> and
+                      overrides. <strong>Families are preserved.</strong> This action cannot be
+                      undone.
+                    </p>
+
+                    {/* Step 1 — initial warning */}
+                    {wipeStep === "idle" && (
+                      <button
+                        className='danger-btn-outline wipe-trigger-btn'
+                        style={{ marginTop: "0.75rem" }}
+                        onClick={() => setWipeStep("confirm1")}
+                      >
+                        <HiTrash /> Clear all data
+                      </button>
+                    )}
+
+                    {/* Step 2 — first confirmation */}
+                    {wipeStep === "confirm1" && (
+                      <div className='wipe-confirm-box'>
+                        <p className='wipe-warning-text'>
+                          ⚠ You are about to delete all records except families. Are you sure?
+                        </p>
+                        <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
+                          <button className='danger-btn' onClick={() => setWipeStep("confirm2")}>
+                            Yes, continue
+                          </button>
+                          <button className='cancel-btn' onClick={() => setWipeStep("idle")}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 3 — final confirmation */}
+                    {wipeStep === "confirm2" && (
+                      <div className='wipe-confirm-box wipe-final'>
+                        <p className='wipe-warning-text'>
+                          This is your <strong>final warning</strong>. All students, fees, payments,
+                          classes, discounts and balances will be permanently deleted. Type{" "}
+                          <code>DELETE</code> to confirm.
+                        </p>
+                        <WipeConfirmInput
+                          onConfirm={clearAllData}
+                          onCancel={() => setWipeStep("idle")}
+                        />
+                      </div>
+                    )}
+
+                    {/* Wiping in progress */}
+                    {wipeStep === "wiping" && (
+                      <div className='wipe-progress'>
+                        <span className='wipe-spinner' />
+                        <span>{wipeProgress || "Clearing data…"}</span>
+                      </div>
+                    )}
+
+                    {/* Done */}
+                    {wipeStep === "done" && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginTop: "0.75rem",
+                          color: "var(--color-text-success)",
+                          fontSize: 13,
+                        }}
+                      >
+                        <HiCheckCircle style={{ width: 16, height: 16 }} />
+                        All data cleared successfully. Families were preserved.
+                        <button
+                          className='cancel-btn'
+                          style={{ marginLeft: "auto" }}
+                          onClick={() => setWipeStep("idle")}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -901,8 +1076,270 @@ export default function SettingsPage() {
 
       {/* ── Inline CSS ────────────────────────────────────────────── */}
       <style>{`
-       
+        .settings-page { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem 3rem; }
+
+        .settings-header {
+          display: flex; align-items: center; justify-content: space-between;
+          flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem; padding-bottom: 1.5rem;
+          border-bottom: 1px solid var(--color-border-tertiary);
+        }
+        .settings-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
+        .settings-header p  { color: var(--color-text-secondary); margin: 0.25rem 0 0; font-size: 0.9rem; }
+
+        .settings-layout { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; }
+        @media (max-width: 680px) { .settings-layout { grid-template-columns: 1fr; } }
+
+        /* ── Nav ── */
+        .settings-nav {
+          display: flex; flex-direction: column; gap: 0.25rem;
+          position: sticky; top: 1rem; align-self: start;
+        }
+        .settings-nav-item {
+          display: flex; align-items: center; gap: 0.625rem;
+          padding: 0.625rem 0.875rem; border-radius: var(--border-radius-md);
+          border: none; background: transparent; cursor: pointer; width: 100%;
+          text-align: left; font-size: 0.875rem; color: var(--color-text-secondary);
+          transition: background 0.15s, color 0.15s;
+        }
+        .settings-nav-item:hover { background: var(--color-background-secondary); color: var(--color-text-primary); }
+        .settings-nav-item.active { background: var(--color-background-info); color: var(--color-text-info); font-weight: 500; }
+        .settings-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+        /* ── Content ── */
+        .settings-content {
+          background: var(--color-background-primary);
+          border: 1px solid var(--color-border-tertiary);
+          border-radius: var(--border-radius-lg);
+          padding: 2rem; min-height: 500px;
+        }
+        .settings-section { max-width: 680px; }
+        .section-header { margin-bottom: 1.75rem; }
+        .section-header h2 { font-size: 1.125rem; font-weight: 600; margin: 0 0 0.375rem; }
+        .section-header p  { color: var(--color-text-secondary); margin: 0; font-size: 0.875rem; }
+
+        .sub-section-title { font-size: 0.9rem; font-weight: 600; margin: 0 0 1rem; color: var(--color-text-primary); }
+        .section-divider   { border: none; border-top: 1px solid var(--color-border-tertiary); margin: 1.75rem 0; }
+        .optional          { font-weight: 400; color: var(--color-text-tertiary); font-size: 0.8rem; }
+
+        .settings-grid { grid-template-columns: 1fr 1fr; }
+        @media (max-width: 520px) { .settings-grid { grid-template-columns: 1fr; } }
+
+        /* ── Logo ── */
+        .logo-upload-area {
+          display: flex; align-items: center; gap: 1.25rem;
+          padding: 1.25rem; border: 1px dashed var(--color-border-secondary);
+          border-radius: var(--border-radius-md); margin-bottom: 1.75rem;
+        }
+        .logo-preview {
+          width: 72px; height: 72px; border-radius: var(--border-radius-md);
+          background: var(--color-background-secondary);
+          display: flex; align-items: center; justify-content: center;
+          overflow: hidden; flex-shrink: 0;
+        }
+        .logo-preview img { width: 100%; height: 100%; object-fit: cover; }
+        .logo-placeholder-icon { width: 32px; height: 32px; color: var(--color-text-tertiary); }
+        .logo-label  { font-weight: 500; margin: 0 0 0.25rem; font-size: 0.875rem; }
+        .logo-hint   { color: var(--color-text-secondary); font-size: 0.8rem; margin: 0 0 0.625rem; }
+        .upload-btn  {
+          display: inline-flex; align-items: center; gap: 0.375rem;
+          padding: 0.4rem 0.875rem; border: 1px solid var(--color-border-secondary);
+          border-radius: var(--border-radius-md); font-size: 0.8rem; cursor: pointer;
+          background: var(--color-background-primary); color: var(--color-text-primary);
+          transition: background 0.15s;
+        }
+        .upload-btn:hover { background: var(--color-background-secondary); }
+
+        /* ── Academic status card ── */
+        .academic-status-card {
+          display: flex; gap: 0; border: 1px solid var(--color-border-tertiary);
+          border-radius: var(--border-radius-md); overflow: hidden; margin-bottom: 1.75rem;
+        }
+        .academic-status-item  { flex: 1; padding: 1rem 1.25rem; }
+        .academic-status-divider { width: 1px; background: var(--color-border-tertiary); }
+        .status-label  { font-size: 0.75rem; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.375rem; }
+        .status-value  { font-size: 1rem; font-weight: 600; color: var(--color-text-primary); }
+        .status-value.highlight { color: var(--color-text-info); }
+
+        /* ── Toggle / switch ── */
+        .toggle-list  { display: flex; flex-direction: column; gap: 0; }
+        .toggle-row   {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 1rem 0; border-bottom: 1px solid var(--color-border-tertiary);
+          gap: 1rem;
+        }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-label { font-size: 0.875rem; font-weight: 500; margin: 0 0 0.2rem; }
+        .toggle-desc  { font-size: 0.8rem; color: var(--color-text-secondary); margin: 0; }
+
+        .switch { position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+          position: absolute; cursor: pointer; inset: 0;
+          background: var(--color-border-secondary);
+          border-radius: 24px; transition: background 0.2s;
+        }
+        .slider::before {
+          content: ""; position: absolute;
+          height: 18px; width: 18px; left: 3px; bottom: 3px;
+          background: white; border-radius: 50%; transition: transform 0.2s;
+        }
+        .switch input:checked + .slider { background: var(--color-text-info); }
+        .switch input:checked + .slider::before { transform: translateX(18px); }
+
+        /* ── Theme options ── */
+        .theme-options { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+        .theme-option {
+          display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+          padding: 0.75rem; border: 2px solid var(--color-border-tertiary);
+          border-radius: var(--border-radius-md); cursor: pointer; background: transparent;
+          transition: border-color 0.15s; font-size: 0.8rem; color: var(--color-text-primary);
+        }
+        .theme-option.active { border-color: var(--color-text-info); }
+        .theme-preview {
+          width: 80px; height: 54px; border-radius: 6px; overflow: hidden;
+          display: flex; border: 1px solid var(--color-border-tertiary);
+        }
+        .theme-preview-light { background: #f8f8f8; }
+        .theme-preview-dark  { background: #1e1e1e; }
+        .theme-preview-system { background: linear-gradient(135deg, #f8f8f8 50%, #1e1e1e 50%); }
+        .preview-sidebar { width: 22px; background: rgba(0,0,0,0.08); height: 100%; }
+        .theme-preview-dark .preview-sidebar { background: rgba(255,255,255,0.08); }
+        .preview-content { flex: 1; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+        .preview-bar { height: 6px; background: rgba(0,0,0,0.12); border-radius: 3px; }
+        .theme-preview-dark .preview-bar { background: rgba(255,255,255,0.15); }
+        .preview-bar.short { width: 60%; }
+
+        /* ── Accent colours ── */
+        .accent-colors { display: flex; gap: 0.625rem; flex-wrap: wrap; }
+        .accent-dot {
+          width: 32px; height: 32px; border-radius: 50%; border: 3px solid transparent;
+          cursor: pointer; display: flex; align-items: center; justify-content: center;
+          transition: transform 0.15s, border-color 0.15s;
+        }
+        .accent-dot:hover { transform: scale(1.15); }
+        .accent-dot.active { border-color: var(--color-border-primary); }
+        .accent-dot svg { width: 16px; height: 16px; color: white; }
+
+        /* ── Pin toggle ── */
+        .pin-toggle {
+          background: none; border: none; cursor: pointer; padding: 0 0.5rem;
+          color: var(--color-text-secondary); display: flex; align-items: center;
+        }
+
+        /* ── Info row ── */
+        .info-row { display: flex; align-items: center; gap: 0.75rem; padding: 1rem; background: var(--color-background-secondary); border-radius: var(--border-radius-md); }
+        .info-icon { width: 20px; height: 20px; color: var(--color-text-secondary); }
+        .info-label { font-size: 0.75rem; color: var(--color-text-secondary); margin: 0; }
+        .info-value { font-size: 0.875rem; font-weight: 500; margin: 0.15rem 0 0; }
+
+        .outline-btn {
+          display: inline-flex; align-items: center; gap: 0.375rem;
+          padding: 0.5rem 1rem; border: 1px solid var(--color-border-secondary);
+          border-radius: var(--border-radius-md); background: transparent;
+          color: var(--color-text-primary); font-size: 0.875rem; cursor: pointer;
+          transition: background 0.15s;
+        }
+        .outline-btn:hover { background: var(--color-background-secondary); }
+
+        /* ── Data actions ── */
+        .data-action-grid { display: flex; flex-direction: column; gap: 0.75rem; }
+        .data-action-card {
+          display: flex; align-items: center; gap: 1rem;
+          padding: 1rem 1.25rem; border: 1px solid var(--color-border-tertiary);
+          border-radius: var(--border-radius-md); flex-wrap: wrap;
+        }
+        .data-action-icon { width: 22px; height: 22px; color: var(--color-text-secondary); flex-shrink: 0; }
+        .data-action-card > div { flex: 1; }
+        .data-action-title { font-size: 0.875rem; font-weight: 500; margin: 0 0 0.2rem; }
+        .data-action-desc  { font-size: 0.8rem; color: var(--color-text-secondary); margin: 0; }
+
+        /* ── Danger zone ── */
+        .danger-title.sub-section-title { color: var(--color-text-danger); }
+        .danger-zone { border: 1px solid var(--color-border-danger); border-radius: var(--border-radius-md); overflow: hidden; }
+        .danger-card {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 1rem; padding: 1rem 1.25rem; flex-wrap: wrap;
+        }
+        .danger-card .danger-title { font-size: 0.875rem; font-weight: 500; margin: 0 0 0.2rem; color: var(--color-text-danger); }
+        .danger-card .danger-desc  { font-size: 0.8rem; color: var(--color-text-secondary); margin: 0; }
+        .danger-btn {
+          padding: 0.5rem 1rem; background: var(--color-background-danger);
+          color: var(--color-text-danger); border: 1px solid var(--color-border-danger);
+          border-radius: var(--border-radius-md); cursor: pointer; font-size: 0.875rem;
+        }
+        .danger-btn-outline {
+          display: inline-flex; align-items: center; gap: 0.375rem;
+          padding: 0.5rem 1rem; border: 1px solid var(--color-border-danger);
+          color: var(--color-text-danger); border-radius: var(--border-radius-md);
+          background: transparent; cursor: pointer; font-size: 0.875rem; transition: background 0.15s;
+        }
+        .danger-btn-outline:hover { background: var(--color-background-danger); }
+
+        /* ── Toast ── */
+        .settings-toast {
+          position: fixed; top: 1.25rem; right: 1.25rem; z-index: 9999;
+          display: flex; align-items: center; gap: 0.625rem;
+          padding: 0.75rem 1.25rem; border-radius: var(--border-radius-md);
+          font-size: 0.875rem; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+          animation: slideIn 0.2s ease;
+        }
+        .settings-toast.success { background: var(--color-background-success); color: var(--color-text-success); border: 1px solid var(--color-border-success); }
+        .settings-toast.error   { background: var(--color-background-danger);  color: var(--color-text-danger);  border: 1px solid var(--color-border-danger);  }
+        .settings-toast svg { width: 18px; height: 18px; flex-shrink: 0; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
+    </div>
+  );
+}
+
+// ── WipeConfirmInput ───────────────────────────────────────────────────────
+// Standalone mini-component to avoid state inside the settings render
+function WipeConfirmInput({ onConfirm, onCancel }) {
+  const [val, setVal] = useState("");
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "0.5rem",
+        marginTop: "0.75rem",
+        flexWrap: "wrap",
+        alignItems: "center",
+      }}
+    >
+      <input
+        type='text'
+        placeholder='Type DELETE to confirm'
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        style={{
+          flex: 1,
+          minWidth: 180,
+          height: 36,
+          padding: "0 12px",
+          border: "1px solid var(--color-border-danger)",
+          borderRadius: 8,
+          fontSize: 13,
+          background: "var(--color-background-primary)",
+          color: "var(--color-text-primary)",
+          outline: "none",
+        }}
+        autoComplete='off'
+        spellCheck={false}
+      />
+      <button
+        className='danger-btn'
+        disabled={val !== "DELETE"}
+        style={{
+          opacity: val !== "DELETE" ? 0.45 : 1,
+          cursor: val !== "DELETE" ? "not-allowed" : "pointer",
+        }}
+        onClick={onConfirm}
+      >
+        Delete everything
+      </button>
+      <button className='cancel-btn' onClick={onCancel}>
+        Cancel
+      </button>
     </div>
   );
 }

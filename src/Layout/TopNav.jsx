@@ -511,7 +511,7 @@ export default function TopNav() {
 
         /* ── Icon buttons ──────────────────────────────────────── */
         .icon-btn {
-          width: 36px; height: 36px; display: flex; align-items: center;
+           display: flex; align-items: center; padding:5px;
           justify-content: center; border-radius: 8px; border: none;
           background: transparent; cursor: pointer; font-size: 18px;
           color: var(--text-secondary, #64748b); transition: background 0.15s, color 0.15s;

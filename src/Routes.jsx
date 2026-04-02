@@ -18,6 +18,7 @@ import ClassDetails from "./pages/classes/ClassDetails.jsx";
 
 import FeeSetup from "./pages/fees/FeeSetup.jsx";
 import PaymentHistory from "./pages/fees/PaymentHistory.jsx";
+import LetterTemplates from "./pages/letters/LetterTemplatesNew.jsx";
 
 import SettingsPage from "./pages/settings/Setting.jsx";
 import MigrateTerms from "./pages/settings/MigrateTerms.jsx";
@@ -27,24 +28,38 @@ import Discounts from "./pages/discount/Discounts.jsx";
 import RoleManagement from "./pages/roles/RoleManagement.jsx";
 
 import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
+import RoleGuard from "./components/common/RoleGuard.jsx";
 import MasterLayout from "./Layout/MasterLayout.jsx";
+
+import { PERMISSIONS } from "./config/permissions.js";
+
+// Combines auth check + role check in one wrapper
+function Guard({ permission, children }) {
+  return (
+    <ProtectedRoute>
+      <RoleGuard permission={permission}>{children}</RoleGuard>
+    </ProtectedRoute>
+  );
+}
 
 export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public — bare root goes to login */}
+        {/* Public routes — no auth required */}
         <Route path='/' element={<Navigate to='/login' replace />} />
         <Route path='/login' element={<Login />} />
         <Route path='/register' element={<Register />} />
         <Route path='/forgot-password' element={<ForgotPassword />} />
 
-        {/* All protected pages live inside MasterLayout */}
+        {/* All app pages inside MasterLayout */}
         <Route
           path='/*'
           element={
             <MasterLayout>
               <Routes>
+                {/* Dashboard — every logged-in user can see this,
+                    but Dashboard.jsx itself branches on role (user vs full) */}
                 <Route
                   path='/dashboard'
                   element={
@@ -54,125 +69,144 @@ export default function AppRoutes() {
                   }
                 />
 
+                {/* Families */}
                 <Route
                   path='/families'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_FAMILIES}>
                       <FamilyList />
-                    </ProtectedRoute>
+                    </Guard>
                   }
                 />
                 <Route
                   path='/families/:id'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_FAMILIES}>
                       <FamilyDetails />
-                    </ProtectedRoute>
+                    </Guard>
                   }
                 />
 
+                {/* Students */}
                 <Route
                   path='/students'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_STUDENTS}>
                       <StudentList />
-                    </ProtectedRoute>
+                    </Guard>
                   }
                 />
                 <Route
                   path='/students/:id'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_STUDENTS}>
                       <StudentDetails />
-                    </ProtectedRoute>
+                    </Guard>
                   }
                 />
 
+                {/* Classes */}
                 <Route
                   path='/classes'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_CLASSES}>
                       <ClassList />
-                    </ProtectedRoute>
+                    </Guard>
                   }
                 />
                 <Route
                   path='/classes/:id'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_CLASSES}>
                       <ClassDetails />
-                    </ProtectedRoute>
+                    </Guard>
                   }
                 />
 
+                {/* Fees */}
                 <Route
                   path='/fees'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_FEES}>
                       <FeeSetup />
-                    </ProtectedRoute>
+                    </Guard>
                   }
                 />
                 <Route
                   path='/payment-history'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_PAYMENTS}>
                       <PaymentHistory />
-                    </ProtectedRoute>
+                    </Guard>
+                  }
+                />
+
+                {/* Reports */}
+                <Route
+                  path='/reports'
+                  element={
+                    <Guard permission={PERMISSIONS.VIEW_REPORTS}>
+                      <Reports />
+                    </Guard>
                   }
                 />
 
                 <Route
-                  path='/reports'
+                  path='/letters'
                   element={
-                    <ProtectedRoute>
-                      <Reports />
-                    </ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_LETTERS}>
+                      <LetterTemplates />
+                    </Guard>
                   }
                 />
+
+                {/* Finance tools */}
                 <Route
                   path='/balance'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_BALANCES}>
                       <PreviousBalances />
-                    </ProtectedRoute>
+                    </Guard>
                   }
                 />
                 <Route
                   path='/discount'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_DISCOUNTS}>
                       <Discounts />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path='/roles'
-                  element={
-                    <ProtectedRoute>
-                      <RoleManagement />
-                    </ProtectedRoute>
+                    </Guard>
                   }
                 />
 
+                {/* Role management */}
+                <Route
+                  path='/roles'
+                  element={
+                    <Guard permission={PERMISSIONS.VIEW_ROLES}>
+                      <RoleManagement />
+                    </Guard>
+                  }
+                />
+
+                {/* Settings */}
                 <Route
                   path='/settings'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.VIEW_SETTINGS}>
                       <SettingsPage />
-                    </ProtectedRoute>
+                    </Guard>
                   }
                 />
                 <Route
                   path='/migrate'
                   element={
-                    <ProtectedRoute>
+                    <Guard permission={PERMISSIONS.DANGER_ZONE}>
                       <MigrateTerms />
-                    </ProtectedRoute>
+                    </Guard>
                   }
                 />
 
-                {/* Anything unknown → dashboard */}
+                {/* Catch-all → dashboard */}
                 <Route path='*' element={<Navigate to='/dashboard' replace />} />
               </Routes>
             </MasterLayout>
