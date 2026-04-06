@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRole } from "../../hooks/useRole";
 import TableToolbar from "../../components/common/TableToolbar";
-import { createFee, getFees, updateFee, deleteFee } from "./feesService";
+import { createFee, getFees, updateFee, deleteFee, createBulkFees } from "./feesService";
 import { getClasses } from "../classes/classService";
 import { getSettings } from "../settings/settingService";
 import {
@@ -37,6 +37,20 @@ export default function FeeSetup() {
   const [form, setForm] = useState(EMPTY_FORM);
   const { canEdit, canDelete } = useRole();
 
+  // ─── Detect Group (fallback if DB doesn't have it) ────────────────
+  const detectGroup = (cls) => {
+    if (cls.group) return cls.group;
+
+    const name = cls.name?.toLowerCase() || "";
+
+    if (name.includes("primary") || name.includes("nursery")) return "primary";
+
+    if (name.includes("jss") || name.includes("ss") || name.includes("secondary"))
+      return "secondary";
+
+    return "unknown";
+  };
+
   // ─── Load ──────────────────────────────────────────────────────────────
   const loadData = async () => {
     setLoading(true);
@@ -46,7 +60,18 @@ export default function FeeSetup() {
         getFees(),
         getSettings(),
       ]);
-      setClasses(clsData || []);
+
+      const enhancedClasses = (clsData || []).map((c) => ({
+        ...c,
+        group: detectGroup(c),
+      }));
+
+      // ✅ SORT HERE
+      const sortedClasses = sortClasses(enhancedClasses);
+
+      setClasses(sortedClasses);
+
+      // setClasses(enhancedClasses);
       setFeeList(feesData || []);
 
       if (!editingId) {
@@ -66,26 +91,31 @@ export default function FeeSetup() {
     loadData();
   }, []);
 
-  // ─── Helpers ──────────────────────────────────────────────────────────
-  const getClassName = (id) => classes.find((c) => c.id === id)?.name ?? "Unknown";
+  // ─── Optimized Class Map ─────────────────────────────────────────
+  const classMap = useMemo(() => Object.fromEntries(classes.map((c) => [c.id, c.name])), [classes]);
 
+  const getClassName = (id) => classMap[id] || "Unknown";
+
+  // ─── Handlers ───────────────────────────────────────────────────
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-  const resetForm = (keepSessionTerm = true) => {
+  const resetForm = () => {
     setEditingId(null);
-    setForm((prev) =>
-      keepSessionTerm ? { ...EMPTY_FORM, session: prev.session, term: prev.term } : EMPTY_FORM,
-    );
+    setForm((prev) => ({
+      ...EMPTY_FORM,
+      session: prev.session,
+      term: prev.term,
+    }));
   };
 
   const handleEdit = (fee) => {
     setEditingId(fee.id);
     setForm({
-      classId: fee.classId || "",
-      session: fee.session || "",
-      term: fee.term || "",
-      feeType: fee.feeType || "",
-      amount: fee.amount || "",
+      classId: fee.classId,
+      session: fee.session,
+      term: fee.term,
+      feeType: fee.feeType,
+      amount: fee.amount,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -93,13 +123,12 @@ export default function FeeSetup() {
   const handleDuplicate = (fee) => {
     setEditingId(null);
     setForm({
-      classId: fee.classId || "",
-      session: fee.session || "",
-      term: fee.term || "",
-      feeType: fee.feeType || "",
-      amount: fee.amount || "",
+      classId: fee.classId,
+      session: fee.session,
+      term: fee.term,
+      feeType: fee.feeType,
+      amount: fee.amount,
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDelete = async (id) => {
@@ -108,15 +137,73 @@ export default function FeeSetup() {
     loadData();
   };
 
-  // ─── Submit ────────────────────────────────────────────────────────────
+  const getClassLevel = (name = "") => {
+    const n = name.toLowerCase();
+
+    if (n.includes("creche") || n.includes("daycare")) return 0;
+    if (n.includes("kg")) return 1;
+
+    if (n.includes("nursery")) return 2;
+
+    if (n.includes("primary")) return 3;
+
+    if (n.includes("jss")) return 4;
+
+    if (n.includes("ss")) return 5;
+
+    return 6; // unknown last
+  };
+
+  const getClassOrderNumber = (name = "") => {
+    const match = name.match(/\d+/);
+    return match ? Number(match[0]) : 0;
+  };
+
+  const sortClasses = (classes = []) => {
+    return [...classes].sort((a, b) => {
+      const levelA = getClassLevel(a.name);
+      const levelB = getClassLevel(b.name);
+
+      if (levelA !== levelB) return levelA - levelB;
+
+      return getClassOrderNumber(a.name) - getClassOrderNumber(b.name);
+    });
+  };
+
+  // ─── Submit Logic (Upgraded) ─────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+
     try {
-      const payload = { ...form, amount: Number(form.amount) };
+      const payload = {
+        ...form,
+        amount: Number(form.amount),
+        feeType: form.feeType.trim().toLowerCase(),
+      };
+
+      let targetClasses = [];
 
       if (form.classId === "all") {
-        await Promise.all(classes.map((cls) => createFee({ ...payload, classId: cls.id })));
+        targetClasses = classes;
+      } else if (form.classId === "primary") {
+        targetClasses = classes.filter((c) => c.group === "primary");
+      } else if (form.classId === "secondary") {
+        targetClasses = classes.filter((c) => c.group === "secondary");
+      }
+
+      if (["all", "primary", "secondary"].includes(form.classId)) {
+        if (!targetClasses.length) {
+          alert("No classes found for selected group.");
+          return;
+        }
+
+        await createBulkFees(
+          targetClasses.map((cls) => ({
+            ...payload,
+            classId: cls.id,
+          })),
+        );
       } else if (editingId) {
         await updateFee(editingId, payload);
       } else {
@@ -127,26 +214,38 @@ export default function FeeSetup() {
       loadData();
     } catch (err) {
       console.error("Fee save failed:", err);
-      alert("Failed to save fee. Please try again.");
+      alert("Failed to save fee.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // ─── Submit ────────────────────────────────────────────────────────────
+
   // ─── Filtering — pure React state, no DataTables ───────────────────────
   // This is what was causing the crash: DataTables moves DOM rows,
   // then React can't find them to update/remove → "removeChild" error.
-  const visibleFees = feeList.filter((f) => {
-    const matchesTerm = !filterTerm || f.term === filterTerm;
-    const matchesSearch =
-      !search ||
-      [getClassName(f.classId), f.feeType, f.session, f.term].some((val) =>
-        val?.toLowerCase().includes(search.toLowerCase()),
-      );
-    return matchesTerm && matchesSearch;
-  });
+  const visibleFees = feeList
+    .filter((f) => {
+      const matchesTerm = !filterTerm || f.term === filterTerm;
+      const matchesSearch =
+        !search ||
+        [getClassName(f.classId), f.feeType, f.session, f.term].some((val) =>
+          val?.toLowerCase().includes(search.toLowerCase()),
+        );
+      return matchesTerm && matchesSearch;
+    })
+    .sort((a, b) => {
+      const nameA = getClassName(a.classId);
+      const nameB = getClassName(b.classId);
 
-  // Group by class for a cleaner summary line
+      const levelDiff = getClassLevel(nameA) - getClassLevel(nameB);
+
+      if (levelDiff !== 0) return levelDiff;
+
+      return getClassOrderNumber(nameA) - getClassOrderNumber(nameB);
+    });
+
   const totalVisible = visibleFees.reduce((sum, f) => sum + Number(f.amount || 0), 0);
   const exportHeaders = ["Class", "Session", "Term", "Fee Type", "Amount"];
   const exportRows = visibleFees.map((fee) => [
@@ -174,12 +273,52 @@ export default function FeeSetup() {
               <HiLibrary className='input-icon' />
               <select name='classId' value={form.classId} onChange={handleChange} required>
                 <option value=''>Select class</option>
-                <option value='all'>— All classes —</option>
-                {classes.map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.name}
-                  </option>
-                ))}
+
+                <optgroup label='Bulk Actions'>
+                  <option value='all'>All Classes</option>
+                  <option value='primary'>All Primary</option>
+                  <option value='secondary'>All Secondary</option>
+                </optgroup>
+
+                <optgroup label='Creche / Daycare'>
+                  {classes
+                    .filter((c) => getClassLevel(c.name) === 0)
+                    .map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </option>
+                    ))}
+                </optgroup>
+
+                <optgroup label='Nursery'>
+                  {classes
+                    .filter((c) => getClassLevel(c.name) === 1)
+                    .map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </option>
+                    ))}
+                </optgroup>
+
+                <optgroup label='Primary'>
+                  {classes
+                    .filter((c) => getClassLevel(c.name) === 2)
+                    .map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </option>
+                    ))}
+                </optgroup>
+
+                <optgroup label='Secondary'>
+                  {classes
+                    .filter((c) => getClassLevel(c.name) >= 3)
+                    .map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </option>
+                    ))}
+                </optgroup>
               </select>
             </div>
           </div>

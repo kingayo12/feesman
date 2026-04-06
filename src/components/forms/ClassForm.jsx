@@ -18,8 +18,8 @@ export default function ClassForm({ onSuccess }) {
     if (name.includes("kg")) return "Pre Nursery";
     if (name.includes("nursery")) return "Nursery";
     if (name.includes("primary")) return "Primary";
-    if (name.includes("jss")) return "JSS";
-    if (name.includes("sss")) return "SSS";
+    if (name.includes("jss")) return "Junior Secondary";
+    if (name.includes("ss")) return "Senior Secondary";
     return "";
   };
 

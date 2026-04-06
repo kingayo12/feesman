@@ -164,7 +164,7 @@ export default function ReceiptToolbar({
         .rtb-print { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
 
         .rtb-close {
-          width: 32px; height: 32px; border-radius: 7px;
+          width: 32px; height: 32px; border-radius: 7px; padding:0;
           background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;
           cursor: pointer; display: flex; align-items: center; justify-content: center;
           font-size: 15px; flex-shrink: 0; transition: background 0.15s;

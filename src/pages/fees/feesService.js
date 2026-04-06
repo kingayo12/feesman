@@ -31,12 +31,52 @@ function normalizeTerm(term) {
 }
 
 export const createFee = async (feeData) => {
+  const exists = await feeExists(feeData);
+
+  if (exists) {
+    console.warn("Duplicate fee skipped:", feeData);
+    return null; // skip duplicate
+  }
+
   return await addDoc(feesRef, {
     ...feeData,
-    // Normalize term before saving so all new docs use consistent format
     term: normalizeTerm(feeData.term),
     createdAt: new Date(),
   });
+};
+
+const feeExists = async ({ classId, session, term, feeType }) => {
+  const q = query(
+    feesRef,
+    where("classId", "==", classId),
+    where("session", "==", session),
+    where("feeType", "==", feeType),
+  );
+
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.some((doc) => normalizeTerm(doc.data().term) === normalizeTerm(term));
+};
+
+export const createBulkFees = async (feesArray) => {
+  const results = [];
+
+  for (const fee of feesArray) {
+    const exists = await feeExists(fee);
+
+    if (!exists) {
+      const res = await addDoc(feesRef, {
+        ...fee,
+        term: normalizeTerm(fee.term),
+        createdAt: new Date(),
+      });
+      results.push(res);
+    } else {
+      console.warn("Skipped duplicate:", fee);
+    }
+  }
+
+  return results;
 };
 
 export const getFees = async () => {

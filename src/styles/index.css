@@ -3,7 +3,7 @@
   --primary-color: #2424ff;
   --primary-color-light: #4a4aff1a;
   --secondary-color: red;
-  --primary-gradient: linear-gradient(to bottom, #2424ff 0%, rgb(0, 29, 87) 100%);
+  --primary-gradient: linear-gradient(to bottom, #2424ff 0%, rgb(0, 29, 87) 100%) !important;
   --bg-primary: #ffffff;
   --bg-secondary: #f8fafc;
   --bg-tertiary: #f1f5f9;
@@ -11,7 +11,7 @@
   --text-secondary: #64748b;
   --text-tertiary: #94a3b8;
   --border-color: #e2e8f0;
-  --border-light: #f1f5f9;
+  --border-light: #057aef;
   --nav-bg: #ffffff;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07);
   --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -589,8 +589,9 @@ main {
 .stat-icon-wrapper {
   height: var(--icon-wrapper-size);
   width: var(--icon-wrapper-size);
-  padding: var(--spacing-lg);
-  /* border-radius: 12px; */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none !important;
   font-size: var(--font-size-xl);
 }
@@ -1638,18 +1639,10 @@ main {
 /* Stats Card */
 .stats-row {
   margin-bottom: 1.5rem;
-}
-/* .stat-card {
-  background: white;
-  padding: 1.2rem;
-  border-radius: 16px;
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  width: fit-content;
-  min-width: 200px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  gap: 10px;
 }
+
 .stat-icon {
   color: #4f46e5;
   font-size: 1.5rem;
@@ -1664,7 +1657,7 @@ main {
   margin: 0;
   font-size: 1.4rem;
   color: #1e293b;
-} */
+}
 
 /* Table Styling */
 .table-card {
@@ -2794,8 +2787,8 @@ a {
 
 .lp-school-address,
 .lp-school-contacts span {
-  margin: 0;
-  font-size: var(--font-size-xs);
+  margin-top: 5px;
+  font-size: var(--font-size-xxs);
   color: var(--text-secondary);
 }
 
@@ -2810,6 +2803,9 @@ a {
   gap: 0.75rem;
   flex-wrap: wrap;
   margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .lp-contact-icon {
@@ -3520,6 +3516,7 @@ a {
   background: var(--border-color);
   border-radius: 24px;
   transition: background 0.2s;
+  outline: 1px solid var(--border-color) !important;
 }
 .slider::before {
   content: "";
@@ -3528,7 +3525,7 @@ a {
   width: 18px;
   left: 3px;
   bottom: 3px;
-  background: white;
+  background: var(--primary-gradient) !important;
   border-radius: 50%;
   transition: transform 0.2s;
 }
@@ -4407,6 +4404,8 @@ a {
   padding: 0;
 }
 
+/* --------------------template-------- */
+
 .lp-sidebar {
   width: 100%;
 }
@@ -4464,6 +4463,34 @@ a {
   gap: 0.5rem;
   flex-wrap: wrap;
   align-items: center;
+}
+.lp-export-group {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.28rem 0.45rem;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+.lp-export-group .lp-btn {
+  border: none;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+  background: transparent;
+}
+.lp-export-group .lp-btn:hover {
+  background: #f3f4f6;
+}
+.lp-spinner-inline {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #d1d5db;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: lp-spin 0.6s linear infinite;
+  flex-shrink: 0;
 }
 
 /* Buttons */
@@ -4784,122 +4811,144 @@ a {
   margin-bottom: 1rem;
 }
 
-/* THE LETTER SHEET */
+/* ── THE LETTER SHEET — Golden Light official letterhead ── */
 .lp-sheet {
   background: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  padding: 2.5rem 3rem;
+  padding: 1.5rem 2.5rem 2rem;
   box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
   max-width: 760px;
   margin: 0 auto;
   font-family: Georgia, "Times New Roman", serif;
+  position: relative;
 }
-.lp-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-.lp-brand {
+
+/* Letterhead row */
+.lp-letterhead {
   display: flex;
   align-items: flex-start;
-  gap: 0.9rem;
+  gap: 1.1rem;
+  margin-bottom: 0.6rem;
+}
+.lp-letterhead-logo {
+  flex-shrink: 0;
 }
 .lp-logo {
-  width: 64px;
-  height: 64px;
+  width: 80px;
+  height: 80px;
   object-fit: contain;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  padding: 0.3rem;
-  flex-shrink: 0;
-  background: #fff;
+  display: block;
 }
 .lp-logo-ph {
-  width: 64px;
-  height: 64px;
+  width: 80px;
+  height: 80px;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  background: #f3f4f6;
+  border: 1px dashed #d1d5db;
+  background: #f9fafb;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #9ca3af;
-  font-size: 1.7rem;
-  flex-shrink: 0;
+  font-size: 1.8rem;
 }
-.lp-school-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+.lp-letterhead-info {
+  flex: 1;
+  text-align: center;
 }
 .lp-school-name {
-  margin: 0;
-  font-size: 1.18rem;
-  font-weight: 700;
-  color: #0f172a;
-  font-family: -apple-system, sans-serif;
+  margin: 0 0 0.3rem;
+  font-size: var(--font-size-lg);
+  font-weight: 900;
+  color: #1a3799;
+  font-family: Arial, sans-serif;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.2;
 }
 .lp-school-addr {
-  margin: 0;
-  font-size: 0.77rem;
-  color: #64748b;
-  font-family: -apple-system, sans-serif;
+  margin-top: 5px;
+  font-size: var(--font-size-xxs);
+  color: #111;
+  font-family: Arial, sans-serif;
+  text-transform: uppercase;
 }
 .lp-school-contacts {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  margin-top: 0.2rem;
+  margin: 0 0 0.15rem;
+  font-size: 0.74rem;
+  color: #111;
+  font-family: Arial, sans-serif;
 }
-.lp-school-contacts span {
-  display: flex;
-  align-items: center;
-  gap: 0.22rem;
-  font-size: 0.73rem;
-  color: #64748b;
-  font-family: -apple-system, sans-serif;
+.lp-sep {
+  margin: 0 0.05rem;
+  color: #9ca3af;
 }
-.lp-ci {
+.lp-school-motto {
+  margin-top: 5px;
   font-size: 0.7rem;
-  flex-shrink: 0;
+  color: #111;
+  font-family: Arial, sans-serif;
 }
-.lp-date-col {
+
+/* Rule */
+.lp-rule {
+  border: none;
+  border-top: 2px solid #1a3799;
+  margin: 0.65rem 0 0.9rem;
+}
+
+/* Date */
+.lp-date-row {
   text-align: right;
-  flex-shrink: 0;
+  margin-bottom: 0.85rem;
 }
 .lp-date-chip {
   display: inline-block;
-  padding: 0.32rem 0.75rem;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 0.77rem;
-  color: #475569;
-  font-family: -apple-system, sans-serif;
+  font-size: 0.8rem;
+  color: #374151;
+  font-family: Arial, sans-serif;
 }
-.lp-rule {
-  border: none;
-  border-top: 2px solid #1e293b;
-  margin-bottom: 1.4rem;
-}
+
+/* Addressing */
 .lp-addr-block {
-  margin-bottom: 1.4rem;
-  font-family: -apple-system, sans-serif;
+  margin-bottom: 1.25rem;
+  font-family: Arial, sans-serif;
 }
 .lp-to-line,
 .lp-re-line {
-  margin: 0 0 0.32rem;
+  margin: 0 0 0.3rem;
   font-size: 0.9rem;
-  color: #1f2937;
+  color: #111;
 }
 .lp-re-line {
-  font-weight: 600;
+  font-weight: 700;
+}
+
+/* Body + watermark container */
+.lp-body-wrap {
+  position: relative;
+  min-height: 200px;
+  margin-bottom: 1.5rem;
+}
+.lp-watermark-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+}
+.lp-watermark {
+  width: 320px;
+  height: 320px;
+  object-fit: contain;
+  opacity: 0.1;
+  user-select: none;
 }
 .lp-body {
-  margin-bottom: 1.6rem;
+  position: relative;
+  z-index: 1;
   font-size: 0.95rem;
 }
 .lp-para {
@@ -4907,12 +4956,16 @@ a {
   line-height: 1.85;
   color: #1f2937;
 }
+
+/* Signature */
 .lp-sig-block {
-  margin-top: 1.6rem;
-  font-family: -apple-system, sans-serif;
+  margin-top: 1.5rem;
+  font-family: Arial, sans-serif;
+  position: relative;
+  z-index: 1;
 }
 .lp-closing {
-  margin: 0 0 1.3rem;
+  margin: 0 0 1.25rem;
   font-size: 0.95rem;
   color: #1f2937;
   font-family: Georgia, serif;
@@ -5464,4 +5517,21 @@ a {
 .lp-bvfi {
   color: #6b7280;
   flex-shrink: 0;
+}
+
+.cd-promote-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.1rem;
+  background: #0d9488;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  justify-self: end;
+  /* margin-bottom: 20px; */
 }

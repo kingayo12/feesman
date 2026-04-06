@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import {
   HiPrinter,
@@ -20,9 +20,15 @@ import {
   HiChevronLeft,
   HiChevronRight,
   HiSearch,
+  HiPhotograph,
+  HiArchive,
 } from "react-icons/hi";
 import { getSettings } from "../settings/settingService";
-import { downloadBlob } from "../../utils/exportUtils";
+import {
+  exportLetterAsDocx,
+  exportLetterAsImage,
+  exportBulkAsZip,
+} from "../../utils/letterExportUtils";
 import { getAllStudents } from "../students/studentService";
 import { getClasses } from "../classes/classService";
 import { getFamilies } from "../families/familyService";
@@ -204,6 +210,10 @@ export default function LetterTemplates() {
   const [draft, setDraft] = useState(null);
   const [modal, setModal] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [exportBusy, setExportBusy] = useState(false);
+
+  // Ref to the rendered live-preview letter sheet (for image export)
+  const sheetRef = useRef(null);
 
   // Bulk state
   const [allStudents, setAllStudents] = useState([]);
@@ -253,14 +263,16 @@ export default function LetterTemplates() {
 
   const schoolDefaults = useMemo(
     () => ({
-      schoolName: settings.name || settings.schoolName || DEFAULT_PLACEHOLDER_VALUES.schoolName,
-      schoolAddress:
-        [settings.address, settings.city, settings.state].filter(Boolean).join(", ") ||
-        DEFAULT_PLACEHOLDER_VALUES.schoolAddress,
+      schoolName: settings.name || settings.schoolName,
+      schoolAddress: [settings.address, settings.city, settings.state].filter(Boolean).join(", "),
+      schoolPhone: settings.contactPhone || settings.schoolPhone,
+      schoolEmail: settings.contactEmail || settings.schoolEmail,
+      schoolMotto: settings.motto || settings.schoolMotto,
       senderName:
         settings.adminName || settings.contactName || DEFAULT_PLACEHOLDER_VALUES.senderName,
       currentTerm: settings.currentTerm || DEFAULT_PLACEHOLDER_VALUES.currentTerm,
       academicYear: settings.academicYear || DEFAULT_PLACEHOLDER_VALUES.academicYear,
+      logoDataUrl: settings.logo || settings.schoolLogo || settings.logoUrl,
     }),
     [settings],
   );
@@ -276,17 +288,31 @@ export default function LetterTemplates() {
     );
   }, [selectedTemplate, tokens, manualValues, schoolDefaults]);
 
-  /* School branding */
+  /* School branding — use schoolDefaults which already merges settings + SCHOOL_DEFAULTS fallbacks */
   const schoolName = schoolDefaults.schoolName;
   const schoolAddress = schoolDefaults.schoolAddress;
-  const schoolPhone = settings.contactPhone || settings.schoolPhone || "";
-  const schoolEmail = settings.contactEmail || settings.schoolEmail || "";
-  const logoUrl = settings.logo || settings.schoolLogo || settings.logoUrl || null;
+  const schoolPhone = schoolDefaults.schoolPhone;
+  const schoolEmail = schoolDefaults.schoolEmail;
+  const schoolMotto = schoolDefaults.schoolMotto;
+  const logoUrl = schoolDefaults.logoDataUrl;
+  const watermarkUrl = schoolDefaults.watermarkDataUrl;
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
+
+  // schoolMeta passed to docx exporter
+  const schoolMeta = useMemo(
+    () => ({
+      schoolName,
+      schoolAddress,
+      schoolPhone,
+      schoolEmail,
+      schoolMotto,
+    }),
+    [schoolName, schoolAddress, schoolPhone, schoolEmail, schoolMotto],
+  );
 
   /* Handlers */
   const updateValue = (tok, val) =>
@@ -343,10 +369,110 @@ export default function LetterTemplates() {
     saveTemplates(next);
   };
 
-  const downloadLetter = (values = liveValues) => {
-    const html = document.querySelector(".lp-sheet")?.outerHTML ?? "";
-    const full = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${selectedTemplate?.name}</title><style>body{font-family:Georgia,serif;color:#1f2937;background:#fff;margin:0;padding:2.5rem 3rem}.lp-sheet{max-width:760px;margin:0 auto}.lp-logo{width:60px;height:60px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;padding:.3rem}.lp-para{margin:0 0 .85rem;line-height:1.85}</style></head><body>${html}</body></html>`;
-    downloadBlob(`${selectedTemplate?.id || "letter"}.html`, full, "text/html;charset=utf-8;");
+  /* Export single letter as .docx */
+  const handleExportDocx = async (values = liveValues, tpl = selectedTemplate) => {
+    if (!tpl) return;
+    setExportBusy(true);
+    try {
+      await exportLetterAsDocx(values, tpl, schoolMeta);
+    } catch (e) {
+      console.error("Export docx failed", e);
+      alert("Export failed. Please try again.");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  /* Export single letter as .png image */
+  const handleExportImage = async () => {
+    const el = sheetRef.current;
+    if (!el) return;
+    setExportBusy(true);
+    try {
+      await exportLetterAsImage(el);
+    } catch (e) {
+      console.error("Export image failed", e);
+      alert("Image export failed. Please try again.");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  /* Export bulk letters as .zip of .docx */
+  const handleExportBulkZip = async () => {
+    if (!bulkGenerated.length || !selectedTemplate) return;
+    setExportBusy(true);
+    try {
+      await exportBulkAsZip(bulkGenerated, selectedTemplate, schoolMeta);
+    } catch (e) {
+      console.error("Bulk ZIP export failed", e);
+      alert("ZIP export failed. Please try again.");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  /* Print — isolate the letter sheet in a new window for clean printing */
+  const handlePrint = (sheetEl) => {
+    const node = sheetEl ?? sheetRef.current ?? document.querySelector(".lp-sheet");
+    if (!node) {
+      window.print();
+      return;
+    }
+    const html = node.outerHTML;
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) {
+      window.print();
+      return;
+    }
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Letter</title>
+<style>
+  @page { size: A4; margin: 15mm 20mm 20mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, "Times New Roman", serif; color: #1f2937; background: #fff; }
+  .lp-sheet { max-width: 100%; padding: 0; box-shadow: none; border: none; border-radius: 0; }
+  /* Letterhead */
+  .lp-letterhead { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 8px; }
+  .lp-letterhead-logo { flex-shrink: 0; }
+  .lp-logo { width: 80px; height: 80px; object-fit: contain; }
+  .lp-logo-ph { width: 80px; height: 80px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 1.5rem; }
+  .lp-letterhead-info { flex: 1; text-align: center; }
+  .lp-school-name { font-size: 18pt; font-weight: 900; color: #1a3799; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: .02em; margin: 0 0 4px; }
+  .lp-school-addr { font-size: 8pt; color: #111; font-family: Arial, sans-serif; text-transform: uppercase; margin: 0 0 3px; }
+  .lp-school-contacts { font-size: 8pt; color: #111; font-family: Arial, sans-serif; margin: 0 0 3px; }
+  .lp-sep { margin: 0 4px; }
+  .lp-school-motto { font-size: 4px; font-weight: 500; marging-top: 5px; font-family: Arial, sans-serif; margin: 0; }
+  /* Rule */
+  .lp-rule { border: none; border-top: 2px solid #1a3799; margin: 8px 0 12px; }
+  /* Date */
+  .lp-date-row { text-align: right; margin-bottom: 12px; }
+  .lp-date-chip { font-size: 9pt; color: #374151; font-family: Arial, sans-serif; }
+  /* Address */
+  .lp-addr-block { margin-bottom: 16px; font-family: Arial, sans-serif; }
+  .lp-to-line, .lp-re-line { margin: 0 0 4px; font-size: 10pt; color: #111; }
+  .lp-re-line { font-weight: 700; }
+  /* Body + watermark */
+  .lp-body-wrap { position: relative; min-height: 200px; margin-bottom: 20px; }
+  .lp-watermark-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .lp-watermark { width: 320px; height: 320px; object-fit: contain; opacity: .10; }
+  .lp-body { position: relative; font-size: 10pt; }
+  .lp-para { margin: 0 0 10px; line-height: 1.85; color: #1f2937; }
+  /* Signature */
+  .lp-sig-block { margin-top: 20px; font-family: Arial, sans-serif; }
+  .lp-closing { margin: 0 0 50px; font-size: 10pt; font-family: Georgia, serif; }
+  .lp-sig-line { width: 180px; border-bottom: 1px solid #374151; margin-bottom: 5px; }
+  .lp-sig-name { font-weight: 700; font-size: 10pt; margin: 0 0 2px; }
+  .lp-sig-role { font-size: 8pt; color: #64748b; margin: 0; }
+  svg { display: none !important; }
+</style>
+</head><body>${html}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+      win.close();
+    }, 400);
   };
 
   /* Bulk generation */
@@ -468,7 +594,7 @@ export default function LetterTemplates() {
     setModal("bulkView");
   };
 
-  /* Letter sheet renderer */
+  /* Letter sheet renderer — matches Golden Light official letterhead */
   const renderSheet = (values = liveValues, tpl = selectedTemplate) => {
     if (!tpl) return null;
     const subject = fill(tpl.subject ?? "", values);
@@ -477,39 +603,38 @@ export default function LetterTemplates() {
     const sender = values.senderName || DEFAULT_PLACEHOLDER_VALUES.senderName;
     return (
       <div className='lp-sheet'>
-        <div className='lp-head'>
-          <div className='lp-brand'>
+        {/* ── Letterhead: logo left, school info centred ── */}
+        <div className='lp-letterhead'>
+          <div className='lp-letterhead-logo'>
             {logoUrl ? (
-              <img src={logoUrl} alt='School logo' className='lp-logo' />
+              <img src={logoUrl} alt='School crest' className='lp-logo' />
             ) : (
               <div className='lp-logo-ph'>
                 <HiOfficeBuilding />
               </div>
             )}
-            <div className='lp-school-meta'>
-              <h2 className='lp-school-name'>{schoolName}</h2>
-              <p className='lp-school-addr'>{schoolAddress}</p>
-              <div className='lp-school-contacts'>
-                {schoolPhone && (
-                  <span>
-                    <HiPhone className='lp-ci' />
-                    {schoolPhone}
-                  </span>
-                )}
-                {schoolEmail && (
-                  <span>
-                    <HiMail className='lp-ci' />
-                    {schoolEmail}
-                  </span>
-                )}
-              </div>
-            </div>
           </div>
-          <div className='lp-date-col'>
-            <span className='lp-date-chip'>{today}</span>
+          <div className='lp-letterhead-info'>
+            <h1 className='lp-school-name'>{schoolName}</h1>
+            <p className='lp-school-addr'>{schoolAddress}</p>
+            <p className='lp-school-contacts'>
+              {schoolPhone && <span>TEL: {schoolPhone}</span>}
+              {schoolPhone && schoolEmail && <span className='lp-sep'> | </span>}
+              {schoolEmail && <span>EMAIL: {schoolEmail}</span>}
+            </p>
+            {schoolMotto && <p className='lp-school-motto'>MOTTO: {schoolMotto}</p>}
           </div>
         </div>
+
+        {/* ── Divider rule ── */}
         <div className='lp-rule' />
+
+        {/* ── Date right-aligned ── */}
+        <div className='lp-date-row'>
+          <span className='lp-date-chip'>{today}</span>
+        </div>
+
+        {/* ── To / Re ── */}
         <div className='lp-addr-block'>
           <p className='lp-to-line'>
             <b>To:</b> {recipient}
@@ -518,7 +643,18 @@ export default function LetterTemplates() {
             <b>Re:</b> {subject}
           </p>
         </div>
-        <div className='lp-body'>{toParagraphs(body)}</div>
+
+        {/* ── Body with watermark behind ── */}
+        <div className='lp-body-wrap'>
+          {watermarkUrl && (
+            <div className='lp-watermark-wrap'>
+              <img src={watermarkUrl} alt='' className='lp-watermark' aria-hidden='true' />
+            </div>
+          )}
+          <div className='lp-body'>{toParagraphs(body)}</div>
+        </div>
+
+        {/* ── Signature ── */}
         <div className='lp-sig-block'>
           <p className='lp-closing'>Yours faithfully,</p>
           <div className='lp-sig-line' />
@@ -543,12 +679,26 @@ export default function LetterTemplates() {
           </p>
         </div>
         <div className='lp-header-btns'>
-          <button className='lp-btn lp-btn-ghost' onClick={() => window.print()}>
+          <button className='lp-btn lp-btn-ghost' onClick={() => handlePrint()}>
             <HiPrinter /> Print
           </button>
-          <button className='lp-btn lp-btn-ghost' onClick={() => downloadLetter()}>
-            <HiDownload /> Export
-          </button>
+          <div className='lp-export-group'>
+            <button
+              className='lp-btn lp-btn-ghost'
+              disabled={exportBusy}
+              onClick={() => handleExportDocx()}
+            >
+              {exportBusy ? <span className='lp-spinner-inline' /> : <HiDocumentText />} Word
+              (.docx)
+            </button>
+            <button
+              className='lp-btn lp-btn-ghost'
+              disabled={exportBusy}
+              onClick={handleExportImage}
+            >
+              {exportBusy ? <span className='lp-spinner-inline' /> : <HiPhotograph />} Image (.png)
+            </button>
+          </div>
           <button className='lp-btn lp-btn-teal' onClick={openBulk}>
             <HiLightningBolt /> Auto-Generate Letters
           </button>
@@ -687,7 +837,7 @@ export default function LetterTemplates() {
             <div className='lp-live-label'>
               <HiDocumentText /> Live Preview
             </div>
-            {renderSheet()}
+            <div ref={sheetRef}>{renderSheet()}</div>
           </div>
         </div>
       </div>
@@ -713,10 +863,21 @@ export default function LetterTemplates() {
                 <p>Adjust values on the left to see changes live.</p>
               </div>
               <div className='lp-modal-hdr-btns'>
-                <button className='lp-btn lp-btn-ghost lp-btn-sm' onClick={() => downloadLetter()}>
-                  <HiDownload /> Export
+                <button
+                  className='lp-btn lp-btn-ghost lp-btn-sm'
+                  disabled={exportBusy}
+                  onClick={() => handleExportDocx()}
+                >
+                  <HiDocumentText /> Word
                 </button>
-                <button className='lp-btn lp-btn-ghost lp-btn-sm' onClick={() => window.print()}>
+                <button
+                  className='lp-btn lp-btn-ghost lp-btn-sm'
+                  disabled={exportBusy}
+                  onClick={handleExportImage}
+                >
+                  <HiPhotograph /> Image
+                </button>
+                <button className='lp-btn lp-btn-ghost lp-btn-sm' onClick={() => handlePrint()}>
                   <HiPrinter /> Print
                 </button>
                 <button className='lp-icon-close' onClick={closeModal}>
@@ -1046,15 +1207,25 @@ export default function LetterTemplates() {
                   <div className='lp-modal-hdr-btns'>
                     <button
                       className='lp-btn lp-btn-ghost lp-btn-sm'
-                      onClick={() => window.print()}
+                      disabled={exportBusy}
+                      onClick={() => handleExportDocx(cur.values)}
+                    >
+                      <HiDocumentText /> Word
+                    </button>
+                    <button
+                      className='lp-btn lp-btn-ghost lp-btn-sm'
+                      disabled={exportBusy}
+                      onClick={() => handlePrint()}
                     >
                       <HiPrinter /> Print
                     </button>
                     <button
-                      className='lp-btn lp-btn-ghost lp-btn-sm'
-                      onClick={() => downloadLetter(cur.values)}
+                      className='lp-btn lp-btn-teal lp-btn-sm'
+                      disabled={exportBusy}
+                      onClick={handleExportBulkZip}
                     >
-                      <HiDownload /> Export
+                      {exportBusy ? <span className='lp-spinner-inline' /> : <HiArchive />}
+                      {exportBusy ? "Preparing…" : `Download all (${bulkGenerated.length}) as ZIP`}
                     </button>
                     <button className='lp-icon-close' onClick={closeModal}>
                       <HiX />
@@ -1110,7 +1281,14 @@ export default function LetterTemplates() {
                       {naira(cur.student.balance)} owing
                     </span>
                   </div>
-                  <div style={{ display: "flex", gap: ".5rem" }}>
+                  <div style={{ display: "flex", gap: ".5rem", flexWrap: "wrap" }}>
+                    <button
+                      className='lp-btn lp-btn-ghost lp-btn-sm'
+                      disabled={exportBusy}
+                      onClick={() => handleExportDocx(cur.values)}
+                    >
+                      <HiDocumentText /> This letter
+                    </button>
                     <button
                       className='lp-btn lp-btn-ghost lp-btn-sm'
                       disabled={bulkLetterIdx === 0}
@@ -1135,10 +1313,6 @@ export default function LetterTemplates() {
       {/* ══ STYLES ══ */}
       <style>{`
        
-
-        /* Dark mode */
-        
-
         /* Print */
         @media print {
           body * { visibility:hidden; }
