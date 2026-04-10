@@ -261,6 +261,62 @@
   background: #052e16;
   color: #4ade80;
 }
+
+/* TopNav shared dark styles */
+[data-theme="dark"] .icon-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+[data-theme="dark"] .search-modal {
+  background: var(--modal-bg);
+  border-color: var(--border-color);
+}
+[data-theme="dark"] .search-close-btn kbd {
+  background: var(--bg-primary);
+}
+[data-theme="dark"] .search-hint-chip {
+  background: var(--bg-primary);
+}
+[data-theme="dark"] .search-result-item:hover {
+  background: var(--bg-primary);
+}
+[data-theme="dark"] .student-avatar-sm {
+  background: #1e1b4b;
+  color: #818cf8;
+}
+[data-theme="dark"] .family-avatar-sm {
+  background: #052e16;
+  color: #4ade80;
+}
+
+/* Settings shared dark styles */
+[data-theme="dark"] .sp-letter-mock {
+  background: #1e293b;
+  border-color: #334155;
+}
+[data-theme="dark"] .sp-export-btn {
+  background: #334155;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+[data-theme="dark"] .sp-export-btn--primary {
+  background: var(--primary-color);
+  color: #fff;
+}
+[data-theme="dark"] .sp-nav-status {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+[data-theme="dark"] .sp-info-banner {
+  background: #1e3a5f;
+  border-color: #1d4ed8;
+  color: #93c5fd;
+}
+[data-theme="dark"] .sp-promote-ready-banner {
+  background: #052e16;
+  border-color: #166534;
+  color: #4ade80;
+}
 [data-theme="dark"] .payments .stat-icon-wrapper {
   background: #2e1065;
   color: #a78bfa;

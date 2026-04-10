@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRole } from "../../hooks/useRole";
+import { PERMISSIONS } from "../../config/permissions";
 import TableToolbar from "../../components/common/TableToolbar";
+import { Bone } from "../../components/common/Skeleton";
 import { createFee, getFees, updateFee, deleteFee, createBulkFees } from "./feesService";
 import { getClasses } from "../classes/classService";
 import { getSettings } from "../settings/settingService";
@@ -35,7 +37,8 @@ export default function FeeSetup() {
   const [filterTerm, setFilterTerm] = useState("");
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
-  const { canEdit, canDelete } = useRole();
+  const { can } = useRole();
+  const canManageFees = can(PERMISSIONS.CREATE_FEE) || can(PERMISSIONS.EDIT_FEE);
 
   // ─── Detect Group (fallback if DB doesn't have it) ────────────────
   const detectGroup = (cls) => {
@@ -173,6 +176,10 @@ export default function FeeSetup() {
   // ─── Submit Logic (Upgraded) ─────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canManageFees) {
+      alert("You do not have permission to manage fees.");
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -260,140 +267,149 @@ export default function FeeSetup() {
   return (
     <div className='form-container'>
       {/* ── Form ───────────────────────────────────────────────── */}
-      <div className='form-header'>
-        <h3>{editingId ? "Edit Fee" : "Add Fee"}</h3>
-        <p>Set a charge for a class, session, and term.</p>
-      </div>
+      {canManageFees ? (
+        <>
+          <div className='form-header'>
+            <h3>{editingId ? "Edit Fee" : "Add Fee"}</h3>
+            <p>Set a charge for a class, session, and term.</p>
+          </div>
 
-      <form className='modern-form' onSubmit={handleSubmit}>
-        <div className='form-grid'>
-          <div className='input-group'>
-            <label>Class</label>
-            <div className='input-wrapper'>
-              <HiLibrary className='input-icon' />
-              <select name='classId' value={form.classId} onChange={handleChange} required>
-                <option value=''>Select class</option>
+          <form className='modern-form' onSubmit={handleSubmit}>
+            <div className='form-grid'>
+              <div className='input-group'>
+                <label>Class</label>
+                <div className='input-wrapper'>
+                  <HiLibrary className='input-icon' />
+                  <select name='classId' value={form.classId} onChange={handleChange} required>
+                    <option value=''>Select class</option>
 
-                <optgroup label='Bulk Actions'>
-                  <option value='all'>All Classes</option>
-                  <option value='primary'>All Primary</option>
-                  <option value='secondary'>All Secondary</option>
-                </optgroup>
+                    <optgroup label='Bulk Actions'>
+                      <option value='all'>All Classes</option>
+                      <option value='primary'>All Primary</option>
+                      <option value='secondary'>All Secondary</option>
+                    </optgroup>
 
-                <optgroup label='Creche / Daycare'>
-                  {classes
-                    .filter((c) => getClassLevel(c.name) === 0)
-                    .map((cls) => (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.name}
+                    <optgroup label='Creche / Daycare'>
+                      {classes
+                        .filter((c) => getClassLevel(c.name) === 0)
+                        .map((cls) => (
+                          <option key={cls.id} value={cls.id}>
+                            {cls.name}
+                          </option>
+                        ))}
+                    </optgroup>
+
+                    <optgroup label='Nursery'>
+                      {classes
+                        .filter((c) => getClassLevel(c.name) === 1)
+                        .map((cls) => (
+                          <option key={cls.id} value={cls.id}>
+                            {cls.name}
+                          </option>
+                        ))}
+                    </optgroup>
+
+                    <optgroup label='Primary'>
+                      {classes
+                        .filter((c) => getClassLevel(c.name) === 2)
+                        .map((cls) => (
+                          <option key={cls.id} value={cls.id}>
+                            {cls.name}
+                          </option>
+                        ))}
+                    </optgroup>
+
+                    <optgroup label='Secondary'>
+                      {classes
+                        .filter((c) => getClassLevel(c.name) >= 3)
+                        .map((cls) => (
+                          <option key={cls.id} value={cls.id}>
+                            {cls.name}
+                          </option>
+                        ))}
+                    </optgroup>
+                  </select>
+                </div>
+              </div>
+
+              <div className='input-group'>
+                <label>Session</label>
+                <div className='input-wrapper'>
+                  <HiCalendar className='input-icon' />
+                  <input
+                    name='session'
+                    value={form.session}
+                    onChange={handleChange}
+                    placeholder='e.g. 2024/2025'
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className='input-group'>
+                <label>Term</label>
+                <div className='input-wrapper'>
+                  <HiClock className='input-icon' />
+                  <select name='term' value={form.term} onChange={handleChange} required>
+                    <option value=''>Select term</option>
+                    {TERMS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
                       </option>
                     ))}
-                </optgroup>
+                  </select>
+                </div>
+              </div>
 
-                <optgroup label='Nursery'>
-                  {classes
-                    .filter((c) => getClassLevel(c.name) === 1)
-                    .map((cls) => (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </option>
-                    ))}
-                </optgroup>
+              <div className='input-group'>
+                <label>Fee Type</label>
+                <div className='input-wrapper'>
+                  <HiTag className='input-icon' />
+                  <input
+                    name='feeType'
+                    value={form.feeType}
+                    onChange={handleChange}
+                    placeholder='e.g. Tuition, PTA Levy'
+                    required
+                  />
+                </div>
+              </div>
 
-                <optgroup label='Primary'>
-                  {classes
-                    .filter((c) => getClassLevel(c.name) === 2)
-                    .map((cls) => (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </option>
-                    ))}
-                </optgroup>
-
-                <optgroup label='Secondary'>
-                  {classes
-                    .filter((c) => getClassLevel(c.name) >= 3)
-                    .map((cls) => (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </option>
-                    ))}
-                </optgroup>
-              </select>
+              <div className='input-group'>
+                <label>Amount (₦)</label>
+                <div className='input-wrapper'>
+                  <HiCash className='input-icon' />
+                  <input
+                    name='amount'
+                    type='number'
+                    value={form.amount}
+                    onChange={handleChange}
+                    placeholder='0'
+                    required
+                    min='1'
+                  />
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className='input-group'>
-            <label>Session</label>
-            <div className='input-wrapper'>
-              <HiCalendar className='input-icon' />
-              <input
-                name='session'
-                value={form.session}
-                onChange={handleChange}
-                placeholder='e.g. 2024/2025'
-                required
-              />
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button className='submit-btn' disabled={isSubmitting}>
+                {isSubmitting ? "Saving…" : editingId ? "Update Fee" : "Add Fee"}
+              </button>
+              {editingId && (
+                <button type='button' className='cancel-btn' onClick={() => resetForm()}>
+                  Cancel
+                </button>
+              )}
             </div>
-          </div>
-
-          <div className='input-group'>
-            <label>Term</label>
-            <div className='input-wrapper'>
-              <HiClock className='input-icon' />
-              <select name='term' value={form.term} onChange={handleChange} required>
-                <option value=''>Select term</option>
-                {TERMS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className='input-group'>
-            <label>Fee Type</label>
-            <div className='input-wrapper'>
-              <HiTag className='input-icon' />
-              <input
-                name='feeType'
-                value={form.feeType}
-                onChange={handleChange}
-                placeholder='e.g. Tuition, PTA Levy'
-                required
-              />
-            </div>
-          </div>
-
-          <div className='input-group'>
-            <label>Amount (₦)</label>
-            <div className='input-wrapper'>
-              <HiCash className='input-icon' />
-              <input
-                name='amount'
-                type='number'
-                value={form.amount}
-                onChange={handleChange}
-                placeholder='0'
-                required
-                min='1'
-              />
-            </div>
-          </div>
+          </form>
+        </>
+      ) : (
+        <div className='form-header'>
+          <h3>Fee Setup</h3>
+          <p>You can view fees, but you do not have permission to create or edit them.</p>
         </div>
-
-        <div style={{ display: "flex", gap: "0.75rem" }}>
-          <button className='submit-btn' disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : editingId ? "Update Fee" : "Add Fee"}
-          </button>
-          {editingId && (
-            <button type='button' className='cancel-btn' onClick={() => resetForm()}>
-              Cancel
-            </button>
-          )}
-        </div>
-      </form>
+      )}
 
       {/* ── Table ──────────────────────────────────────────────── */}
       <div className='table-card' style={{ marginTop: "2rem" }}>
@@ -468,11 +484,28 @@ export default function FeeSetup() {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan='6' className='empty-row'>
-                    Loading…
-                  </td>
-                </tr>
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={`fee-skel-${i}`}>
+                    <td>
+                      <Bone w={130} h={14} r={4} />
+                    </td>
+                    <td>
+                      <Bone w={90} h={14} r={4} />
+                    </td>
+                    <td>
+                      <Bone w={70} h={24} r={99} />
+                    </td>
+                    <td>
+                      <Bone w={110} h={14} r={4} />
+                    </td>
+                    <td className='text-right'>
+                      <Bone w={90} h={14} r={4} style={{ marginLeft: "auto" }} />
+                    </td>
+                    <td className='actions-cell'>
+                      <Bone w={78} h={28} r={8} />
+                    </td>
+                  </tr>
+                ))
               ) : visibleFees.length ? (
                 visibleFees.map((fee) => (
                   <tr key={fee.id} className={editingId === fee.id ? "row-editing" : ""}>
@@ -486,19 +519,21 @@ export default function FeeSetup() {
                     <td>{fee.feeType}</td>
                     <td className='text-right'>₦{Number(fee.amount).toLocaleString()}</td>
                     <td className='actions-cell'>
-                      {canEdit && (
+                      {can(PERMISSIONS.EDIT_FEE) && (
                         <button title='Edit' className='edit-btn' onClick={() => handleEdit(fee)}>
                           <HiPencil />
                         </button>
                       )}
-                      <button
-                        title='Duplicate into form'
-                        className='edit-btn'
-                        onClick={() => handleDuplicate(fee)}
-                      >
-                        <HiDuplicate />
-                      </button>
-                      {canDelete && (
+                      {canManageFees && (
+                        <button
+                          title='Duplicate into form'
+                          className='edit-btn'
+                          onClick={() => handleDuplicate(fee)}
+                        >
+                          <HiDuplicate />
+                        </button>
+                      )}
+                      {can(PERMISSIONS.DELETE_FEE) && (
                         <button
                           title='Delete'
                           className='delete-btn'

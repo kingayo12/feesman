@@ -15,6 +15,7 @@ import { getSettings } from "../settings/settingService";
 import FamilyForm from "../../components/forms/FamilyForm";
 import { FamilyListSkeleton } from "../../components/common/Skeleton";
 import { useRole } from "../../hooks/useRole";
+import { PERMISSIONS } from "../../config/permissions";
 import { Link } from "react-router-dom";
 import { HiOutlineUsers, HiChevronRight, HiPencilAlt, HiTrash } from "react-icons/hi";
 import TableToolbar from "../../components/common/TableToolbar";
@@ -28,7 +29,7 @@ export default function FamilyList() {
   const [currentTerm, setCurrentTerm] = useState("");
   const tableRef = useRef(null);
   const dataTableRef = useRef(null);
-  const { canEdit, canDelete } = useRole();
+  const { can } = useRole();
 
   const calculateFamilyFinancials = async (familyId, settings, activeDiscounts) => {
     const { academicYear, currentTerm } = settings;
@@ -169,14 +170,16 @@ export default function FamilyList() {
 
   return (
     <div className='page-wrapper'>
-      <FamilyForm
-        initialData={editingFamily}
-        onSuccess={() => {
-          setEditingFamily(null);
-          loadFamilies();
-        }}
-        onCancel={() => setEditingFamily(null)}
-      />
+      {(can(PERMISSIONS.CREATE_FAMILY) || (editingFamily && can(PERMISSIONS.EDIT_FAMILY))) && (
+        <FamilyForm
+          initialData={editingFamily}
+          onSuccess={() => {
+            setEditingFamily(null);
+            loadFamilies();
+          }}
+          onCancel={() => setEditingFamily(null)}
+        />
+      )}
       <div className='table-card'>
         {currentTerm && (
           <p
@@ -228,12 +231,12 @@ export default function FamilyList() {
                 <td>{formatDate(family.createdAt)}</td>
                 <td>
                   <div className='action-btn'>
-                    {canEdit && (
+                    {can(PERMISSIONS.EDIT_FAMILY) && (
                       <button onClick={() => setEditingFamily(family)} className='edit-btn'>
                         <HiPencilAlt />
                       </button>
                     )}
-                    {canDelete && (
+                    {can(PERMISSIONS.DELETE_FAMILY) && (
                       <button
                         className='delete-btn'
                         onClick={() => {

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { getSettings, updateSettings } from "./settingService";
 import { useAuth } from "../../context/AuthContext";
+import { Bone } from "../../components/common/Skeleton";
 import { collection, getDocs, deleteDoc, writeBatch, doc } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
 import { getAllStudents } from "../students/studentService";
@@ -140,7 +141,15 @@ function applyTheme(theme) {
       : theme;
   document.documentElement.setAttribute("data-theme", resolved);
   try {
+    localStorage.setItem("themePreference", theme);
     localStorage.setItem("theme", resolved);
+  } catch {}
+  try {
+    window.dispatchEvent(
+      new CustomEvent("feesman-theme-change", {
+        detail: { themePreference: theme, resolvedTheme: resolved },
+      }),
+    );
   } catch {}
 }
 
@@ -491,13 +500,14 @@ export default function SettingsPage() {
 
   const isThirdTermEnded = settings.currentTerm === "3rd Term" && termEndPassed;
 
-  const termStatusColor = !settings.termEndDate
-    ? "#6b7280"
+  const navTermClass = settings.currentTerm === "3rd Term" ? "sp-term-warn" : "sp-term-ok";
+  const termEndClass = !settings.termEndDate
+    ? "sp-term-muted"
     : termEndPassed
-      ? "#dc2626"
+      ? "sp-term-danger"
       : (() => {
           const daysLeft = Math.ceil((new Date(settings.termEndDate) - new Date()) / 86400000);
-          return daysLeft <= 7 ? "#d97706" : "#16a34a";
+          return daysLeft <= 7 ? "sp-term-warn" : "sp-term-ok";
         })();
 
   /* ─────────────────────────────────────────────────────────────
@@ -505,9 +515,37 @@ export default function SettingsPage() {
   ───────────────────────────────────────────────────────────── */
   if (loading)
     return (
-      <div className='sp-loading'>
-        <div className='sp-spinner' />
-        <p>Loading settings…</p>
+      <div className='settings-page'>
+        <div className='settings-header'>
+          <div>
+            <Bone w={160} h={26} style={{ marginBottom: 8 }} />
+            <Bone w={320} h={14} />
+          </div>
+          <Bone w={130} h={40} r={10} />
+        </div>
+
+        <div className='settings-layout'>
+          <nav className='settings-nav'>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Bone key={`set-nav-skel-${i}`} w='100%' h={38} r={8} style={{ marginBottom: 8 }} />
+            ))}
+          </nav>
+
+          <div className='settings-content'>
+            <div className='settings-section'>
+              <Bone w={170} h={20} style={{ marginBottom: 10 }} />
+              <Bone w='60%' h={13} style={{ marginBottom: 18 }} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={`set-field-skel-${i}`}>
+                    <Bone w={90} h={11} style={{ marginBottom: 6 }} />
+                    <Bone w='100%' h={40} r={8} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
 
@@ -566,11 +604,7 @@ export default function SettingsPage() {
               </div>
               <div className='sp-nav-status-row'>
                 <span>Term</span>
-                <strong
-                  style={{ color: settings.currentTerm === "3rd Term" ? "#d97706" : "#16a34a" }}
-                >
-                  {settings.currentTerm || "—"}
-                </strong>
+                <strong className={navTermClass}>{settings.currentTerm || "—"}</strong>
               </div>
               {isThirdTermEnded && (
                 <div className='sp-nav-promote-note'>
@@ -608,13 +642,13 @@ export default function SettingsPage() {
                     Used on letters, receipts, and the letterhead. PNG or JPEG, min 200×200px
                     recommended.
                   </p>
-                  <div style={{ display: "flex", gap: ".5rem", flexWrap: "wrap" }}>
+                  <div className='sp-inline-actions'>
                     <label className='upload-btn'>
                       <HiPhotograph /> Upload Logo
                       <input
                         type='file'
                         accept='image/*'
-                        style={{ display: "none" }}
+                        className='sp-file-input-hidden'
                         onChange={(e) => {
                           const file = e.target.files[0];
                           if (!file) return;
@@ -663,7 +697,7 @@ export default function SettingsPage() {
                       onChange={handleChange}
                       placeholder='e.g. EIS'
                       maxLength={6}
-                      style={{ textTransform: "uppercase" }}
+                      className='sp-uppercase-input'
                       onInput={(e) => {
                         e.target.value = e.target.value.toUpperCase();
                       }}
@@ -721,7 +755,7 @@ export default function SettingsPage() {
                     School Motto <span className='optional'>(optional)</span>
                   </label>
                   <div className='input-wrapper'>
-                    <HiStar className='input-icon' style={{ color: "#f59e0b" }} />
+                    <HiStar className='input-icon sp-star-icon' />
                     <input
                       name='motto'
                       value={settings.motto || ""}
@@ -871,7 +905,7 @@ export default function SettingsPage() {
                 <div className='academic-status-divider' />
                 <div className='academic-status-item'>
                   <span className='status-label'>Term End</span>
-                  <span className='status-value' style={{ color: termStatusColor }}>
+                  <span className={`status-value ${termEndClass}`}>
                     {settings.termEndDate
                       ? new Date(settings.termEndDate).toLocaleDateString("en-GB", {
                           day: "numeric",
@@ -974,7 +1008,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   {settings.termEndDate && (
-                    <small className='hint' style={{ color: termStatusColor }}>
+                    <small className={`hint ${termEndClass}`}>
                       {termEndPassed
                         ? "This term has ended"
                         : `${Math.ceil((new Date(settings.termEndDate) - new Date()) / 86400000)} days remaining`}
@@ -1034,10 +1068,7 @@ export default function SettingsPage() {
                 </div>
 
                 {settings.lateFeeEnabled && (
-                  <div
-                    className='input-group'
-                    style={{ maxWidth: 260, marginLeft: "1rem", marginTop: ".25rem" }}
-                  >
+                  <div className='input-group sp-inline-setting-input'>
                     <label>Late Fee Amount (₦)</label>
                     <div className='input-wrapper'>
                       <input
@@ -1094,13 +1125,12 @@ export default function SettingsPage() {
                 Sets the primary colour for buttons, links, and active states throughout the app.
               </p>
               <div className='accent-colors'>
-                {ACCENT_COLORS.map(({ id, label, hex }) => (
+                {ACCENT_COLORS.map(({ id, label }) => (
                   <button
                     key={id}
                     type='button'
                     title={label}
-                    className={`accent-dot ${settings.accentColor === id ? "active" : ""}`}
-                    style={{ background: hex }}
+                    className={`accent-dot accent-dot-${id} ${settings.accentColor === id ? "active" : ""}`}
                     onClick={() => handleAccentChange(id)}
                   >
                     {settings.accentColor === id && <HiCheckCircle />}
@@ -1205,10 +1235,7 @@ export default function SettingsPage() {
                 </div>
 
                 {settings.overdueReminders && (
-                  <div
-                    className='input-group'
-                    style={{ maxWidth: 260, marginLeft: "1rem", marginTop: ".25rem" }}
-                  >
+                  <div className='input-group sp-inline-setting-input'>
                     <label>Remind this many days before term ends</label>
                     <div className='input-wrapper'>
                       <HiBell className='input-icon' />
@@ -1285,10 +1312,7 @@ export default function SettingsPage() {
                 </div>
 
                 {settings.requirePin && (
-                  <div
-                    className='input-group'
-                    style={{ maxWidth: 260, marginLeft: "1rem", marginTop: ".25rem" }}
-                  >
+                  <div className='input-group sp-inline-setting-input'>
                     <label>4-Digit PIN</label>
                     <div className='input-wrapper'>
                       <HiLockClosed className='input-icon' />
@@ -1331,10 +1355,7 @@ export default function SettingsPage() {
                 </div>
 
                 {settings.autoLogout && (
-                  <div
-                    className='input-group'
-                    style={{ maxWidth: 260, marginLeft: "1rem", marginTop: ".25rem" }}
-                  >
+                  <div className='input-group sp-inline-setting-input'>
                     <label>Inactivity timeout</label>
                     <div className='input-wrapper'>
                       <HiClock className='input-icon' />
@@ -1363,12 +1384,12 @@ export default function SettingsPage() {
                   <p className='info-value'>{user?.email || settings.contactEmail || "—"}</p>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: ".65rem", marginTop: "1rem", flexWrap: "wrap" }}>
+              <div className='sp-inline-actions-lg'>
                 <button className='outline-btn' onClick={handlePasswordReset}>
                   <HiLockClosed /> Send Password Reset Email
                 </button>
               </div>
-              <p className='sp-sub-desc' style={{ marginTop: ".5rem" }}>
+              <p className='sp-sub-desc sp-sub-desc-top'>
                 A reset link will be sent to{" "}
                 <strong>{user?.email || settings.contactEmail || "your email"}</strong>.
               </p>
@@ -1552,9 +1573,7 @@ export default function SettingsPage() {
 
               <div className='section-divider' />
               {/* ── Danger Zone ── */}
-              <h3 className='sub-section-title' style={{ color: "var(--text-danger,#dc2626)" }}>
-                Danger Zone
-              </h3>
+              <h3 className='sub-section-title danger-title'>Danger Zone</h3>
               <div className='danger-zone'>
                 {/* Card 1: Clear fee overrides */}
                 <div className='danger-card'>
@@ -1566,7 +1585,7 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   {confirmClear ? (
-                    <div style={{ display: "flex", gap: ".5rem" }}>
+                    <div className='sp-inline-actions'>
                       <button
                         className='danger-btn'
                         disabled={clearingOverrides}
@@ -1586,8 +1605,8 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Card 2: Wipe all data */}
-                <div className='danger-card wipe-card' style={{ alignItems: "flex-start" }}>
-                  <div style={{ flex: 1 }}>
+                <div className='danger-card wipe-card sp-wipe-card'>
+                  <div className='sp-grow'>
                     <p className='danger-title'>Clear all data (keep families)</p>
                     <p className='danger-desc'>
                       Permanently deletes all{" "}
@@ -1598,7 +1617,6 @@ export default function SettingsPage() {
                     {wipeStep === "idle" && (
                       <button
                         className='danger-btn-outline wipe-trigger-btn'
-                        style={{ marginTop: ".65rem" }}
                         onClick={() => setWipeStep("confirm1")}
                       >
                         <HiTrash /> Clear all data
@@ -1611,7 +1629,7 @@ export default function SettingsPage() {
                           ⚠ You are about to delete all records except families. This cannot be
                           undone.
                         </p>
-                        <div style={{ display: "flex", gap: ".5rem", marginTop: ".65rem" }}>
+                        <div className='sp-inline-actions sp-inline-actions-top'>
                           <button className='danger-btn' onClick={() => setWipeStep("confirm2")}>
                             Yes, continue
                           </button>
@@ -1659,240 +1677,6 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
-
-      {/* ── Styles ── */}
-      <style>{`
-        /* Loading */
-        .sp-loading { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:300px; gap:1rem; color:var(--text-secondary,#6b7280); }
-        .sp-spinner, .sp-btn-spinner { border-radius:50%; animation:spSpin .7s linear infinite; }
-        .sp-spinner { width:32px; height:32px; border:3px solid #e5e7eb; border-top-color:#4f46e5; }
-        .sp-btn-spinner { width:14px; height:14px; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; display:inline-block; }
-        .sp-btn-spinner--sm { border-top-color:var(--primary-color,#4f46e5); border-color:#e5e7eb; }
-        @keyframes spSpin { to { transform:rotate(360deg); } }
-
-        /* Save button */
-        .sp-save-btn { display:inline-flex; align-items:center; gap:.4rem; padding:.6rem 1.3rem; background:var(--primary-color,#4f46e5); color:#fff; border:none; border-radius:10px; font-size:.875rem; font-weight:600; cursor:pointer; transition:background .15s; }
-        .sp-save-btn:hover { opacity:.92; }
-        .sp-save-btn:disabled { opacity:.55; cursor:not-allowed; }
-
-        /* Required star */
-        .sp-required { color:#ef4444; }
-
-        /* Clear logo button */
-        .sp-clear-logo-btn { display:inline-flex; align-items:center; gap:.3rem; padding:.38rem .8rem; border:1px solid #fecaca; background:#fef2f2; color:#dc2626; border-radius:7px; font-size:.78rem; cursor:pointer; }
-        .sp-clear-logo-btn:hover { background:#fee2e2; }
-
-        /* Sub description */
-        .sp-sub-desc { font-size:.8rem; color:var(--text-secondary,#6b7280); margin:.25rem 0 0; }
-        .sp-accent-label { font-size:.78rem; color:var(--text-secondary,#6b7280); margin:.5rem 0 0; }
-
-        /* Info banner */
-        .sp-info-banner { display:flex; align-items:flex-start; gap:.55rem; padding:.75rem 1rem; background:#eff6ff; border:1px solid #bfdbfe; border-radius:9px; font-size:.8rem; color:#1d4ed8; line-height:1.5; margin-bottom:1rem; }
-        .sp-info-banner svg { font-size:.95rem; flex-shrink:0; margin-top:2px; }
-
-        /* Promotion ready banner */
-        .sp-promote-ready-banner { display:flex; align-items:flex-start; gap:.75rem; padding:.9rem 1.1rem; background:#f0fdf4; border:1px solid #86efac; border-radius:10px; font-size:.83rem; color:#15803d; line-height:1.5; margin-bottom:1.25rem; }
-        .sp-promote-ready-banner svg { font-size:1.3rem; flex-shrink:0; margin-top:1px; }
-        .sp-promote-ready-banner p { margin:.2rem 0 0; }
-
-        /* Nav status card */
-        .sp-nav-status { margin-top:.75rem; padding:.75rem; background:var(--bg-secondary,#f8fafc); border-radius:8px; border:1px solid var(--border-color,#e2e8f0); font-size:.75rem; display:flex; flex-direction:column; gap:.3rem; }
-        .sp-nav-status-row { display:flex; justify-content:space-between; align-items:center; }
-        .sp-nav-status-row span { color:var(--text-secondary,#6b7280); }
-        .sp-nav-promote-note { display:flex; align-items:center; gap:.3rem; color:#d97706; font-weight:600; margin-top:.2rem; font-size:.72rem; }
-
-        /* Letterhead preview */
-        .sp-letterhead-preview { margin-top:1.75rem; }
-        .sp-preview-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary,#6b7280); margin:0 0 .65rem; }
-        .sp-letter-mock { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:1.25rem 1.5rem; max-width:520px; box-shadow:0 2px 12px rgba(0,0,0,.06); }
-        [data-theme="dark"] .sp-letter-mock { background:#1e293b; border-color:#334155; }
-        .sp-letter-mock-head { display:flex; align-items:flex-start; gap:.85rem; margin-bottom:.75rem; }
-        .sp-mock-logo { width:52px; height:52px; object-fit:contain; border-radius:6px; border:1px solid #e5e7eb; padding:.2rem; flex-shrink:0; }
-        .sp-mock-logo-ph { width:52px; height:52px; border-radius:6px; border:1px dashed #d1d5db; background:#f9fafb; display:flex; align-items:center; justify-content:center; color:#9ca3af; font-size:1.3rem; flex-shrink:0; }
-        .sp-mock-info { display:flex; flex-direction:column; gap:.18rem; }
-        .sp-mock-info strong { font-size:.95rem; color:#0f172a; font-family:Arial,sans-serif; }
-        [data-theme="dark"] .sp-mock-info strong { color:#f1f5f9; }
-        .sp-mock-info span { font-size:.72rem; color:#6b7280; font-family:Arial,sans-serif; }
-        .sp-mock-motto { font-weight:600; color:#374151; }
-        [data-theme="dark"] .sp-mock-motto { color:#d1d5db; }
-        .sp-mock-rule { border:none; border-top:2px solid #1e293b; margin-top:.5rem; }
-        [data-theme="dark"] .sp-mock-rule { border-color:#f1f5f9; }
-
-        /* Export icons */
-        .sp-export-icon { width:38px; height:38px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
-        .sp-icon-blue   { background:#eff6ff; color:#2563eb; }
-        .sp-icon-green  { background:#f0fdf4; color:#16a34a; }
-        .sp-icon-purple { background:#faf5ff; color:#7c3aed; }
-        .sp-icon-amber  { background:#fffbeb; color:#d97706; }
-        .sp-icon-teal   { background:#f0fdfa; color:#0d9488; }
-
-        .sp-export-btn { display:inline-flex; align-items:center; gap:.35rem; padding:.45rem .95rem; border:1px solid #d1d5db; background:#fff; color:#374151; border-radius:8px; font-size:.8rem; font-weight:500; cursor:pointer; white-space:nowrap; transition:background .14s; }
-        .sp-export-btn:hover { background:#f3f4f6; }
-        .sp-export-btn:disabled { opacity:.5; cursor:not-allowed; }
-        .sp-export-btn--primary { background:var(--primary-color,#4f46e5); color:#fff; border-color:var(--primary-color,#4f46e5); }
-        .sp-export-btn--primary:hover { opacity:.9; }
-        [data-theme="dark"] .sp-export-btn { background:#334155; border-color:#475569; color:#e2e8f0; }
-        [data-theme="dark"] .sp-export-btn--primary { background:var(--primary-color,#4f46e5); color:#fff; }
-
-        .sp-backup-card { flex-wrap:nowrap; align-items:flex-start; }
-        .sp-backup-card > div:nth-child(2) { flex:1; }
-
-        /* Wipe done */
-        .sp-wipe-done { display:flex; align-items:center; gap:.5rem; margin-top:.65rem; color:var(--text-success,#16a34a); font-size:.83rem; }
-        .sp-wipe-done svg { flex-shrink:0; }
-
-        /* ── Settings page structure (preserved from original) ── */
-        .settings-page { max-width:1100px; margin:0 auto; padding:0 1.5rem 3rem; }
-        .settings-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; margin-bottom:2rem; padding-bottom:1.5rem; border-bottom:1px solid var(--border-color,#e5e7eb); }
-        .settings-header h1 { font-size:1.5rem; font-weight:700; margin:0; color:var(--text-primary,#111827); }
-        .settings-header p { color:var(--text-secondary,#6b7280); margin:.25rem 0 0; font-size:.875rem; }
-        .settings-layout { display:grid; grid-template-columns:220px 1fr; gap:2rem; }
-        @media(max-width:680px) { .settings-layout { grid-template-columns:1fr; } }
-
-        .settings-nav { display:flex; flex-direction:column; gap:.2rem; position:sticky; top:1rem; align-self:start; background:var(--bg-primary,#fff); border:1px solid var(--border-color,#e5e7eb); border-radius:12px; padding:.75rem .6rem; }
-        .settings-nav-item { display:flex; align-items:center; gap:.6rem; padding:.6rem .8rem; border-radius:8px; border:none; background:transparent; cursor:pointer; width:100%; text-align:left; font-size:.855rem; color:var(--text-secondary,#6b7280); transition:background .14s,color .14s; }
-        .settings-nav-item:hover { background:var(--bg-secondary,#f8fafc); color:var(--text-primary,#111827); }
-        .settings-nav-item.active { background:var(--primary-color,#4f46e5); color:#fff; font-weight:600; }
-        .settings-nav-item svg { width:17px; height:17px; flex-shrink:0; }
-
-        .settings-content { background:var(--bg-primary,#fff); border:1px solid var(--border-color,#e5e7eb); border-radius:14px; padding:1.75rem; min-height:500px; }
-        .settings-section { max-width:680px; }
-        .section-header { margin-bottom:1.5rem; }
-        .section-header h2 { font-size:1.1rem; font-weight:700; margin:0 0 .3rem; color:var(--text-primary,#111827); }
-        .section-header p { color:var(--text-secondary,#6b7280); margin:0; font-size:.84rem; line-height:1.5; }
-        .sub-section-title { font-size:.875rem; font-weight:600; margin:0 0 .85rem; color:var(--text-primary,#111827); }
-        .section-divider { border:none; border-top:1px solid var(--border-color,#e5e7eb); margin:1.5rem 0; }
-        .optional { font-weight:400; color:var(--text-tertiary,#9ca3af); font-size:.78rem; }
-        .settings-grid { grid-template-columns:1fr 1fr; }
-        @media(max-width:520px) { .settings-grid { grid-template-columns:1fr; } }
-
-        /* Logo */
-        .logo-upload-area { display:flex; align-items:flex-start; gap:1.1rem; padding:1.1rem; border:1px dashed var(--border-color,#d1d5db); border-radius:10px; margin-bottom:1.5rem; }
-        .logo-preview { width:72px; height:72px; border-radius:10px; background:var(--bg-secondary,#f8fafc); display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; border:1px solid var(--border-color,#e5e7eb); }
-        .logo-preview img { width:100%; height:100%; object-fit:cover; }
-        .logo-placeholder-icon { width:30px; height:30px; color:var(--text-tertiary,#9ca3af); }
-        .logo-label { font-weight:600; margin:0 0 .2rem; font-size:.875rem; color:var(--text-primary,#111827); }
-        .logo-hint { color:var(--text-secondary,#6b7280); font-size:.78rem; margin:0 0 .65rem; line-height:1.4; }
-        .upload-btn { display:inline-flex; align-items:center; gap:.35rem; padding:.38rem .85rem; border:1px solid var(--border-color,#d1d5db); border-radius:7px; font-size:.78rem; cursor:pointer; background:var(--bg-primary,#fff); color:var(--text-primary,#374151); transition:background .14s; }
-        .upload-btn:hover { background:var(--bg-secondary,#f8fafc); }
-
-        /* Academic status */
-        .academic-status-card { display:flex; border:1px solid var(--border-color,#e5e7eb); border-radius:10px; overflow:hidden; margin-bottom:1.25rem; }
-        .academic-status-item { flex:1; padding:.85rem 1.1rem; }
-        .academic-status-divider { width:1px; background:var(--border-color,#e5e7eb); }
-        .status-label { display:block; font-size:.7rem; color:var(--text-secondary,#6b7280); text-transform:uppercase; letter-spacing:.05em; margin-bottom:.3rem; }
-        .status-value { display:block; font-size:.95rem; font-weight:600; color:var(--text-primary,#111827); }
-        .status-value.highlight { color:var(--primary-color,#4f46e5); }
-
-        /* Toggles */
-        .toggle-list { display:flex; flex-direction:column; }
-        .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:.9rem 0; border-bottom:1px solid var(--border-color,#e5e7eb); gap:1rem; }
-        .toggle-row:last-child { border-bottom:none; }
-        .toggle-label { font-size:.875rem; font-weight:500; margin:0 0 .18rem; color:var(--text-primary,#111827); }
-        .toggle-desc { font-size:.78rem; color:var(--text-secondary,#6b7280); margin:0; }
-        .switch { position:relative; display:inline-block; width:42px; height:24px; flex-shrink:0; }
-        .switch input { opacity:0; width:0; height:0; }
-        .slider { position:absolute; cursor:pointer; inset:0; background:#d1d5db; border-radius:24px; transition:background .2s; }
-        .slider::before { content:""; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
-        .switch input:checked + .slider { background:var(--primary-color,#4f46e5); }
-        .switch input:checked + .slider::before { transform:translateX(18px); }
-
-        /* Theme */
-        .theme-options { display:flex; gap:.85rem; flex-wrap:wrap; margin-bottom:.5rem; }
-        .theme-option { display:flex; flex-direction:column; align-items:center; gap:.4rem; padding:.65rem; border:2px solid var(--border-color,#e5e7eb); border-radius:10px; cursor:pointer; background:transparent; transition:border-color .14s; font-size:.78rem; color:var(--text-primary,#374151); }
-        .theme-option.active { border-color:var(--primary-color,#4f46e5); }
-        .theme-preview { width:78px; height:52px; border-radius:6px; overflow:hidden; display:flex; border:1px solid var(--border-color,#e5e7eb); }
-        .theme-preview-light { background:#f8f8f8; }
-        .theme-preview-dark  { background:#1e1e1e; }
-        .theme-preview-system { background:linear-gradient(135deg,#f8f8f8 50%,#1e1e1e 50%); }
-        .preview-sidebar { width:20px; background:rgba(0,0,0,.08); height:100%; }
-        .theme-preview-dark .preview-sidebar { background:rgba(255,255,255,.08); }
-        .preview-content { flex:1; padding:5px; display:flex; flex-direction:column; gap:3px; }
-        .preview-bar { height:5px; background:rgba(0,0,0,.12); border-radius:3px; }
-        .theme-preview-dark .preview-bar { background:rgba(255,255,255,.15); }
-        .preview-bar.short { width:55%; }
-
-        /* Accent */
-        .accent-colors { display:flex; gap:.55rem; flex-wrap:wrap; }
-        .accent-dot { width:30px; height:30px; border-radius:50%; border:3px solid transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform .14s,border-color .14s; }
-        .accent-dot:hover { transform:scale(1.18); }
-        .accent-dot.active { border-color:var(--text-primary,#111827); }
-        .accent-dot svg { width:14px; height:14px; color:#fff; }
-
-        /* Pin toggle */
-        .pin-toggle { background:none; border:none; cursor:pointer; padding:0 .45rem; color:var(--text-secondary,#6b7280); display:flex; align-items:center; }
-
-        /* Info row */
-        .info-row { display:flex; align-items:center; gap:.75rem; padding:.85rem 1rem; background:var(--bg-secondary,#f8fafc); border-radius:9px; }
-        .info-icon { width:20px; height:20px; color:var(--text-secondary,#6b7280); }
-        .info-label { font-size:.72rem; color:var(--text-secondary,#6b7280); margin:0; }
-        .info-value { font-size:.875rem; font-weight:500; margin:.1rem 0 0; color:var(--text-primary,#111827); }
-
-        /* Outline button */
-        .outline-btn { display:inline-flex; align-items:center; gap:.35rem; padding:.48rem 1rem; border:1px solid var(--border-color,#d1d5db); border-radius:8px; background:transparent; color:var(--text-primary,#374151); font-size:.855rem; cursor:pointer; transition:background .14s; }
-        .outline-btn:hover { background:var(--bg-secondary,#f8fafc); }
-
-        /* Data actions */
-        .data-action-grid { display:flex; flex-direction:column; gap:.65rem; }
-        .data-action-card { display:flex; align-items:center; gap:.85rem; padding:.9rem 1.1rem; border:1px solid var(--border-color,#e5e7eb); border-radius:10px; flex-wrap:wrap; }
-        .data-action-card > div:nth-child(2) { flex:1; min-width:140px; }
-        .data-action-title { font-size:.875rem; font-weight:600; margin:0 0 .15rem; color:var(--text-primary,#111827); }
-        .data-action-desc  { font-size:.77rem; color:var(--text-secondary,#6b7280); margin:0; line-height:1.45; }
-
-        /* Danger zone */
-        .danger-zone { border:1px solid #fecaca; border-radius:10px; overflow:hidden; }
-        .danger-card { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.9rem 1.1rem; flex-wrap:wrap; border-bottom:1px solid #fecaca; }
-        .danger-card:last-child { border-bottom:none; }
-        .danger-title { font-size:.875rem; font-weight:600; margin:0 0 .15rem; color:#dc2626; }
-        .danger-desc  { font-size:.78rem; color:var(--text-secondary,#6b7280); margin:0; line-height:1.4; }
-        .danger-btn { padding:.45rem .95rem; background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:8px; cursor:pointer; font-size:.855rem; }
-        .danger-btn:hover { background:#fee2e2; }
-        .danger-btn:disabled { opacity:.5; cursor:not-allowed; }
-        .danger-btn-outline { display:inline-flex; align-items:center; gap:.35rem; padding:.45rem .95rem; border:1px solid #fecaca; color:#dc2626; border-radius:8px; background:transparent; cursor:pointer; font-size:.855rem; transition:background .14s; }
-        .danger-btn-outline:hover { background:#fef2f2; }
-        .cancel-btn { padding:.45rem .95rem; border:1px solid var(--border-color,#d1d5db); border-radius:8px; background:transparent; cursor:pointer; font-size:.855rem; color:var(--text-primary,#374151); }
-        .cancel-btn:hover { background:var(--bg-secondary,#f8fafc); }
-        .wipe-trigger-btn { }
-        .wipe-confirm-box { margin-top:.65rem; }
-        .wipe-warning-text { font-size:.8rem; color:#92400e; line-height:1.5; margin:0; }
-        .wipe-final .wipe-warning-text { color:#dc2626; }
-        .wipe-progress { display:flex; align-items:center; gap:.5rem; font-size:.8rem; color:var(--text-secondary,#6b7280); margin-top:.65rem; }
-        .wipe-spinner { width:14px; height:14px; border:2px solid #e5e7eb; border-top-color:#4f46e5; border-radius:50%; animation:spSpin .7s linear infinite; flex-shrink:0; }
-
-        /* Toast */
-        .settings-toast { position:fixed; top:1.1rem; right:1.1rem; z-index:9999; display:flex; align-items:center; gap:.55rem; padding:.7rem 1.1rem; border-radius:9px; font-size:.855rem; font-weight:500; box-shadow:0 8px 24px rgba(0,0,0,.14); animation:spToastIn .2s ease; max-width:360px; }
-        .settings-toast.success { background:#f0fdf4; color:#15803d; border:1px solid #86efac; }
-        .settings-toast.error   { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
-        .settings-toast svg { width:17px; height:17px; flex-shrink:0; }
-        @keyframes spToastIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:none} }
-
-        /* Dark mode */
-        [data-theme="dark"] .settings-nav { background:var(--bg-secondary); border-color:var(--border-color); }
-        [data-theme="dark"] .settings-content { background:var(--bg-secondary); border-color:var(--border-color); }
-        [data-theme="dark"] .section-header h2 { color:var(--text-primary); }
-        [data-theme="dark"] .sub-section-title { color:var(--text-primary); }
-        [data-theme="dark"] .toggle-label { color:var(--text-primary); }
-        [data-theme="dark"] .toggle-row { border-color:var(--border-color); }
-        [data-theme="dark"] .academic-status-card { border-color:var(--border-color); background:var(--bg-primary); }
-        [data-theme="dark"] .academic-status-divider { background:var(--border-color); }
-        [data-theme="dark"] .status-value { color:var(--text-primary); }
-        [data-theme="dark"] .info-row { background:var(--bg-primary); }
-        [data-theme="dark"] .info-value { color:var(--text-primary); }
-        [data-theme="dark"] .data-action-card { border-color:var(--border-color); }
-        [data-theme="dark"] .data-action-title { color:var(--text-primary); }
-        [data-theme="dark"] .outline-btn { border-color:var(--border-color); color:var(--text-primary); }
-        [data-theme="dark"] .cancel-btn { border-color:var(--border-color); color:var(--text-primary); }
-        [data-theme="dark"] .logo-upload-area { border-color:var(--border-color); }
-        [data-theme="dark"] .upload-btn { background:var(--bg-secondary); border-color:var(--border-color); color:var(--text-primary); }
-        [data-theme="dark"] .sp-nav-status { background:var(--bg-primary); border-color:var(--border-color); }
-        [data-theme="dark"] .theme-option { border-color:var(--border-color); color:var(--text-primary); }
-        [data-theme="dark"] .sp-info-banner { background:#1e3a5f; border-color:#1d4ed8; color:#93c5fd; }
-        [data-theme="dark"] .sp-promote-ready-banner { background:#052e16; border-color:#166534; color:#4ade80; }
-        [data-theme="dark"] .settings-toast.success { background:#052e16; color:#4ade80; border-color:#166534; }
-        [data-theme="dark"] .settings-toast.error   { background:#450a0a; color:#fca5a5; border-color:#991b1b; }
-        [data-theme="dark"] .logo-preview { background:var(--bg-primary); border-color:var(--border-color); }
-        [data-theme="dark"] .hint { color:var(--text-secondary); }
-      `}</style>
     </div>
   );
 }
@@ -1903,42 +1687,20 @@ export default function SettingsPage() {
 function WipeConfirmInput({ onConfirm, onCancel }) {
   const [val, setVal] = useState("");
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: ".5rem",
-        marginTop: ".65rem",
-        flexWrap: "wrap",
-        alignItems: "center",
-      }}
-    >
+    <div className='wipe-confirm-controls'>
       <input
+        className='wipe-confirm-input'
         type='text'
         placeholder='Type DELETE to confirm'
         value={val}
         onChange={(e) => setVal(e.target.value)}
-        style={{
-          flex: 1,
-          minWidth: 180,
-          height: 36,
-          padding: "0 12px",
-          border: "1px solid #fecaca",
-          borderRadius: 8,
-          fontSize: 13,
-          background: "var(--bg-primary,#fff)",
-          color: "var(--text-primary,#111827)",
-          outline: "none",
-        }}
         autoComplete='off'
         spellCheck={false}
       />
       <button
         className='danger-btn'
         disabled={val !== "DELETE"}
-        style={{
-          opacity: val !== "DELETE" ? 0.42 : 1,
-          cursor: val !== "DELETE" ? "not-allowed" : "pointer",
-        }}
+        data-disabled={val !== "DELETE"}
         onClick={onConfirm}
       >
         Delete everything

@@ -523,19 +523,6 @@ export default function StudentDetails() {
           onClose={() => setReceiptPayment(null)}
         />
       )}
-
-      <style>{`
-        .prev-bal-badge,.discount-badge{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 10px;font-size:11px;font-weight:600;margin-left:10px}
-        .prev-bal-badge{background:#fef9c3;color:#854d0e;border:1px solid #fde68a}
-        .discount-badge{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0}
-        .prev-bal-badge svg,.discount-badge svg{width:12px;height:12px}
-        .pb-alert-banner{display:flex;align-items:flex-start;gap:10px;background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;color:#854d0e;font-size:13px;margin-bottom:1.25rem}
-        .pb-alert-banner svg{width:18px;height:18px;flex-shrink:0;margin-top:1px}
-        .discount-alert-banner{display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;color:#166534;font-size:13px;margin-bottom:1.25rem}
-        .discount-alert-banner svg{width:18px;height:18px;flex-shrink:0;margin-top:1px}
-        [data-theme="dark"] .pb-alert-banner{background:#422006;border-color:#713f12;color:#fbbf24}
-        [data-theme="dark"] .discount-alert-banner{background:#052e16;border-color:#14532d;color:#4ade80}
-      `}</style>
     </div>
   );
 }

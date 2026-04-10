@@ -26,6 +26,7 @@ import MigrateTerms from "./pages/settings/MigrateTerms.jsx";
 import PreviousBalances from "./pages/previous_balance/Previousbalances.jsx";
 import Discounts from "./pages/discount/Discounts.jsx";
 import RoleManagement from "./pages/roles/RoleManagement.jsx";
+import UserProfile from "./pages/profile/UserProfile.jsx";
 
 import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
 import RoleGuard from "./components/common/RoleGuard.jsx";
@@ -195,6 +196,14 @@ export default function AppRoutes() {
                     <Guard permission={PERMISSIONS.VIEW_SETTINGS}>
                       <SettingsPage />
                     </Guard>
+                  }
+                />
+                <Route
+                  path='/profile'
+                  element={
+                    <ProtectedRoute>
+                      <UserProfile />
+                    </ProtectedRoute>
                   }
                 />
                 <Route

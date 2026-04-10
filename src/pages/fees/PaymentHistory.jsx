@@ -55,11 +55,6 @@ function Skeleton() {
           </div>
         ))}
       </div>
-      <style>{`
-        .skel-bone { background:linear-gradient(90deg,var(--skel-base,#e2e8f0) 25%,var(--skel-shine,#f1f5f9) 50%,var(--skel-base,#e2e8f0) 75%); background-size:200% 100%; animation:skel-shimmer 1.4s ease-in-out infinite; display:block; flex-shrink:0; }
-        @keyframes skel-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-        [data-theme="dark"] .skel-bone { --skel-base:#1e293b; --skel-shine:#334155; }
-      `}</style>
     </div>
   );
 }
@@ -299,11 +294,26 @@ export default function PaymentHistory() {
         </div>
 
         {loading ? (
-          <div style={{ padding: "2.5rem", textAlign: "center" }}>
-            <div className='spinner' />
-            <p style={{ marginTop: "1rem", color: "var(--color-text-secondary)", fontSize: 13 }}>
-              Loading payments…
-            </p>
+          <div style={{ padding: "1rem 1.25rem" }}>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={`ph-skel-${i}`}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1.4fr .9fr .9fr .8fr",
+                  gap: "0.75rem",
+                  padding: "10px 0",
+                  borderBottom: "1px solid var(--border-light,#f1f5f9)",
+                  alignItems: "center",
+                }}
+              >
+                <Bone w='76%' h={13} r={4} />
+                <Bone w='84%' h={13} r={4} />
+                <Bone w={70} h={24} r={99} />
+                <Bone w={64} h={22} r={8} />
+                <Bone w='70%' h={13} r={4} style={{ marginLeft: "auto" }} />
+              </div>
+            ))}
           </div>
         ) : (
           <>
@@ -419,21 +429,6 @@ export default function PaymentHistory() {
           </>
         )}
       </div>
-
-      <style>{`
-        .ph-btn {
-          padding:4px 10px; border-radius:6px; font-size:12px; font-weight:500;
-          border:1px solid var(--color-border-secondary,#e2e8f0);
-          background:transparent; color:var(--color-text-secondary); cursor:pointer;
-          transition:background 0.15s;
-        }
-        .ph-btn:hover:not(:disabled) { background:var(--color-background-secondary,#f8fafc); }
-        .ph-btn.active { background:#4f46e5; color:#fff; border-color:#4f46e5; }
-        .ph-btn:disabled { opacity:0.4; cursor:not-allowed; }
-        [data-theme="dark"] .ph-btn              { border-color:#334155; color:#94a3b8; }
-        [data-theme="dark"] .ph-btn.active       { background:#4f46e5; color:#fff; border-color:#4f46e5; }
-        [data-theme="dark"] .ph-btn:hover:not(:disabled) { background:#1e293b; }
-      `}</style>
     </div>
   );
 }

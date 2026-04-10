@@ -1,7 +1,6 @@
-/**
+﻿/**
  * ReceiptToolbar.jsx
  * Complete export action bar for receipt modals.
- * Place in: src/components/common/ReceiptToolbar.jsx
  */
 
 import {
@@ -14,7 +13,6 @@ import {
   HiExclamationCircle,
 } from "react-icons/hi";
 
-// WhatsApp SVG icon (no react-icons entry for this)
 function WhatsAppIcon() {
   return (
     <svg viewBox='0 0 24 24' width='16' height='16' fill='currentColor'>
@@ -37,74 +35,46 @@ export default function ReceiptToolbar({
 }) {
   return (
     <div data-no-capture className='rtb-root'>
-      {/* ── Main bar ─────────────────────────────────────────────── */}
       <div className='rtb-bar'>
         <span className='rtb-title'>{title}</span>
 
         <div className='rtb-actions'>
-          {/* PDF */}
-          <button
-            className='rtb-btn rtb-pdf'
-            onClick={exportPDF}
-            disabled={exporting}
-            title='Download PDF'
-          >
+          <button className='rtb-btn rtb-pdf' onClick={exportPDF} disabled={exporting} title='Download PDF'>
             {exporting ? <Spinner /> : <HiDownload />}
             <span>PDF</span>
           </button>
 
-          {/* PNG Image */}
-          <button
-            className='rtb-btn rtb-img'
-            onClick={exportImage}
-            disabled={exporting}
-            title='Download as image'
-          >
+          <button className='rtb-btn rtb-img' onClick={exportImage} disabled={exporting} title='Download as image'>
             {exporting ? <Spinner /> : <HiPhotograph />}
             <span>Image</span>
           </button>
 
-          {/* WhatsApp */}
-          <button
-            className='rtb-btn rtb-wa'
-            onClick={shareWhatsApp}
-            disabled={exporting}
-            title='Share on WhatsApp'
-          >
+          <button className='rtb-btn rtb-wa' onClick={shareWhatsApp} disabled={exporting} title='Share on WhatsApp'>
             {exporting ? <Spinner /> : <WhatsAppIcon />}
             <span>WhatsApp</span>
           </button>
 
-          {/* Native share / clipboard */}
           <button
             className='rtb-btn rtb-share'
             onClick={shareNative}
             disabled={exporting}
-            title={canShare ? "Share…" : "Copy to clipboard"}
+            title={canShare ? "Share..." : "Copy to clipboard"}
           >
             {exporting ? <Spinner /> : <HiShare />}
             <span>{canShare ? "Share" : "Copy"}</span>
           </button>
 
-          {/* Print */}
-          <button
-            className='rtb-btn rtb-print'
-            onClick={() => window.print()}
-            disabled={exporting}
-            title='Print / Save as PDF'
-          >
+          <button className='rtb-btn rtb-print' onClick={() => window.print()} disabled={exporting} title='Print / Save as PDF'>
             <HiPrinter />
             <span>Print</span>
           </button>
 
-          {/* Close */}
           <button className='rtb-close' onClick={onClose} title='Close' disabled={exporting}>
             <HiX />
           </button>
         </div>
       </div>
 
-      {/* ── Error banner ─────────────────────────────────────────── */}
       {error && (
         <div className='rtb-banner rtb-error'>
           <HiExclamationCircle />
@@ -112,7 +82,6 @@ export default function ReceiptToolbar({
         </div>
       )}
 
-      {/* ── Success toast ─────────────────────────────────────────── */}
       {toast && (
         <div className='rtb-banner rtb-success'>
           <HiCheckCircle />
@@ -120,96 +89,12 @@ export default function ReceiptToolbar({
         </div>
       )}
 
-      {/* ── Busy overlay hint ─────────────────────────────────────── */}
       {exporting && (
         <div className='rtb-busy'>
           <Spinner size={18} />
-          <span>Preparing export…</span>
+          <span>Preparing export...</span>
         </div>
       )}
-
-      <style>{`
-        .rtb-root { font-family: "Segoe UI", Arial, sans-serif; }
-
-        /* Bar */
-        .rtb-bar {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 12px 16px; gap: 12px; flex-wrap: wrap;
-          background: #f8fafc; border-bottom: 1px solid #e2e8f0;
-        }
-        .rtb-title { font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-
-        /* Action group */
-        .rtb-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-
-        /* Shared button base */
-        .rtb-btn {
-          display: inline-flex; align-items: center; gap: 5px;
-          padding: 7px 12px; border-radius: 7px;
-          border: 1px solid transparent; cursor: pointer;
-          font-size: 12px; font-weight: 600; transition: filter 0.15s, opacity 0.15s;
-          white-space: nowrap;
-        }
-        .rtb-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
-        .rtb-btn span { display: none; }
-        @media (min-width: 520px) { .rtb-btn span { display: inline; } }
-        .rtb-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-        .rtb-btn:not(:disabled):hover { filter: brightness(0.93); }
-
-        /* Individual colours */
-        .rtb-pdf   { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
-        .rtb-img   { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
-        .rtb-wa    { background: #dcfce7; color: #15803d; border-color: #4ade80; }
-        .rtb-share { background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; }
-        .rtb-print { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
-
-        .rtb-close {
-          width: 32px; height: 32px; border-radius: 7px; padding:0;
-          background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;
-          cursor: pointer; display: flex; align-items: center; justify-content: center;
-          font-size: 15px; flex-shrink: 0; transition: background 0.15s;
-        }
-        .rtb-close:hover:not(:disabled) { background: #fecaca; }
-        .rtb-close:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        /* Banners */
-        .rtb-banner {
-          display: flex; align-items: center; gap: 8px;
-          padding: 9px 16px; font-size: 12px; font-weight: 500;
-          border-bottom: 1px solid transparent;
-          animation: rtb-fade-in 0.2s ease;
-        }
-        .rtb-banner svg { width: 16px; height: 16px; flex-shrink: 0; }
-        .rtb-error   { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
-        .rtb-success { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
-
-        /* Busy strip */
-        .rtb-busy {
-          display: flex; align-items: center; gap: 8px;
-          padding: 7px 16px; font-size: 12px; color: #64748b;
-          background: #f1f5f9; border-bottom: 1px solid #e2e8f0;
-          animation: rtb-fade-in 0.2s ease;
-        }
-
-        @keyframes rtb-fade-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-        @keyframes rtb-spin    { to { transform: rotate(360deg); } }
-
-        /* Dark mode */
-        [data-theme="dark"] .rtb-bar    { background: #0f172a; border-color: #1e293b; }
-        [data-theme="dark"] .rtb-title  { color: #f1f5f9; }
-        [data-theme="dark"] .rtb-pdf    { background: #1e3a5f; color: #93c5fd; border-color: #1e40af; }
-        [data-theme="dark"] .rtb-img    { background: #052e16; color: #6ee7b7; border-color: #065f46; }
-        [data-theme="dark"] .rtb-wa     { background: #052e16; color: #4ade80; border-color: #14532d; }
-        [data-theme="dark"] .rtb-share  { background: #2e1065; color: #c4b5fd; border-color: #4c1d95; }
-        [data-theme="dark"] .rtb-print  { background: #431407; color: #fdba74; border-color: #7c2d12; }
-        [data-theme="dark"] .rtb-close  { background: #3f0000; color: #f87171; border-color: #7f1d1d; }
-        [data-theme="dark"] .rtb-busy   { background: #0f172a; border-color: #1e293b; color: #64748b; }
-        [data-theme="dark"] .rtb-error  { background: #3f0000; color: #f87171; border-color: #7f1d1d; }
-        [data-theme="dark"] .rtb-success { background: #052e16; color: #4ade80; border-color: #14532d; }
-
-        /* Print — hide the whole toolbar */
-        @media print { .rtb-root { display: none !important; } }
-      `}</style>
     </div>
   );
 }
@@ -224,9 +109,9 @@ function Spinner({ size = 14 }) {
         borderRadius: "50%",
         border: "2px solid currentColor",
         borderTopColor: "transparent",
-        flexShrink: 0,
-        animation: "rtb-spin 0.7s linear infinite",
+        animation: "rtb-spin 0.8s linear infinite",
       }}
+      aria-hidden='true'
     />
   );
 }

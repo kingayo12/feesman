@@ -4,7 +4,6 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../../firebase/auth";
 import Logo from "../../assets/logo.png";
 import { HiMail, HiExclamationCircle, HiCheckCircle, HiArrowLeft } from "react-icons/hi";
-import { AUTH_STYLES } from "./Login";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -160,15 +159,6 @@ export default function ForgotPassword() {
           </Link>
         </div>
       </div>
-
-      <style>{`
-        ${AUTH_STYLES}
-        .fp-lock-badge {
-          width: 52px; height: 52px; border-radius: 12px;
-          background: #fef9c3; border: 1px solid #fde68a;
-          display: flex; align-items: center; justify-content: center;
-        }
-      `}</style>
     </div>
   );
 }

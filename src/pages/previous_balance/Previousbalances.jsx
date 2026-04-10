@@ -12,6 +12,7 @@ import { getAllStudents } from "../students/studentService";
 import { getFamilies } from "../families/familyService";
 import { getSettings } from "../settings/settingService";
 import { useRole } from "../../hooks/useRole";
+import { PERMISSIONS } from "../../config/permissions";
 import TableToolbar from "../../components/common/TableToolbar";
 import {
   getAllPreviousBalancesForSession,
@@ -29,6 +30,7 @@ import {
   HiPlus,
   HiX,
 } from "react-icons/hi";
+import { Bone } from "../../components/common/Skeleton";
 
 export default function PreviousBalances() {
   const [students, setStudents] = useState([]);
@@ -40,7 +42,8 @@ export default function PreviousBalances() {
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState(null);
   const [editingId, setEditingId] = useState(null); // docId being edited
-  const { canEdit, canDelete } = useRole();
+  const { can } = useRole();
+  const canManageBalances = can(PERMISSIONS.EDIT_BALANCES);
   const [showForm, setShowForm] = useState(false);
 
   const [form, setForm] = useState({
@@ -207,24 +210,26 @@ export default function PreviousBalances() {
             </p>
           </div>
         </div>
-        <button
-          className={`submit-btn ${showForm ? "cancel-mode" : ""}`}
-          style={{ marginTop: 0, width: "auto" }}
-          onClick={() => {
-            if (showForm) resetForm();
-            else setShowForm(true);
-          }}
-        >
-          {showForm ? (
-            <>
-              <HiX /> Cancel
-            </>
-          ) : (
-            <>
-              <HiPlus /> Add Balance
-            </>
-          )}
-        </button>
+        {canManageBalances && (
+          <button
+            className={`submit-btn ${showForm ? "cancel-mode" : ""}`}
+            style={{ marginTop: 0, width: "auto" }}
+            onClick={() => {
+              if (showForm) resetForm();
+              else setShowForm(true);
+            }}
+          >
+            {showForm ? (
+              <>
+                <HiX /> Cancel
+              </>
+            ) : (
+              <>
+                <HiPlus /> Add Balance
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* ── Info banner ───────────────────────────────────────────── */}
@@ -254,7 +259,7 @@ export default function PreviousBalances() {
       </div>
 
       {/* ── Entry form ────────────────────────────────────────────── */}
-      {showForm && (
+      {showForm && canManageBalances && (
         <div className='pb-form-card animate-slide'>
           <h3 style={{ marginBottom: "1.25rem", fontSize: "1rem", fontWeight: 600 }}>
             {editingId ? "Edit Previous Balance" : "Add Previous Balance"}
@@ -383,8 +388,27 @@ export default function PreviousBalances() {
         )}
 
         {loading ? (
-          <div className='empty-state-container' style={{ padding: "3rem" }}>
-            <div className='spinner' />
+          <div style={{ padding: "1rem 1.25rem" }}>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={`pb-skel-${i}`}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2fr 1.1fr 1fr 1fr 1.3fr 1fr",
+                  gap: "0.75rem",
+                  padding: "10px 0",
+                  borderBottom: "1px solid var(--border-light,#f1f5f9)",
+                  alignItems: "center",
+                }}
+              >
+                <Bone w='86%' h={14} r={4} />
+                <Bone w='82%' h={14} r={4} />
+                <Bone w='70%' h={14} r={4} />
+                <Bone w='60%' h={14} r={4} />
+                <Bone w='84%' h={14} r={4} />
+                <Bone w={74} h={28} r={8} />
+              </div>
+            ))}
           </div>
         ) : (
           <table className='data-table'>
@@ -445,12 +469,12 @@ export default function PreviousBalances() {
                       </td>
                       <td className='actions-cell'>
                         {record ? (
-                          canEdit && (
+                          can(PERMISSIONS.EDIT_BALANCES) && (
                             <button className='edit-btn' onClick={() => handleEdit(record)}>
                               <HiPencil /> Edit
                             </button>
                           )
-                        ) : (
+                        ) : canManageBalances ? (
                           <button
                             className='edit-btn'
                             onClick={() => {
@@ -461,8 +485,8 @@ export default function PreviousBalances() {
                           >
                             <HiPencil /> Set
                           </button>
-                        )}
-                        {record && canDelete && (
+                        ) : null}
+                        {record && can(PERMISSIONS.EDIT_BALANCES) && (
                           <button className='delete-btn' onClick={() => handleDelete(record)}>
                             <HiTrash />
                           </button>
@@ -482,77 +506,6 @@ export default function PreviousBalances() {
           </table>
         )}
       </div>
-
-      <style>{`
-        .pb-page { max-width: 1100px; margin: 0 auto; }
-
-        .pb-toast {
-          position: fixed; top: 1.25rem; right: 1.25rem; z-index: 9999;
-          display: flex; align-items: center; gap: 0.5rem;
-          padding: 0.75rem 1.25rem; border-radius: 8px;
-          font-size: 13px; font-weight: 500;
-          animation: slideIn 0.2s ease;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-        }
-        .pb-toast.success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-        .pb-toast.error   { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-        .pb-toast svg { width: 17px; height: 17px; flex-shrink: 0; }
-        @keyframes slideIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; } }
-
-        .pb-header {
-          display: flex; justify-content: space-between; align-items: center;
-          flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;
-        }
-        .pb-header-left { display: flex; align-items: center; gap: 1rem; }
-        .pb-icon-wrap {
-          width: 48px; height: 48px; border-radius: 12px;
-          background: #fef9c3; color: #854d0e;
-          display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
-        }
-        .pb-header h2 { margin: 0; font-size: 1.5rem; }
-        .pb-header p  { margin: 0; color: var(--color-text-secondary); font-size: 0.9rem; }
-
-        .pb-info-banner {
-          display: flex; gap: 10px; align-items: flex-start;
-          padding: 12px 16px; border-radius: 8px;
-          background: #eff6ff; border: 1px solid #bfdbfe;
-          color: #1e40af; font-size: 13px; margin-bottom: 1.5rem;
-        }
-        .pb-info-banner svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
-        .pb-info-banner p   { margin: 0; line-height: 1.5; }
-
-        .pb-stats {
-          display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 1rem; margin-bottom: 1.5rem;
-        }
-        .pb-stat-card {
-          background: white; border-radius: 12px; padding: 1.25rem;
-          border: 1px solid #f1f5f9;
-          display: flex; flex-direction: column; gap: 6px;
-        }
-        .pb-stat-label { font-size: 12px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
-        .pb-stat-value { font-size: 1.75rem; font-weight: 700; color: #1e293b; }
-        .pb-stat-value.danger { color: #dc2626; }
-
-        .pb-form-card {
-          background: white; border-radius: 16px; padding: 1.5rem;
-          border: 1px solid #e2e8f0; margin-bottom: 1.5rem;
-        }
-
-        .pb-row-owing { background: #fff9f9 !important; }
-        [data-theme="dark"] .pb-row-owing { background: #1f1010 !important; }
-
-        .pb-amount { font-weight: 700; font-size: 14px; }
-        .pb-amount.danger { color: #dc2626; }
-        .pb-amount.clear  { color: #16a34a; }
-
-        .cancel-mode { background: #fee2e2 !important; color: #dc2626 !important; }
-
-        [data-theme="dark"] .pb-stat-card   { background: #1e293b; border-color: #334155; }
-        [data-theme="dark"] .pb-stat-value  { color: #f1f5f9; }
-        [data-theme="dark"] .pb-form-card   { background: #1e293b; border-color: #334155; }
-        [data-theme="dark"] .pb-info-banner { background: #1e3a5f; border-color: #1e40af; color: #93c5fd; }
-      `}</style>
     </div>
   );
 }

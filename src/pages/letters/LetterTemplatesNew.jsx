@@ -1309,17 +1309,6 @@ export default function LetterTemplates() {
             </div>
           );
         })()}
-
-      {/* ══ STYLES ══ */}
-      <style>{`
-       
-        /* Print */
-        @media print {
-          body * { visibility:hidden; }
-          .lp-sheet, .lp-sheet * { visibility:visible; }
-          .lp-sheet { position:fixed; inset:0; padding:2.5rem 3rem; box-shadow:none; border:none; max-width:none; border-radius:0; }
-        }
-      `}</style>
     </div>
   );
 }

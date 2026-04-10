@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import { getClasses, deleteClass } from "./classService";
 import { getAllStudents } from "../students/studentService";
 import { useRole } from "../../hooks/useRole";
+import { PERMISSIONS } from "../../config/permissions";
 import TableToolbar from "../../components/common/TableToolbar";
 import ClassForm from "../../components/forms/ClassForm";
 import { ClassListSkeleton } from "../../components/common/Skeleton";
@@ -46,7 +47,7 @@ export default function ClassList() {
   const [showForm, setShowForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
   const [deleting, setDeleting] = useState(false);
-  const { canDelete } = useRole();
+  const { can } = useRole();
 
   const loadAll = async () => {
     setLoading(true);
@@ -109,22 +110,24 @@ export default function ClassList() {
             <p>Organise classes, view enrolment, and promote students to the next level</p>
           </div>
         </div>
-        <button
-          className={`toggle-form-btn ${showForm ? "cancel" : "add"}`}
-          onClick={() => setShowForm(!showForm)}
-        >
-          {showForm ? (
-            "Close Form"
-          ) : (
-            <>
-              <HiPlusCircle /> Add New Class
-            </>
-          )}
-        </button>
+        {can(PERMISSIONS.CREATE_CLASS) && (
+          <button
+            className={`toggle-form-btn ${showForm ? "cancel" : "add"}`}
+            onClick={() => setShowForm(!showForm)}
+          >
+            {showForm ? (
+              "Close Form"
+            ) : (
+              <>
+                <HiPlusCircle /> Add New Class
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* ── Add class form ── */}
-      {showForm && (
+      {showForm && can(PERMISSIONS.CREATE_CLASS) && (
         <div className='form-card-wrapper animate-slide'>
           <ClassForm
             onSuccess={() => {
@@ -206,7 +209,7 @@ export default function ClassList() {
                           <HiLightningBolt /> Promote
                         </Link>
                       )}
-                      {canDelete && (
+                      {can(PERMISSIONS.DELETE_CLASS) && (
                         <button
                           className='delete-btn'
                           onClick={() => setDeleteTarget({ id: cls.id, name: cls.name })}
@@ -267,45 +270,6 @@ export default function ClassList() {
           </div>
         </div>
       )}
-
-      {/* ── Styles ── */}
-      <style>{`
-        /* Student count badge */
-        .cl-count { display:inline-flex; align-items:center; gap:.3rem; font-size:.82rem; font-weight:600; color:#374151; }
-        [data-theme="dark"] .cl-count { color:#d1d5db; }
-        .cl-count--empty { color:#9ca3af; font-weight:400; }
-
-        /* Promote quick-link */
-        .cl-promote-btn {
-          display:inline-flex; align-items:center; gap:.3rem;
-          padding:.42rem .8rem; border-radius:8px;
-          border:1px solid #99f6e4; background:#f0fdfa;
-          color:#0d9488; font-size:.8rem; font-weight:600;
-          text-decoration:none; transition:background .13s, border-color .13s;
-        }
-        .cl-promote-btn:hover { background:#ccfbf1; border-color:#5eead4; }
-        [data-theme="dark"] .cl-promote-btn { background:#022c22; border-color:#134e4a; color:#6ee7b7; }
-        [data-theme="dark"] .cl-promote-btn:hover { background:#134e4a; }
-
-        /* Delete confirm modal */
-        .cl-del-overlay { position:fixed; inset:0; background:rgba(15,23,42,.7); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:2000; padding:1rem; }
-        .cl-del-modal { background:#fff; border-radius:16px; padding:1.75rem; max-width:400px; width:100%; box-shadow:0 32px 80px rgba(0,0,0,.25); text-align:center; }
-        [data-theme="dark"] .cl-del-modal { background:#1e293b; }
-        .cl-del-icon-wrap { width:52px; height:52px; border-radius:50%; background:#fef2f2; color:#dc2626; display:flex; align-items:center; justify-content:center; font-size:1.5rem; margin:0 auto .85rem; }
-        .cl-del-modal h4 { margin:0 0 .5rem; font-size:1rem; color:#111827; }
-        [data-theme="dark"] .cl-del-modal h4 { color:#f1f5f9; }
-        .cl-del-modal p { margin:0 0 1rem; font-size:.84rem; color:#6b7280; line-height:1.5; }
-        [data-theme="dark"] .cl-del-modal p { color:#94a3b8; }
-        .cl-del-warn { display:flex; align-items:center; gap:.4rem; padding:.6rem .85rem; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; font-size:.78rem; color:#92400e; margin-bottom:1rem; text-align:left; }
-        .cl-del-actions { display:flex; gap:.6rem; justify-content:center; }
-        .cl-del-cancel { padding:.5rem 1.1rem; border:1px solid #d1d5db; border-radius:8px; background:transparent; cursor:pointer; font-size:.875rem; color:#374151; }
-        .cl-del-cancel:hover { background:#f3f4f6; }
-        .cl-del-cancel:disabled { opacity:.45; cursor:not-allowed; }
-        [data-theme="dark"] .cl-del-cancel { border-color:#475569; color:#d1d5db; }
-        .cl-del-confirm { padding:.5rem 1.1rem; border:none; border-radius:8px; background:#dc2626; color:#fff; cursor:pointer; font-size:.875rem; font-weight:600; transition:background .14s; }
-        .cl-del-confirm:hover { background:#b91c1c; }
-        .cl-del-confirm:disabled { opacity:.45; cursor:not-allowed; }
-      `}</style>
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Logo from "../../assets/logo.png";
 import { HiMail, HiLockClosed, HiUser, HiEye, HiEyeOff, HiExclamationCircle } from "react-icons/hi";
-import { AUTH_STYLES } from "./Login";
 
 export default function Register() {
   const { register } = useAuth();
@@ -199,8 +198,6 @@ export default function Register() {
           </p>
         </div>
       </div>
-
-      <style>{AUTH_STYLES}</style>
     </div>
   );
 }

@@ -203,11 +203,6 @@ export default function Reports() {
           ))}
         </div>
         <Bone h={300} r={12} />
-        <style>{`
-        .skel-bone { background:linear-gradient(90deg,var(--skel-base,#e2e8f0) 25%,var(--skel-shine,#f1f5f9) 50%,var(--skel-base,#e2e8f0) 75%); background-size:200% 100%; animation:skel-shimmer 1.4s ease-in-out infinite; display:block; }
-        @keyframes skel-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-        [data-theme="dark"] .skel-bone { --skel-base:#1e293b; --skel-shine:#334155; }
-      `}</style>
       </div>
     );
 
@@ -313,11 +308,31 @@ export default function Reports() {
         </div>
 
         {loading ? (
-          <div style={{ padding: "2rem", textAlign: "center" }}>
-            <div className='spinner' />
-            <p style={{ marginTop: "1rem", color: "var(--color-text-secondary)", fontSize: 13 }}>
-              Calculating balances…
-            </p>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+              gap: "0.9rem",
+              padding: "0.5rem 0",
+            }}
+          >
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={`report-skel-${i}`}
+                style={{
+                  background: "var(--color-background-secondary)",
+                  borderRadius: 12,
+                  padding: "1rem",
+                  border: "1px solid var(--color-border-tertiary)",
+                }}
+              >
+                <Bone w='60%' h={14} r={4} style={{ marginBottom: 10 }} />
+                <Bone w='100%' h={6} r={3} style={{ marginBottom: 12 }} />
+                <Bone w='78%' h={12} r={4} style={{ marginBottom: 6 }} />
+                <Bone w='70%' h={12} r={4} style={{ marginBottom: 6 }} />
+                <Bone w='82%' h={12} r={4} />
+              </div>
+            ))}
           </div>
         ) : reportData.length === 0 ? (
           <p className='empty-row'>No data for {selectedTerm}. Make sure fees are configured.</p>

@@ -4,6 +4,7 @@ import { getAllStudents, deleteStudent } from "./studentService";
 import { HiSearch, HiOutlineAcademicCap, HiEye, HiFilter, HiTrash } from "react-icons/hi";
 import { filterData } from "../../utils/helpers";
 import { useRole } from "../../hooks/useRole";
+import { PERMISSIONS } from "../../config/permissions";
 import TableToolbar from "../../components/common/TableToolbar";
 import { getClasses } from "../classes/classService";
 import { getFamilies } from "../families/familyService";
@@ -15,7 +16,7 @@ export default function StudentList() {
   const [families, setFamilies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const { canDelete } = useRole();
+  const { can } = useRole();
 
   useEffect(() => {
     async function loadAllData() {
@@ -154,7 +155,7 @@ export default function StudentList() {
                     <Link to={`/students/${student.id}`} className='view-btn'>
                       <HiEye /> View
                     </Link>
-                    {canDelete && (
+                    {can(PERMISSIONS.DELETE_STUDENT) && (
                       <button
                         className='delete-btn'
                         onClick={() => handleDelete(student.id)}

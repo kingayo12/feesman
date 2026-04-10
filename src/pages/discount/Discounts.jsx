@@ -20,6 +20,7 @@ import { getFamilies } from "../families/familyService";
 import { getAllStudents } from "../students/studentService";
 import { getSettings } from "../settings/settingService";
 import { useRole } from "../../hooks/useRole";
+import { PERMISSIONS } from "../../config/permissions";
 import {
   HiTag,
   HiPlus,
@@ -77,7 +78,8 @@ export default function Discounts() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
-  const { canEdit, canDelete } = useRole();
+  const { can } = useRole();
+  const canManageDiscounts = can(PERMISSIONS.MANAGE_DISCOUNTS);
   const [assignForm, setAssignForm] = useState({
     discountId: "",
     targetType: "family",
@@ -149,6 +151,10 @@ export default function Discounts() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!canManageDiscounts) {
+      showToast("error", "You do not have permission to manage discounts.");
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -175,6 +181,10 @@ export default function Discounts() {
   };
 
   const handleDelete = async (d) => {
+    if (!canManageDiscounts) {
+      showToast("error", "You do not have permission to delete discounts.");
+      return;
+    }
     if (!window.confirm(`Delete "${d.name}"? All assignments will also be removed.`)) return;
     try {
       await deleteDiscount(d.id);
@@ -188,6 +198,10 @@ export default function Discounts() {
   // ── Assignment ────────────────────────────────────────────────────────
   const handleAssign = async (e) => {
     e.preventDefault();
+    if (!canManageDiscounts) {
+      showToast("error", "You do not have permission to assign discounts.");
+      return;
+    }
     if (!assignForm.discountId || !assignForm.targetId) return;
     setAssigning(true);
     try {
@@ -211,6 +225,10 @@ export default function Discounts() {
   };
 
   const handleRemoveAssignment = async (a) => {
+    if (!canManageDiscounts) {
+      showToast("error", "You do not have permission to remove assignments.");
+      return;
+    }
     if (!window.confirm("Remove this assignment?")) return;
     try {
       await removeAssignment(a.id);
@@ -244,7 +262,6 @@ export default function Discounts() {
             <Bone key={i} h={64} r={12} />
           ))}
         </div>
-        <style>{`.skel-bone{background:linear-gradient(90deg,var(--skel-base,#e2e8f0) 25%,var(--skel-shine,#f1f5f9) 50%,var(--skel-base,#e2e8f0) 75%);background-size:200% 100%;animation:skel-shimmer 1.4s ease-in-out infinite;display:block}@keyframes skel-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}[data-theme=dark] .skel-bone{--skel-base:#1e293b;--skel-shine:#334155}`}</style>
       </div>
     );
 
@@ -288,7 +305,7 @@ export default function Discounts() {
             <p>Define and assign fee discounts — {settings.academicYear}</p>
           </div>
         </div>
-        {tab === "discounts" && (
+        {tab === "discounts" && canManageDiscounts && (
           <button
             className={`submit-btn ${showForm ? "" : ""}`}
             style={{ marginTop: 0, width: "auto" }}
@@ -372,7 +389,7 @@ export default function Discounts() {
       {tab === "discounts" && (
         <>
           {/* Form */}
-          {showForm && (
+          {showForm && canManageDiscounts && (
             <div
               className='pb-form-card animate-slide'
               style={{
@@ -669,12 +686,12 @@ export default function Discounts() {
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
-                      {canEdit && (
+                      {can(PERMISSIONS.MANAGE_DISCOUNTS) && (
                         <button className='edit-btn' onClick={() => handleEdit(d)}>
                           <HiPencil /> Edit
                         </button>
                       )}
-                      {canDelete && (
+                      {can(PERMISSIONS.MANAGE_DISCOUNTS) && (
                         <button className='delete-btn' onClick={() => handleDelete(d)}>
                           <HiTrash />
                         </button>
@@ -692,7 +709,7 @@ export default function Discounts() {
       {tab === "assign" && (
         <>
           {/* Assignment form */}
-          {manualDiscounts.length > 0 ? (
+          {manualDiscounts.length > 0 && canManageDiscounts ? (
             <div
               className='pb-form-card animate-slide'
               style={{
@@ -885,7 +902,7 @@ export default function Discounts() {
                         {a.note || "—"}
                       </td>
                       <td>
-                        {canDelete && (
+                        {can(PERMISSIONS.MANAGE_DISCOUNTS) && (
                           <button className='delete-btn' onClick={() => handleRemoveAssignment(a)}>
                             <HiTrash />
                           </button>
@@ -899,31 +916,6 @@ export default function Discounts() {
           </div>
         </>
       )}
-
-      <style>{`
-        .discount-card {
-          background: var(--color-background-primary, #fff);
-          border: 1px solid var(--color-border-tertiary, #f1f5f9);
-          border-radius: 12px; padding: 1rem 1.25rem;
-          display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
-          transition: box-shadow .15s;
-        }
-        .discount-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
-        [data-theme="dark"] .discount-card { background: #1e293b; border-color: #334155; }
-        .discount-card-left { display: flex; align-items: flex-start; gap: 0.875rem; flex: 1; }
-        .discount-icon-wrap { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .dc-pill { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
-        .dc-pill.purple { background: #ede9fe; color: #6d28d9; }
-        .dc-pill.teal   { background: #e1f5ee; color: #0f6e56; }
-        .dc-pill.amber  { background: #fef9c3; color: #854d0e; }
-        [data-theme="dark"] .dc-pill.purple { background: #2e1065; color: #c4b5fd; }
-        [data-theme="dark"] .dc-pill.teal   { background: #04342c; color: #5dcaa5; }
-        [data-theme="dark"] .dc-pill.amber  { background: #412402; color: #fac775; }
-        [data-theme="dark"] .pb-form-card   { background: #1e293b !important; border-color: #334155 !important; }
-        .pb-toast.success { background:#dcfce7;color:#166534;border:1px solid #bbf7d0; }
-        .pb-toast.error   { background:#fee2e2;color:#991b1b;border:1px solid #fecaca; }
-        @keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1} }
-      `}</style>
     </div>
   );
 }

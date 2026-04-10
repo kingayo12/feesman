@@ -12,6 +12,8 @@ import { formatDate } from "../../utils/helpers";
 import { getFeesByClass } from "../fees/feesService";
 import { getStudentFeeOverrides } from "../students/studentFeeOverrideService";
 import { getPreviousBalanceAmount } from "../previous_balance/Previousbalanceservice";
+import { useRole } from "../../hooks/useRole";
+import { PERMISSIONS } from "../../config/permissions";
 import Logo from "../../assets/logo.png";
 import {
   HiArrowLeft,
@@ -94,6 +96,7 @@ function FamilyDetailsSkeleton() {
 export default function FamilyDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { can } = useRole();
 
   const [family, setFamily] = useState(null);
   const [students, setStudents] = useState([]);
@@ -223,21 +226,23 @@ export default function FamilyDetails() {
               <HiAcademicCap className='icon' />
               <h3>Registered Students</h3>
             </div>
-            <button
-              className={`action-btn ${showAddStudent ? "cancel" : "add"}`}
-              onClick={() => setShowAddStudent(!showAddStudent)}
-            >
-              {showAddStudent ? (
-                "Cancel"
-              ) : (
-                <>
-                  <HiUserAdd /> Add Student
-                </>
-              )}
-            </button>
+            {can(PERMISSIONS.CREATE_STUDENT) && (
+              <button
+                className={`action-btn ${showAddStudent ? "cancel" : "add"}`}
+                onClick={() => setShowAddStudent(!showAddStudent)}
+              >
+                {showAddStudent ? (
+                  "Cancel"
+                ) : (
+                  <>
+                    <HiUserAdd /> Add Student
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
-          {showAddStudent && (
+          {showAddStudent && can(PERMISSIONS.CREATE_STUDENT) && (
             <div className='form-slide-down'>
               <StudentForm
                 familyId={id}
