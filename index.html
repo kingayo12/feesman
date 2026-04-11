@@ -4,12 +4,83 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>feesman</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#2424ff" />
+  <meta name="description"
+    content="Comprehensive school fee management system for tracking payments, managing students and families, and generating financial reports" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Feesman" />
+
+  <!-- PWA Icons for Apple -->
+  <link rel="apple-touch-icon" href="/icon-180.png" sizes="180x180" />
+  <link rel="apple-touch-icon" href="/icon-152.png" sizes="152x152" />
+  <link rel="apple-touch-icon" href="/icon-144.png" sizes="144x144" />
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Performance: Preload Critical Resources -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+  <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+
+  <!-- Favicon -->
+  <link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml" />
+
+  <!-- Windows Tile -->
+  <meta name="msapplication-TileColor" content="#2424ff" />
+  <meta name="msapplication-config" content="/browserconfig.xml" />
+
+  <title>Feesman - School Fee Manager</title>
 </head>
 
 <body>
   <div id="root"></div>
+
+  <!-- Service Worker Registration -->
+  <script>
+    // Register service worker for PWA support
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+          .then(reg => {
+            console.log('Service Worker registered successfully:', reg);
+            // Check for updates periodically
+            setInterval(() => {
+              reg.update().catch(err => console.log('Update check failed:', err));
+            }, 60000); // Check every minute
+          })
+          .catch(err => {
+            console.log('Service Worker registration failed:', err);
+          });
+      });
+    }
+
+    // PWA Install Prompt Handler
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // Prevent the mini-infobar from appearing
+      e.preventDefault();
+      // Stash the event for later use
+      deferredPrompt = e;
+      // Show install button/prompt to user
+      const installButton = document.getElementById('install-button');
+      if (installButton) {
+        installButton.style.display = 'block';
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      console.log('PWA was installed');
+      deferredPrompt = null;
+    });
+  </script>
+
   <script type="module" src="/src/main.jsx"></script>
 </body>
 
