@@ -16,6 +16,7 @@ import {
   HiTrash,
   HiDuplicate,
   HiSearch,
+  HiChevronDown,
 } from "react-icons/hi";
 
 const TERMS = ["1st Term", "2nd Term", "3rd Term"];
@@ -37,6 +38,7 @@ export default function FeeSetup() {
   const [filterTerm, setFilterTerm] = useState("");
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
   const { can } = useRole();
   const canManageFees = can(PERMISSIONS.CREATE_FEE) || can(PERMISSIONS.EDIT_FEE);
 
@@ -138,6 +140,15 @@ export default function FeeSetup() {
     if (!window.confirm("Delete this fee?")) return;
     await deleteFee(id);
     loadData();
+  };
+
+  const toggleGroup = (groupKey) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
   };
 
   const getClassLevel = (name = "") => {
@@ -253,7 +264,46 @@ export default function FeeSetup() {
       return getClassOrderNumber(nameA) - getClassOrderNumber(nameB);
     });
 
+  const groupedFees = useMemo(() => {
+    const groups = new Map();
+
+    visibleFees.forEach((fee) => {
+      const key = `${fee.classId}__${fee.session}__${fee.term}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          classId: fee.classId,
+          session: fee.session,
+          term: fee.term,
+          fees: [],
+          totalAmount: 0,
+        });
+      }
+
+      const group = groups.get(key);
+      group.fees.push(fee);
+      group.totalAmount += Number(fee.amount || 0);
+    });
+
+    return Array.from(groups.values()).map((group) => ({
+      ...group,
+      fees: [...group.fees].sort((a, b) => String(a.feeType).localeCompare(String(b.feeType))),
+    }));
+  }, [visibleFees]);
+
   const totalVisible = visibleFees.reduce((sum, f) => sum + Number(f.amount || 0), 0);
+  const allGroupsExpanded =
+    groupedFees.length > 0 && groupedFees.every((group) => expandedGroups.has(group.key));
+
+  const toggleAllGroups = () => {
+    if (!groupedFees.length) return;
+    if (allGroupsExpanded) {
+      setExpandedGroups(new Set());
+      return;
+    }
+    setExpandedGroups(new Set(groupedFees.map((group) => group.key)));
+  };
+
   const exportHeaders = ["Class", "Session", "Term", "Fee Type", "Amount"];
   const exportRows = visibleFees.map((fee) => [
     getClassName(fee.classId),
@@ -412,20 +462,11 @@ export default function FeeSetup() {
       )}
 
       {/* ── Table ──────────────────────────────────────────────── */}
-      <div className='table-card' style={{ marginTop: "2rem" }}>
+      <div className='table-card fee-setup-card' style={{ marginTop: "2rem" }}>
         {/* Controls row */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "0.75rem",
-            marginBottom: "1rem",
-          }}
-        >
+        <div className='fee-table-controls'>
           {/* Term tabs */}
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <div className='fee-term-tabs'>
             <button
               className={`term-tab ${filterTerm === "" ? "active" : ""}`}
               onClick={() => setFilterTerm("")}
@@ -443,15 +484,23 @@ export default function FeeSetup() {
             ))}
           </div>
 
-          {/* Search */}
-          <div className='search-box' style={{ minWidth: 220 }}>
-            <HiSearch className='search-icon' />
-            <input
-              type='text'
-              placeholder='Search class or fee type…'
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className='fee-controls-right'>
+            {/* Search */}
+            <div className='search-box fee-search-box'>
+              <HiSearch className='search-icon' />
+              <input
+                type='text'
+                placeholder='Search class or fee type…'
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            {!!groupedFees.length && (
+              <button type='button' className='fee-expand-all-btn' onClick={toggleAllGroups}>
+                {allGroupsExpanded ? "Collapse all" : "Expand all"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -459,27 +508,25 @@ export default function FeeSetup() {
         {visibleFees.length > 0 && (
           <>
             <TableToolbar fileName='fees' headers={exportHeaders} rows={exportRows} />
-            <p
-              style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: "0.5rem" }}
-            >
-              {visibleFees.length} fee{visibleFees.length !== 1 ? "s" : ""} — total ₦
-              {totalVisible.toLocaleString()}
+            <p className='fee-summary-line'>
+              {groupedFees.length} class group{groupedFees.length !== 1 ? "s" : ""} (
+              {visibleFees.length} fee item{visibleFees.length !== 1 ? "s" : ""}) — total ₦
+              <strong>{totalVisible.toLocaleString()}</strong>
               {filterTerm ? ` for ${filterTerm}` : ""}
             </p>
           </>
         )}
 
         {/* Table — rendered by React only, no DataTables */}
-        <div style={{ overflowX: "auto" }}>
-          <table className='data-table'>
+        <div className='fee-table-wrapper'>
+          <table className='data-table fee-setup-table'>
             <thead>
               <tr>
                 <th>Class</th>
                 <th>Session</th>
                 <th>Term</th>
-                <th>Fee Type</th>
-                <th className='text-right'>Amount</th>
-                <th>Actions</th>
+                <th className='text-right'>Total Amount</th>
+                <th>Fee Breakdown</th>
               </tr>
             </thead>
             <tbody>
@@ -495,59 +542,121 @@ export default function FeeSetup() {
                     <td>
                       <Bone w={70} h={24} r={99} />
                     </td>
-                    <td>
-                      <Bone w={110} h={14} r={4} />
-                    </td>
                     <td className='text-right'>
                       <Bone w={90} h={14} r={4} style={{ marginLeft: "auto" }} />
                     </td>
-                    <td className='actions-cell'>
-                      <Bone w={78} h={28} r={8} />
+                    <td>
+                      <Bone w={150} h={28} r={8} />
                     </td>
                   </tr>
                 ))
-              ) : visibleFees.length ? (
-                visibleFees.map((fee) => (
-                  <tr key={fee.id} className={editingId === fee.id ? "row-editing" : ""}>
-                    <td>
-                      <strong>{getClassName(fee.classId)}</strong>
-                    </td>
-                    <td>{fee.session}</td>
-                    <td>
-                      <span className='term-badge'>{fee.term}</span>
-                    </td>
-                    <td>{fee.feeType}</td>
-                    <td className='text-right'>₦{Number(fee.amount).toLocaleString()}</td>
-                    <td className='actions-cell'>
-                      {can(PERMISSIONS.EDIT_FEE) && (
-                        <button title='Edit' className='edit-btn' onClick={() => handleEdit(fee)}>
-                          <HiPencil />
-                        </button>
-                      )}
-                      {canManageFees && (
+              ) : groupedFees.length ? (
+                groupedFees.map((group) => {
+                  const isOpen = expandedGroups.has(group.key);
+                  return [
+                    <tr
+                      key={`${group.key}-parent`}
+                      className={`fee-parent-row ${isOpen ? "is-open" : ""} ${
+                        group.fees.some((fee) => editingId === fee.id) ? "row-editing" : ""
+                      }`}
+                    >
+                      <td className='fee-class-cell'>
+                        <strong>{getClassName(group.classId)}</strong>
+                        <div className='fee-group-meta'>
+                          {group.fees.length} fee type{group.fees.length !== 1 ? "s" : ""}
+                        </div>
+                      </td>
+                      <td>{group.session}</td>
+                      <td>
+                        <span className='term-badge'>{group.term}</span>
+                      </td>
+                      <td className='text-right'>
+                        <strong>₦{Number(group.totalAmount).toLocaleString()}</strong>
+                      </td>
+                      <td>
                         <button
-                          title='Duplicate into form'
-                          className='edit-btn'
-                          onClick={() => handleDuplicate(fee)}
+                          type='button'
+                          className='fee-breakdown-toggle'
+                          onClick={() => toggleGroup(group.key)}
+                          aria-expanded={isOpen}
                         >
-                          <HiDuplicate />
+                          <span className='fee-breakdown-label'>
+                            {isOpen ? "Hide fee types" : "Show fee types"}
+                          </span>
+                          <span className='fee-breakdown-badge'>{group.fees.length}</span>
+                          <HiChevronDown
+                            className={`fee-breakdown-chevron ${isOpen ? "open" : ""}`}
+                          />
                         </button>
-                      )}
-                      {can(PERMISSIONS.DELETE_FEE) && (
-                        <button
-                          title='Delete'
-                          className='delete-btn'
-                          onClick={() => handleDelete(fee.id)}
-                        >
-                          <HiTrash />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>,
+
+                    <tr
+                      key={`${group.key}-child`}
+                      className={`fee-child-row ${isOpen ? "open" : ""}`}
+                    >
+                      <td colSpan='5' className={`fee-child-cell ${isOpen ? "open" : ""}`}>
+                        <div className={`fee-breakdown-panel ${isOpen ? "open" : ""}`}>
+                          <div className='fee-breakdown-list'>
+                            <table className='fee-nested-table'>
+                              <thead>
+                                <tr>
+                                  <th>Fee Type</th>
+                                  <th className='text-right'>Amount</th>
+                                  <th>Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {group.fees.map((fee) => (
+                                  <tr key={fee.id}>
+                                    <td>{fee.feeType}</td>
+                                    <td className='text-right'>
+                                      ₦{Number(fee.amount).toLocaleString()}
+                                    </td>
+                                    <td>
+                                      <div className='actions-cell fee-breakdown-actions'>
+                                        {can(PERMISSIONS.EDIT_FEE) && (
+                                          <button
+                                            title='Edit'
+                                            className='edit-btn'
+                                            onClick={() => handleEdit(fee)}
+                                          >
+                                            <HiPencil />
+                                          </button>
+                                        )}
+                                        {canManageFees && (
+                                          <button
+                                            title='Duplicate into form'
+                                            className='edit-btn'
+                                            onClick={() => handleDuplicate(fee)}
+                                          >
+                                            <HiDuplicate />
+                                          </button>
+                                        )}
+                                        {can(PERMISSIONS.DELETE_FEE) && (
+                                          <button
+                                            title='Delete'
+                                            className='delete-btn'
+                                            onClick={() => handleDelete(fee.id)}
+                                          >
+                                            <HiTrash />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>,
+                  ];
+                })
               ) : (
                 <tr>
-                  <td colSpan='6' className='empty-row'>
+                  <td colSpan='5' className='empty-row'>
                     {search
                       ? `No fees matching "${search}"`
                       : `No fees defined for ${filterTerm || "any term"} yet.`}

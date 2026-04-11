@@ -85,6 +85,15 @@ function nextSession(session = "") {
   return session;
 }
 
+function toDateValue(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === "function") return value.toDate();
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 /* ─────────────────────────────────────────────────────────────
    COMPONENT
 ───────────────────────────────────────────────────────────── */
@@ -228,8 +237,16 @@ export default function ClassDetails() {
   // AND the term end date has already passed.
   const isThirdTermEnded = (() => {
     if (settings?.currentTerm !== "3rd Term") return false;
-    if (!settings?.termEndDate) return false;
-    return new Date(settings.termEndDate) < new Date();
+
+    const termEndDate = toDateValue(settings?.termEndDate);
+    if (!termEndDate) return false;
+
+    // Treat the configured term end date as the end of that calendar day,
+    // so promotion only opens after the full final day has passed.
+    const termEndCutoff = new Date(termEndDate);
+    termEndCutoff.setHours(23, 59, 59, 999);
+
+    return Date.now() > termEndCutoff.getTime();
   })();
   const { prefix: curPrefix, level: curLevel, arm: curArm } = parseClassName(classData?.name || "");
 

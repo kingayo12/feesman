@@ -820,3 +820,63 @@
   border-color: #475569;
   color: #e2e8f0;
 }
+
+/* =====================================
+   GLOBAL UNIFIED TABLE DESIGN SYSTEM
+   Dark mode companion overrides
+===================================== */
+
+[data-theme="dark"] .table-card,
+[data-theme="dark"] .history-card,
+[data-theme="dark"] .letter-table-card,
+[data-theme="dark"] .table-container {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.45);
+}
+
+[data-theme="dark"] .data-table th,
+[data-theme="dark"] .modern-table th,
+[data-theme="dark"] .ledger-table th,
+[data-theme="dark"] .mini-table th {
+  background: linear-gradient(180deg, #152238 0%, #112033 100%) !important;
+  color: #cbd5e1 !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .data-table td,
+[data-theme="dark"] .modern-table td,
+[data-theme="dark"] .ledger-table td,
+[data-theme="dark"] .mini-table td {
+  background: #0f172a;
+  color: #e2e8f0 !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .data-table tbody tr:hover td,
+[data-theme="dark"] .modern-table tbody tr:hover td,
+[data-theme="dark"] .ledger-table tbody tr:hover td,
+[data-theme="dark"] .mini-table tbody tr:hover td {
+  background: #17263b;
+}
+
+[data-theme="dark"] .empty-row {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .fee-setup-card {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.45);
+}
+
+[data-theme="dark"] .fee-setup-table thead th {
+  background: linear-gradient(180deg, #152238 0%, #112033 100%) !important;
+  color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .fee-setup-table .fee-parent-row td,
+[data-theme="dark"] .fee-setup-table .fee-parent-row:hover td,
+[data-theme="dark"] .fee-setup-table .fee-parent-row.is-open td {
+  background: #0f172a !important;
+}
