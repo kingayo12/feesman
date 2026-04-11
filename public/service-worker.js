@@ -19,26 +19,26 @@ const OFFLINE_ROUTES = ["/", "/dashboard", "/students", "/families", "/fees", "/
 
 // ── Install ────────────────────────────────────────────────────────────────
 self.addEventListener("install", (event) => {
-  console.log("[Service Worker] Installing...");
+  // console.log("[Service Worker] Installing...");
   event.waitUntil(
     Promise.all([
       caches.open(STATIC_CACHE).then((cache) => {
-        console.log("[Service Worker] Caching app shell");
+        // console.log("[Service Worker] Caching app shell");
         return cache.addAll(APP_SHELL);
       }),
       caches.open(OFFLINE_CACHE).then((cache) => {
-        console.log("[Service Worker] Caching offline routes");
+        // console.log("[Service Worker] Caching offline routes");
         // Attempt to cache offline routes, but don't fail if some are unavailable
         return Promise.allSettled(
           OFFLINE_ROUTES.map((route) =>
             cache.add(route).catch((err) => {
-              console.log(`[Service Worker] Failed to cache ${route}:`, err);
+              // console.log(`[Service Worker] Failed to cache ${route}:`, err);
             }),
           ),
         );
       }),
     ]).then(() => {
-      console.log("[Service Worker] Install complete");
+      // console.log("[Service Worker] Install complete");
       self.skipWaiting();
     }),
   );
@@ -46,18 +46,18 @@ self.addEventListener("install", (event) => {
 
 // ── Activate — clean up old caches ────────────────────────────────────────
 self.addEventListener("activate", (event) => {
-  console.log("[Service Worker] Activating...");
+  // console.log("[Service Worker] Activating...");
   event.waitUntil(
     caches
       .keys()
       .then((keys) => {
-        console.log("[Service Worker] Available caches:", keys);
+        // console.log("[Service Worker] Available caches:", keys);
         return Promise.all(
           keys
             .filter((key) => {
               const isOldVersion = !key.includes(CACHE_VERSION);
               if (isOldVersion) {
-                console.log("[Service Worker] Deleting old cache:", key);
+                // console.log("[Service Worker] Deleting old cache:", key);
               }
               return isOldVersion;
             })
@@ -65,7 +65,7 @@ self.addEventListener("activate", (event) => {
         );
       })
       .then(() => {
-        console.log("[Service Worker] Claiming clients");
+        // console.log("[Service Worker] Claiming clients");
         return self.clients.claim();
       }),
   );
@@ -136,17 +136,17 @@ async function cacheFirst(request, cacheName) {
       const age = (Date.now() - parseInt(cacheTime)) / 1000;
       const maxAge = cacheName === STATIC_CACHE ? CACHE_MAX_AGE.static : CACHE_MAX_AGE.data;
       if (age < maxAge) {
-        console.log("[Service Worker] Serving from cache:", request.url);
+        // console.log("[Service Worker] Serving from cache:", request.url);
         return cached;
       }
     } else {
       // No timestamp, serve it anyway but try to update
-      console.log("[Service Worker] Serving from cache (no timestamp):", request.url);
+      // console.log("[Service Worker] Serving from cache (no timestamp):", request.url);
     }
   }
 
   try {
-    console.log("[Service Worker] Fetching from network:", request.url);
+    // console.log("[Service Worker] Fetching from network:", request.url);
     const response = await fetch(request);
     if (response.ok) {
       const clonedResponse = response.clone();
@@ -173,7 +173,7 @@ async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
 
   try {
-    console.log("[Service Worker] Attempting network first:", request.url);
+    // console.log("[Service Worker] Attempting network first:", request.url);
     const response = await fetch(request);
     if (response.ok) {
       const clonedResponse = response.clone();
@@ -190,7 +190,7 @@ async function networkFirst(request, cacheName) {
     console.error("[Service Worker] Network fetch failed:", request.url, error);
     const cached = await cache.match(request);
     if (cached) {
-      console.log("[Service Worker] Serving from cache fallback:", request.url);
+      // console.log("[Service Worker] Serving from cache fallback:", request.url);
       return cached;
     }
 
@@ -318,19 +318,19 @@ function getOfflinePage() {
 
 // ── Background sync and messaging ──────────────────────────────────────────
 self.addEventListener("message", (event) => {
-  console.log("[Service Worker] Message received:", event.data);
+  // console.log("[Service Worker] Message received:", event.data);
 
   if (event.data === "SKIP_WAITING") {
-    console.log("[Service Worker] Skipping waiting...");
+    // console.log("[Service Worker] Skipping waiting...");
     self.skipWaiting();
   }
 
   if (event.data === "CLEAR_CACHE") {
-    console.log("[Service Worker] Clearing all caches...");
+    // console.log("[Service Worker] Clearing all caches...");
     caches.keys().then((keys) => {
       Promise.all(
         keys.map((key) => {
-          console.log("[Service Worker] Deleting cache:", key);
+          // console.log("[Service Worker] Deleting cache:", key);
           return caches.delete(key);
         }),
       );
@@ -338,7 +338,7 @@ self.addEventListener("message", (event) => {
   }
 
   if (event.data?.type === "CACHE_URLS") {
-    console.log("[Service Worker] Caching URLs:", event.data.urls);
+    // console.log("[Service Worker] Caching URLs:", event.data.urls);
     caches.open(DATA_CACHE).then((cache) => {
       cache.addAll(event.data.urls).catch((err) => {
         console.error("[Service Worker] Failed to cache URLs:", err);
