@@ -236,7 +236,7 @@ aside.side-nav .logo {
 
 aside.side-nav .logo img {
   width: 100%;
-  max-width: 48px;
+  max-width: 38px;
   object-fit: contain;
 }
 
@@ -7265,7 +7265,7 @@ a {
 
 .auth-brand-panel {
   flex: 1;
-  background: #4f46e5;
+  background: var(--primary-gradient);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7286,7 +7286,7 @@ a {
   height: 64px;
   object-fit: contain;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.15);
+  background: #fff;
   padding: 8px;
   margin-bottom: 1.5rem;
   display: block;
@@ -7532,7 +7532,7 @@ a {
 .auth-submit-btn {
   height: 46px;
   border-radius: 10px;
-  background: #4f46e5;
+  background: var(--primary-gradient);
   color: #fff;
   border: none;
   font-size: 14px;
@@ -7549,11 +7549,13 @@ a {
   letter-spacing: 0.01em;
 }
 .auth-submit-btn:hover:not(:disabled) {
-  background: #4338ca;
+  background: var(--primary-color);
 }
 .auth-submit-btn:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+  background: gainsboro;
+  color: gray;
 }
 .auth-submit-btn.amber {
   background: #b45309;

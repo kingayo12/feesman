@@ -16,7 +16,7 @@ import {
   FaUserShield,
   FaEnvelopeOpenText,
 } from "react-icons/fa";
-import Logo from "../assets/logo.png";
+import Logo from "../assets/logo.svg";
 import { useRole } from "../hooks/useRole";
 import { PERMISSIONS } from "../config/permissions";
 
