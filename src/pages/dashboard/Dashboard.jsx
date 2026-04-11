@@ -23,7 +23,9 @@ import { formatDate } from "../../utils/helpers";
 import { useNavigate } from "react-router-dom";
 import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS, ROLE_META, ROLES } from "../../config/permissions";
-
+import QuestionsImage from "../../assets/money.svg";
+import ProblemSolvingImage from "../../assets/Problem solving-rafiki.svg";
+import HeroImage from "../../assets/web2.svg";
 const EMPTY_STATS = {
   totalFees: 0,
   totalPayments: 0,
@@ -34,6 +36,33 @@ const EMPTY_STATS = {
   collectionByMethod: [],
 };
 
+const APP_SLIDES = [
+  {
+    title: "Track Every Naira in Real Time",
+    body: "Monitor expected fees, collections, and outstanding balances across classes without waiting for manual reports.",
+    ctaLabel: "View Payments",
+    ctaTo: "/payment-history",
+    image: QuestionsImage,
+    imageAlt: "Illustration of school finance questions and analytics",
+  },
+  {
+    title: "Manage Families and Students Faster",
+    body: "Keep class enrollment, family records, and fee setup aligned so your staff can act quickly and accurately.",
+    ctaLabel: "Open Students",
+    ctaTo: "/students",
+    image: ProblemSolvingImage,
+    imageAlt: "Illustration of solving school operations workflow",
+  },
+  {
+    title: "Run a Role-Based Finance Workflow",
+    body: "Give each role the right dashboard visibility while keeping sensitive controls and settings protected.",
+    ctaLabel: "Go to Settings",
+    ctaTo: "/settings",
+    image: HeroImage,
+    imageAlt: "Feesman dashboard hero preview",
+  },
+];
+
 // ── Skeleton ──────────────────────────────────────────────────────────────
 function Bone({ w = "100%", h = 16, r = 6, style = {} }) {
   return <div className='skel-bone' style={{ width: w, height: h, borderRadius: r, ...style }} />;
@@ -42,36 +71,108 @@ function Bone({ w = "100%", h = 16, r = 6, style = {} }) {
 function DashboardSkeleton() {
   return (
     <div className='dashboard-wrapper'>
-      <div className='dashboard-header' style={{ marginBottom: "2rem" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <Bone w={220} h={28} r={6} />
-          <Bone w={300} h={16} r={6} />
-        </div>
-        <Bone w={36} h={36} r={8} />
-      </div>
-      <div className='stats-grid'>
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className='stat-card' style={{ gap: "1rem" }}>
-            <div className='stat-card-inner' style={{ flex: 1 }}>
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-                <Bone w='60%' h={13} />
-                <Bone w='80%' h={28} r={4} />
-                <Bone w='50%' h={11} />
-              </div>
-              <Bone w={50} h={50} r={10} />
-            </div>
+      <div className='right'>
+        <div className='dashboard-header' style={{ marginBottom: "1.4rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <Bone w={260} h={28} r={6} />
+            <Bone w={320} h={16} r={6} />
           </div>
+          <Bone w={36} h={36} r={8} />
+        </div>
+        <Bone w={120} h={26} r={999} style={{ marginBottom: "1rem" }} />
+
+        <div className='stats-grid'>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className='stat-card' style={{ gap: "1rem" }}>
+              <div className='stat-card-inner' style={{ flex: 1 }}>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <Bone w='60%' h={13} />
+                  <Bone w='80%' h={28} r={4} />
+                  <Bone w='50%' h={11} />
+                </div>
+                <Bone w={50} h={50} r={10} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className='db-grid-2' style={{ marginTop: "1.25rem" }}>
+          <div className='db-card'>
+            <Bone w='45%' h={18} style={{ marginBottom: "0.8rem" }} />
+            <Bone w='100%' h={12} style={{ marginBottom: "0.45rem" }} />
+            <Bone w='88%' h={12} style={{ marginBottom: "0.45rem" }} />
+            <Bone w='72%' h={12} />
+          </div>
+          <div className='db-card'>
+            <Bone w='48%' h={18} style={{ marginBottom: "0.8rem" }} />
+            <Bone w='100%' h={12} style={{ marginBottom: "0.45rem" }} />
+            <Bone w='95%' h={12} style={{ marginBottom: "0.45rem" }} />
+            <Bone w='70%' h={12} />
+          </div>
+        </div>
+
+        <div className='db-card' style={{ marginTop: "1.25rem" }}>
+          <Bone w='36%' h={18} style={{ marginBottom: "0.8rem" }} />
+          <Bone w='100%' h={12} style={{ marginBottom: "0.55rem" }} />
+          <Bone w='100%' h={12} style={{ marginBottom: "0.55rem" }} />
+          <Bone w='100%' h={12} style={{ marginBottom: "0.55rem" }} />
+        </div>
+      </div>
+
+      <aside className='left dashboard-promo is-skeleton'>
+        <div className='top'>
+          <Bone w='55%' h={11} r={999} />
+          <Bone w='100%' h={24} r={8} />
+          <Bone w='94%' h={12} r={8} />
+          <Bone w='85%' h={12} r={8} />
+          <Bone w={130} h={34} r={999} />
+        </div>
+        <div className='promo-dots'>
+          <Bone w={8} h={8} r={999} />
+          <Bone w={8} h={8} r={999} />
+          <Bone w={8} h={8} r={999} />
+        </div>
+        <div className='bottom'>
+          <Bone w='100%' h={190} r={14} />
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function PromoSlider({ activeSlide, onSlideSelect, onSlideAction }) {
+  const slide = APP_SLIDES[activeSlide];
+
+  return (
+    <aside className='left dashboard-promo'>
+      <div className='top'>
+        <span className='promo-chip'>Feesman Insights</span>
+        <div className='promo-slide-content' key={slide.title}>
+          <h3>{slide.title}</h3>
+          <p>{slide.body}</p>
+        </div>
+        <button className='promo-cta-btn' onClick={() => onSlideAction(slide.ctaTo)}>
+          {slide.ctaLabel} <HiArrowRight />
+        </button>
+      </div>
+
+      <div className='promo-dots' aria-label='Slider indicators'>
+        {APP_SLIDES.map((item, idx) => (
+          <button
+            key={item.title}
+            type='button'
+            className={`promo-dot ${idx === activeSlide ? "active" : ""}`}
+            aria-label={`Show slide ${idx + 1}`}
+            aria-current={idx === activeSlide ? "true" : "false"}
+            onClick={() => onSlideSelect(idx)}
+          />
         ))}
       </div>
-      <div className='dashboard-main-grid' style={{ marginTop: "2rem" }}>
-        <div className='insight-card'>
-          <Bone w='100%' h={200} r={8} />
-        </div>
-        <div className='recent-activity'>
-          <Bone w='100%' h={200} r={8} />
-        </div>
+
+      <div className='bottom'>
+        <img key={slide.title} src={slide.image} alt={slide.imageAlt} />
       </div>
-    </div>
+    </aside>
   );
 }
 
@@ -215,6 +316,7 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [academicYear, setAcademicYear] = useState(null);
   const [currentTerm, setCurrentTerm] = useState(null);
+  const [activeSlide, setActiveSlide] = useState(0);
   const navigate = useNavigate();
   const { role, can } = useRole();
   const canViewFullDashboard = can(PERMISSIONS.VIEW_FULL_DASHBOARD);
@@ -253,6 +355,14 @@ export default function Dashboard() {
   useEffect(() => {
     loadStats();
   }, [loadStats]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % APP_SLIDES.length);
+    }, 6000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   if (loading) return <DashboardSkeleton />;
   if (error)
@@ -736,35 +846,42 @@ export default function Dashboard() {
 
   return (
     <div className='dashboard-wrapper'>
-      <header className='dashboard-header'>
-        <div>
-          <h1>{header.title}</h1>
-          <p>
-            {header.sub} for <strong>{currentTerm}</strong>, <strong>{academicYear}</strong>
-          </p>
-        </div>
-        <button className='icon-btn refresh-btn' onClick={loadStats} title='Refresh'>
-          <HiRefresh />
-        </button>
-      </header>
-      {roleMeta && (
-        <div style={{ marginBottom: "0.9rem" }}>
-          <span className='db-badge' style={{ background: roleMeta.bg, color: roleMeta.color }}>
-            {roleMeta.label}
-          </span>
-        </div>
-      )}
+      <div className='right'>
+        <header className='dashboard-header'>
+          <div>
+            <h3>{header.title}</h3>
+            <p>
+              {header.sub} for <strong>{currentTerm}</strong>, <strong>{academicYear}</strong>
+            </p>
+          </div>
+          <button className='icon-btn refresh-btn' onClick={loadStats} title='Refresh'>
+            <HiRefresh />
+          </button>
+        </header>
+        {roleMeta && (
+          <div style={{ marginBottom: "0.9rem" }}>
+            <span className='db-badge' style={{ background: roleMeta.bg, color: roleMeta.color }}>
+              {roleMeta.label}
+            </span>
+          </div>
+        )}
 
-      {!canViewFullDashboard && roleKey !== ROLES.user ? (
-        <div className='db-card'>
-          <p style={{ color: "var(--color-text-secondary)" }}>
-            Your role has a restricted dashboard scope. Contact super admin to enable additional
-            dashboard permissions.
-          </p>
-        </div>
-      ) : (
-        roleView
-      )}
+        {!canViewFullDashboard && roleKey !== ROLES.user ? (
+          <div className='db-card'>
+            <p style={{ color: "var(--color-text-secondary)" }}>
+              Your role has a restricted dashboard scope. Contact super admin to enable additional
+              dashboard permissions.
+            </p>
+          </div>
+        ) : (
+          roleView
+        )}
+      </div>
+      <PromoSlider
+        activeSlide={activeSlide}
+        onSlideSelect={setActiveSlide}
+        onSlideAction={(to) => navigate(to)}
+      />
     </div>
   );
 }

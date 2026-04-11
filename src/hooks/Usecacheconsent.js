@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 const CONSENT_KEY = "cache_consent"; // "accepted" | "declined" | undefined
+const IS_PROD = import.meta.env.PROD;
 
 export function useCacheConsent() {
   const stored = localStorage.getItem(CONSENT_KEY);
@@ -11,7 +12,7 @@ export function useCacheConsent() {
 
   // ── Register SW ───────────────────────────────────────────────────────
   const registerSW = useCallback(async () => {
-    if (!("serviceWorker" in navigator)) return;
+    if (!IS_PROD || !("serviceWorker" in navigator)) return;
 
     try {
       const reg = await navigator.serviceWorker.register("/service-worker.js", {
@@ -78,6 +79,17 @@ export function useCacheConsent() {
 
   // ── On mount: if previously accepted, register straight away ──────────
   useEffect(() => {
+    // In development, always remove existing registrations/caches to prevent stale chunks.
+    if (!IS_PROD && "serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => r.unregister());
+      });
+      if (typeof caches !== "undefined") {
+        caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))));
+      }
+      return;
+    }
+
     if (stored === "accepted") registerSW();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

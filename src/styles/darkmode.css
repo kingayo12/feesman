@@ -369,10 +369,33 @@
 
 /* ── Toggle / switch ─────────────────────────────────────── */
 [data-theme="dark"] .slider {
-  background: #334155;
+  background: linear-gradient(135deg, #334155, #475569);
 }
 [data-theme="dark"] .toggle-row {
   border-color: #334155;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.92));
+  box-shadow: none;
+}
+[data-theme="dark"] .switch input:checked + .slider {
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+}
+[data-theme="dark"] .switch input:focus-visible + .slider {
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18);
+}
+[data-theme="dark"] .pin-toggle {
+  background: #0f172a;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+[data-theme="dark"] .pin-toggle:hover {
+  background: #1e293b;
+  color: #7dd3fc;
+  border-color: #475569;
+}
+[data-theme="dark"] .settings-readonly-banner {
+  background: linear-gradient(135deg, rgba(30, 64, 175, 0.18), rgba(15, 23, 42, 0.9));
+  border-color: rgba(96, 165, 250, 0.35);
+  color: #bfdbfe;
 }
 
 /* ── Letter page dark mode overrides ───────────────────────── */

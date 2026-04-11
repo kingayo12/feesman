@@ -12,7 +12,7 @@ import {
   signOut,
 } from "firebase/auth";
 
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, getFirestore, setDoc, serverTimestamp } from "firebase/firestore";
 
 import { auth } from "../firebase/auth";
 import { db } from "../firebase/firestore";
@@ -22,13 +22,14 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const firestore = db ?? getFirestore();
 
   // 🔥 Listen to auth state + merge Firestore data
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          const userRef = doc(db, "users", firebaseUser.uid);
+          const userRef = doc(firestore, "users", firebaseUser.uid);
           const userSnap = await getDoc(userRef);
 
           let firestoreData = {};
@@ -59,7 +60,7 @@ export function AuthProvider({ children }) {
     });
 
     return () => unsub();
-  }, []);
+  }, [firestore]);
 
   // 🔐 Login
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
@@ -74,7 +75,7 @@ export function AuthProvider({ children }) {
     }
 
     // ✅ Create Firestore user profile with role
-    await setDoc(doc(db, "users", credential.user.uid), {
+    await setDoc(doc(firestore, "users", credential.user.uid), {
       uid: credential.user.uid,
       email,
       displayName,

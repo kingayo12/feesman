@@ -42,25 +42,7 @@
 <body>
   <div id="root"></div>
 
-  <!-- Service Worker Registration -->
   <script>
-    // Register service worker for PWA support
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
-          .then(reg => {
-            console.log('Service Worker registered successfully:', reg);
-            // Check for updates periodically
-            setInterval(() => {
-              reg.update().catch(err => console.log('Update check failed:', err));
-            }, 60000); // Check every minute
-          })
-          .catch(err => {
-            console.log('Service Worker registration failed:', err);
-          });
-      });
-    }
-
     // PWA Install Prompt Handler
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {

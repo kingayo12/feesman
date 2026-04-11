@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { getSettings, updateSettings } from "./settingService";
 import { useAuth } from "../../context/AuthContext";
+import { useRole } from "../../hooks/useRole";
+import { PERMISSIONS } from "../../config/permissions";
 import { Bone } from "../../components/common/Skeleton";
 import { collection, getDocs, deleteDoc, writeBatch, doc } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
@@ -129,6 +131,42 @@ const DEFAULT_SETTINGS = {
   pin: "",
 };
 
+const TAB_SAVE_FIELDS = {
+  school: [
+    "name",
+    "abbr",
+    "state",
+    "tagline",
+    "motto",
+    "address",
+    "website",
+    "contactEmail",
+    "contactPhone",
+    "timezone",
+    "currency",
+    "logo",
+  ],
+  academic: [
+    "academicYear",
+    "currentTerm",
+    "termStartDate",
+    "termEndDate",
+    "nextTermStart",
+    "allowPartialPayment",
+    "lateFeeEnabled",
+    "lateFeeAmount",
+  ],
+  appearance: ["theme", "accentColor", "sidebarCompact"],
+  notifications: [
+    "emailNotifications",
+    "paymentAlerts",
+    "overdueReminders",
+    "reminderDaysBefore",
+    "weeklyReport",
+  ],
+  security: ["requirePin", "sessionTimeout", "autoLogout", "pin"],
+};
+
 /* ─────────────────────────────────────────────────────────────
    THEME / ACCENT HELPERS
 ───────────────────────────────────────────────────────────── */
@@ -221,11 +259,12 @@ function generateSessions() {
 ───────────────────────────────────────────────────────────── */
 export default function SettingsPage() {
   const { user, sendPasswordReset } = useAuth?.() ?? {};
+  const { can } = useRole();
 
   const [activeTab, setActiveTab] = useState("school");
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingTab, setSavingTab] = useState(null);
   const [toast, setToast] = useState(null);
 
   // Security
@@ -237,6 +276,10 @@ export default function SettingsPage() {
   const [wipeProgress, setWipeProgress] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearingOverrides, setClearingOverrides] = useState(false);
+  const canEditSettings = can(PERMISSIONS.EDIT_SETTINGS);
+  const canUseDangerZone = can(PERMISSIONS.DANGER_ZONE);
+  const isReadOnly = !canEditSettings;
+  const canEditTab = (tabId) => tabId !== "data" && canEditSettings;
 
   /* ── Load settings ── */
   useEffect(() => {
@@ -258,32 +301,50 @@ export default function SettingsPage() {
   }, []);
 
   const handleChange = (e) => {
+    if (isReadOnly) return;
     const { name, value, type, checked } = e.target;
     setSettings((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
   };
 
-  const handleSave = async () => {
-    setSaving(true);
+  const handleSaveTab = async (tabId) => {
+    if (!canEditTab(tabId)) {
+      showToast("error", "You can view settings, but you do not have permission to change them.");
+      return;
+    }
+
+    const fields = TAB_SAVE_FIELDS[tabId] || [];
+    if (!fields.length) return;
+
+    const payload = fields.reduce((acc, key) => {
+      acc[key] = settings[key];
+      return acc;
+    }, {});
+
+    setSavingTab(tabId);
     try {
-      await updateSettings(settings);
-      // Apply appearance changes immediately on save
-      applyTheme(settings.theme);
-      applyAccentColor(settings.accentColor);
-      showToast("success", "Settings saved successfully.");
+      await updateSettings(payload);
+      if (tabId === "appearance") {
+        applyTheme(settings.theme);
+        applyAccentColor(settings.accentColor);
+      }
+      const tabLabel = TABS.find((t) => t.id === tabId)?.label || "Current";
+      showToast("success", `${tabLabel} settings saved successfully.`);
     } catch {
-      showToast("error", "Failed to save. Please try again.");
+      showToast("error", "Failed to save this tab. Please try again.");
     } finally {
-      setSaving(false);
+      setSavingTab(null);
     }
   };
 
   /* ── Live preview for theme & accent ── */
   const handleThemeChange = (themeId) => {
+    if (isReadOnly) return;
     setSettings((prev) => ({ ...prev, theme: themeId }));
     applyTheme(themeId); // apply immediately for live preview
   };
 
   const handleAccentChange = (accentId) => {
+    if (isReadOnly) return;
     setSettings((prev) => ({ ...prev, accentColor: accentId }));
     applyAccentColor(accentId); // apply immediately for live preview
   };
@@ -566,19 +627,17 @@ export default function SettingsPage() {
       <div className='settings-header'>
         <div>
           <h1>Settings</h1>
-          <p>Manage your school configuration, appearance, and data</p>
+          <p>
+            {isReadOnly
+              ? "View your school configuration and appearance. Editing is disabled for your role."
+              : "Manage your school configuration, appearance, and data. Save changes per tab."}
+          </p>
         </div>
-        <button className='sp-save-btn' onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <>
-              <div className='sp-btn-spinner' /> Saving…
-            </>
-          ) : (
-            <>
-              <HiSave /> Save Changes
-            </>
-          )}
-        </button>
+        {isReadOnly && (
+          <button className='sp-save-btn' disabled title='You have view-only access to settings'>
+            <HiInformationCircle /> View Only
+          </button>
+        )}
       </div>
 
       <div className='settings-layout'>
@@ -617,1064 +676,1221 @@ export default function SettingsPage() {
 
         {/* ── Content ── */}
         <div className='settings-content'>
-          {/* ══════════════════════════════════════════
+          {isReadOnly && (
+            <div className='settings-readonly-banner'>
+              <HiInformationCircle />
+              <span>
+                This role can view settings but cannot save changes. Grant
+                <strong> Edit settings</strong> to enable management.
+              </span>
+            </div>
+          )}
+
+          <fieldset
+            className={`settings-fieldset ${isReadOnly && activeTab !== "data" ? "is-read-only" : ""}`}
+            disabled={isReadOnly && activeTab !== "data"}
+          >
+            {/* ══════════════════════════════════════════
                SCHOOL PROFILE
           ══════════════════════════════════════════ */}
-          {activeTab === "school" && (
-            <div className='settings-section'>
-              <div className='section-header'>
-                <h2>School Profile</h2>
-                <p>This information appears on receipts, letters, and reports across the system.</p>
-              </div>
-
-              {/* Logo */}
-              <div className='logo-upload-area'>
-                <div className='logo-preview'>
-                  {settings.logo ? (
-                    <img src={settings.logo} alt='School logo' />
-                  ) : (
-                    <HiOfficeBuilding className='logo-placeholder-icon' />
-                  )}
+            {activeTab === "school" && (
+              <div className='settings-section'>
+                <div className='section-header'>
+                  <div>
+                    <h2>School Profile</h2>
+                    <p>
+                      This information appears on receipts, letters, and reports across the system.
+                    </p>
+                  </div>
+                  <button
+                    className='sp-save-btn sp-tab-save-btn'
+                    onClick={() => handleSaveTab("school")}
+                    disabled={savingTab === "school" || !canEditTab("school")}
+                    title={
+                      !canEditTab("school")
+                        ? "You do not have edit access for this tab"
+                        : "Save School Profile"
+                    }
+                  >
+                    {savingTab === "school" ? (
+                      <>
+                        <div className='sp-btn-spinner' /> Saving…
+                      </>
+                    ) : (
+                      <>
+                        <HiSave /> Save Tab
+                      </>
+                    )}
+                  </button>
                 </div>
-                <div className='logo-upload-info'>
-                  <p className='logo-label'>School Logo</p>
-                  <p className='logo-hint'>
-                    Used on letters, receipts, and the letterhead. PNG or JPEG, min 200×200px
-                    recommended.
-                  </p>
-                  <div className='sp-inline-actions'>
-                    <label className='upload-btn'>
-                      <HiPhotograph /> Upload Logo
-                      <input
-                        type='file'
-                        accept='image/*'
-                        className='sp-file-input-hidden'
-                        onChange={(e) => {
-                          const file = e.target.files[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = (ev) =>
-                            setSettings((prev) => ({ ...prev, logo: ev.target.result }));
-                          reader.readAsDataURL(file);
-                        }}
-                      />
-                    </label>
-                    {settings.logo && (
-                      <button
-                        className='sp-clear-logo-btn'
-                        onClick={() => setSettings((prev) => ({ ...prev, logo: "" }))}
-                      >
-                        <HiTrash /> Remove
-                      </button>
+
+                {/* Logo */}
+                <div className='logo-upload-area'>
+                  <div className='logo-preview'>
+                    {settings.logo ? (
+                      <img src={settings.logo} alt='School logo' />
+                    ) : (
+                      <HiOfficeBuilding className='logo-placeholder-icon' />
                     )}
                   </div>
-                </div>
-              </div>
-
-              <div className='form-grid settings-grid'>
-                <div className='input-group full-width'>
-                  <label>
-                    School Name <span className='sp-required'>*</span>
-                  </label>
-                  <div className='input-wrapper'>
-                    <HiOfficeBuilding className='input-icon' />
-                    <input
-                      name='name'
-                      value={settings.name}
-                      onChange={handleChange}
-                      placeholder='e.g. Excellence International School'
-                    />
-                  </div>
-                </div>
-
-                <div className='input-group'>
-                  <label>Abbreviation</label>
-                  <div className='input-wrapper'>
-                    <HiIdentification className='input-icon' />
-                    <input
-                      name='abbr'
-                      value={settings.abbr || ""}
-                      onChange={handleChange}
-                      placeholder='e.g. EIS'
-                      maxLength={6}
-                      className='sp-uppercase-input'
-                      onInput={(e) => {
-                        e.target.value = e.target.value.toUpperCase();
-                      }}
-                    />
-                  </div>
-                  <small className='hint'>
-                    Used in auto-generating admission numbers (max 6 chars)
-                  </small>
-                </div>
-
-                <div className='input-group'>
-                  <label>State</label>
-                  <div className='input-wrapper'>
-                    <HiLocationMarker className='input-icon' />
-                    <input
-                      name='state'
-                      value={settings.state || ""}
-                      onChange={handleChange}
-                      placeholder='e.g. Ogun, Lagos'
-                      maxLength={12}
-                    />
-                  </div>
-                  <small className='hint'>First 2–3 letters used in admission number prefix</small>
-                </div>
-
-                <div className='input-group full-width'>
-                  <label>Address</label>
-                  <div className='input-wrapper'>
-                    <HiLocationMarker className='input-icon' />
-                    <input
-                      name='address'
-                      value={settings.address || ""}
-                      onChange={handleChange}
-                      placeholder='Street, City, State'
-                    />
-                  </div>
-                </div>
-
-                <div className='input-group full-width'>
-                  <label>
-                    Tagline / Description <span className='optional'>(optional)</span>
-                  </label>
-                  <div className='input-wrapper'>
-                    <input
-                      name='tagline'
-                      value={settings.tagline || ""}
-                      onChange={handleChange}
-                      placeholder='e.g. Excellence in Education'
-                    />
-                  </div>
-                </div>
-
-                <div className='input-group full-width'>
-                  <label>
-                    School Motto <span className='optional'>(optional)</span>
-                  </label>
-                  <div className='input-wrapper'>
-                    <HiStar className='input-icon sp-star-icon' />
-                    <input
-                      name='motto'
-                      value={settings.motto || ""}
-                      onChange={handleChange}
-                      placeholder='e.g. Province of Knowledge'
-                    />
-                  </div>
-                  <small className='hint'>
-                    Printed on official letters and the document letterhead
-                  </small>
-                </div>
-
-                <div className='input-group'>
-                  <label>Official Email</label>
-                  <div className='input-wrapper'>
-                    <HiMail className='input-icon' />
-                    <input
-                      type='email'
-                      name='contactEmail'
-                      value={settings.contactEmail}
-                      onChange={handleChange}
-                      placeholder='admin@school.com'
-                    />
-                  </div>
-                </div>
-
-                <div className='input-group'>
-                  <label>Phone Number</label>
-                  <div className='input-wrapper'>
-                    <HiPhone className='input-icon' />
-                    <input
-                      name='contactPhone'
-                      value={settings.contactPhone}
-                      onChange={handleChange}
-                      placeholder='+234 800 000 0000'
-                    />
-                  </div>
-                </div>
-
-                <div className='input-group'>
-                  <label>
-                    Website <span className='optional'>(optional)</span>
-                  </label>
-                  <div className='input-wrapper'>
-                    <HiGlobe className='input-icon' />
-                    <input
-                      name='website'
-                      value={settings.website || ""}
-                      onChange={handleChange}
-                      placeholder='https://www.school.com'
-                    />
-                  </div>
-                </div>
-
-                <div className='input-group'>
-                  <label>Currency</label>
-                  <div className='input-wrapper'>
-                    <HiCurrencyDollar className='input-icon' />
-                    <select
-                      name='currency'
-                      value={settings.currency || "NGN (₦)"}
-                      onChange={handleChange}
-                    >
-                      {CURRENCIES.map((c) => (
-                        <option key={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className='input-group'>
-                  <label>Timezone</label>
-                  <div className='input-wrapper'>
-                    <HiClock className='input-icon' />
-                    <select
-                      name='timezone'
-                      value={settings.timezone || "Africa/Lagos"}
-                      onChange={handleChange}
-                    >
-                      {TIMEZONES.map((t) => (
-                        <option key={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Live preview of letterhead */}
-              {(settings.name || settings.logo) && (
-                <div className='sp-letterhead-preview'>
-                  <p className='sp-preview-label'>Letterhead preview</p>
-                  <div className='sp-letter-mock'>
-                    <div className='sp-letter-mock-head'>
-                      {settings.logo ? (
-                        <img src={settings.logo} className='sp-mock-logo' alt='logo' />
-                      ) : (
-                        <div className='sp-mock-logo-ph'>
-                          <HiOfficeBuilding />
-                        </div>
+                  <div className='logo-upload-info'>
+                    <p className='logo-label'>School Logo</p>
+                    <p className='logo-hint'>
+                      Used on letters, receipts, and the letterhead. PNG or JPEG, min 200×200px
+                      recommended.
+                    </p>
+                    <div className='sp-inline-actions'>
+                      <label className='upload-btn'>
+                        <HiPhotograph /> Upload Logo
+                        <input
+                          type='file'
+                          accept='image/*'
+                          className='sp-file-input-hidden'
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) =>
+                              setSettings((prev) => ({ ...prev, logo: ev.target.result }));
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+                      {settings.logo && (
+                        <button
+                          className='sp-clear-logo-btn'
+                          onClick={() => setSettings((prev) => ({ ...prev, logo: "" }))}
+                        >
+                          <HiTrash /> Remove
+                        </button>
                       )}
-                      <div className='sp-mock-info'>
-                        <strong>{settings.name || "School Name"}</strong>
-                        {settings.address && <span>{settings.address}</span>}
-                        {(settings.contactPhone || settings.contactEmail) && (
-                          <span>
-                            {settings.contactPhone && `Tel: ${settings.contactPhone}`}
-                            {settings.contactPhone && settings.contactEmail && " · "}
-                            {settings.contactEmail && `Email: ${settings.contactEmail}`}
-                          </span>
-                        )}
-                        {settings.motto && (
-                          <span className='sp-mock-motto'>Motto: {settings.motto}</span>
-                        )}
-                      </div>
                     </div>
-                    <div className='sp-mock-rule' />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════
-               ACADEMIC
-          ══════════════════════════════════════════ */}
-          {activeTab === "academic" && (
-            <div className='settings-section'>
-              <div className='section-header'>
-                <h2>Academic Settings</h2>
-                <p>
-                  Current session and term drive all fee calculations, payment records, and student
-                  promotion across the system.
-                </p>
-              </div>
-
-              {/* Status card */}
-              <div className='academic-status-card'>
-                <div className='academic-status-item'>
-                  <span className='status-label'>Current Session</span>
-                  <span className='status-value'>{settings.academicYear || "—"}</span>
-                </div>
-                <div className='academic-status-divider' />
-                <div className='academic-status-item'>
-                  <span className='status-label'>Current Term</span>
-                  <span className='status-value highlight'>{settings.currentTerm || "—"}</span>
-                </div>
-                <div className='academic-status-divider' />
-                <div className='academic-status-item'>
-                  <span className='status-label'>Term End</span>
-                  <span className={`status-value ${termEndClass}`}>
-                    {settings.termEndDate
-                      ? new Date(settings.termEndDate).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : "Not set"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Promotion readiness banner */}
-              {isThirdTermEnded ? (
-                <div className='sp-promote-ready-banner'>
-                  <HiAcademicCap />
-                  <div>
-                    <strong>3rd Term has ended — promotion window is open</strong>
-                    <p>
-                      The Promote button is now visible on class pages. Go to{" "}
-                      <strong>Class Management</strong> to promote students to their next class.
-                    </p>
-                  </div>
-                </div>
-              ) : settings.currentTerm === "3rd Term" && !termEndPassed ? (
-                <div className='sp-info-banner'>
-                  <HiInformationCircle />
-                  <span>
-                    You are in the <strong>3rd Term</strong>. The Promote button will appear on
-                    class pages once the term end date (
-                    <strong>{settings.termEndDate || "not set"}</strong>) passes.
-                  </span>
-                </div>
-              ) : settings.currentTerm && settings.currentTerm !== "3rd Term" ? (
-                <div className='sp-info-banner'>
-                  <HiInformationCircle />
-                  <span>
-                    Student promotion is only available after <strong>3rd Term</strong> ends.
-                    Currently in <strong>{settings.currentTerm}</strong>.
-                  </span>
-                </div>
-              ) : null}
-
-              <div className='form-grid settings-grid'>
-                <div className='input-group'>
-                  <label>
-                    Academic Year <span className='sp-required'>*</span>
-                  </label>
-                  <div className='input-wrapper'>
-                    <HiCalendar className='input-icon' />
-                    <select
-                      name='academicYear'
-                      value={settings.academicYear}
-                      onChange={handleChange}
-                    >
-                      <option value=''>Select year</option>
-                      {generateSessions().map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                    </select>
                   </div>
                 </div>
 
-                <div className='input-group'>
-                  <label>
-                    Current Term <span className='sp-required'>*</span>
-                  </label>
-                  <div className='input-wrapper'>
-                    <HiClock className='input-icon' />
-                    <select name='currentTerm' value={settings.currentTerm} onChange={handleChange}>
-                      <option value=''>Select term</option>
-                      {TERMS.map((t) => (
-                        <option key={t}>{t}</option>
-                      ))}
-                    </select>
+                <div className='form-grid settings-grid'>
+                  <div className='input-group full-width'>
+                    <label>
+                      School Name <span className='sp-required'>*</span>
+                    </label>
+                    <div className='input-wrapper'>
+                      <HiOfficeBuilding className='input-icon' />
+                      <input
+                        name='name'
+                        value={settings.name}
+                        onChange={handleChange}
+                        placeholder='e.g. Excellence International School'
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className='input-group'>
-                  <label>Term Start Date</label>
-                  <div className='input-wrapper'>
-                    <HiCalendar className='input-icon' />
-                    <input
-                      type='date'
-                      name='termStartDate'
-                      value={settings.termStartDate || ""}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
-
-                <div className='input-group'>
-                  <label>Term End Date</label>
-                  <div className='input-wrapper'>
-                    <HiCalendar className='input-icon' />
-                    <input
-                      type='date'
-                      name='termEndDate'
-                      value={settings.termEndDate || ""}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  {settings.termEndDate && (
-                    <small className={`hint ${termEndClass}`}>
-                      {termEndPassed
-                        ? "This term has ended"
-                        : `${Math.ceil((new Date(settings.termEndDate) - new Date()) / 86400000)} days remaining`}
+                  <div className='input-group'>
+                    <label>Abbreviation</label>
+                    <div className='input-wrapper'>
+                      <HiIdentification className='input-icon' />
+                      <input
+                        name='abbr'
+                        value={settings.abbr || ""}
+                        onChange={handleChange}
+                        placeholder='e.g. EIS'
+                        maxLength={6}
+                        className='sp-uppercase-input'
+                        onInput={(e) => {
+                          e.target.value = e.target.value.toUpperCase();
+                        }}
+                      />
+                    </div>
+                    <small className='hint'>
+                      Used in auto-generating admission numbers (max 6 chars)
                     </small>
-                  )}
-                </div>
-
-                <div className='input-group'>
-                  <label>Next Term Start Date</label>
-                  <div className='input-wrapper'>
-                    <HiCalendar className='input-icon' />
-                    <input
-                      type='date'
-                      name='nextTermStart'
-                      value={settings.nextTermStart || ""}
-                      onChange={handleChange}
-                    />
                   </div>
-                </div>
-              </div>
 
-              <div className='section-divider' />
-              <h3 className='sub-section-title'>Payment Behaviour</h3>
-              <div className='toggle-list'>
-                <div className='toggle-row'>
-                  <div>
-                    <p className='toggle-label'>Allow partial payments</p>
-                    <p className='toggle-desc'>Students can pay any portion of their fee balance</p>
-                  </div>
-                  <label className='switch'>
-                    <input
-                      type='checkbox'
-                      name='allowPartialPayment'
-                      checked={!!settings.allowPartialPayment}
-                      onChange={handleChange}
-                    />
-                    <span className='slider' />
-                  </label>
-                </div>
-
-                <div className='toggle-row'>
-                  <div>
-                    <p className='toggle-label'>Enable late payment fee</p>
-                    <p className='toggle-desc'>
-                      Automatically add a surcharge for overdue balances
-                    </p>
-                  </div>
-                  <label className='switch'>
-                    <input
-                      type='checkbox'
-                      name='lateFeeEnabled'
-                      checked={!!settings.lateFeeEnabled}
-                      onChange={handleChange}
-                    />
-                    <span className='slider' />
-                  </label>
-                </div>
-
-                {settings.lateFeeEnabled && (
-                  <div className='input-group sp-inline-setting-input'>
-                    <label>Late Fee Amount (₦)</label>
+                  <div className='input-group'>
+                    <label>State</label>
                     <div className='input-wrapper'>
+                      <HiLocationMarker className='input-icon' />
                       <input
-                        type='number'
-                        name='lateFeeAmount'
-                        value={settings.lateFeeAmount || ""}
+                        name='state'
+                        value={settings.state || ""}
                         onChange={handleChange}
-                        placeholder='e.g. 500'
-                        min='0'
+                        placeholder='e.g. Ogun, Lagos'
+                        maxLength={12}
+                      />
+                    </div>
+                    <small className='hint'>
+                      First 2–3 letters used in admission number prefix
+                    </small>
+                  </div>
+
+                  <div className='input-group full-width'>
+                    <label>Address</label>
+                    <div className='input-wrapper'>
+                      <HiLocationMarker className='input-icon' />
+                      <input
+                        name='address'
+                        value={settings.address || ""}
+                        onChange={handleChange}
+                        placeholder='Street, City, State'
                       />
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* ══════════════════════════════════════════
-               APPEARANCE
-          ══════════════════════════════════════════ */}
-          {activeTab === "appearance" && (
-            <div className='settings-section'>
-              <div className='section-header'>
-                <h2>Appearance</h2>
-                <p>
-                  Changes apply immediately as you select them. Save to persist across sessions.
-                </p>
-              </div>
-
-              <h3 className='sub-section-title'>Theme</h3>
-              <div className='theme-options'>
-                {THEMES.map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type='button'
-                    className={`theme-option ${settings.theme === id ? "active" : ""}`}
-                    onClick={() => handleThemeChange(id)}
-                  >
-                    <div className={`theme-preview theme-preview-${id}`}>
-                      <div className='preview-sidebar' />
-                      <div className='preview-content'>
-                        <div className='preview-bar' />
-                        <div className='preview-bar short' />
-                      </div>
-                    </div>
-                    <span>{label}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className='section-divider' />
-              <h3 className='sub-section-title'>Accent Colour</h3>
-              <p className='sp-sub-desc'>
-                Sets the primary colour for buttons, links, and active states throughout the app.
-              </p>
-              <div className='accent-colors'>
-                {ACCENT_COLORS.map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type='button'
-                    title={label}
-                    className={`accent-dot accent-dot-${id} ${settings.accentColor === id ? "active" : ""}`}
-                    onClick={() => handleAccentChange(id)}
-                  >
-                    {settings.accentColor === id && <HiCheckCircle />}
-                  </button>
-                ))}
-              </div>
-              {settings.accentColor && (
-                <p className='sp-accent-label'>
-                  Selected:{" "}
-                  <strong>{ACCENT_COLORS.find((c) => c.id === settings.accentColor)?.label}</strong>
-                </p>
-              )}
-
-              <div className='section-divider' />
-              <h3 className='sub-section-title'>Layout</h3>
-              <div className='toggle-list'>
-                <div className='toggle-row'>
-                  <div>
-                    <p className='toggle-label'>Compact sidebar</p>
-                    <p className='toggle-desc'>Show icons only, hide text labels</p>
-                  </div>
-                  <label className='switch'>
-                    <input
-                      type='checkbox'
-                      name='sidebarCompact'
-                      checked={!!settings.sidebarCompact}
-                      onChange={handleChange}
-                    />
-                    <span className='slider' />
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════
-               NOTIFICATIONS
-          ══════════════════════════════════════════ */}
-          {activeTab === "notifications" && (
-            <div className='settings-section'>
-              <div className='section-header'>
-                <h2>Notifications</h2>
-                <p>
-                  Control which alerts and reports are generated. The notification bell in the top
-                  bar uses these preferences.
-                </p>
-              </div>
-
-              <div className='toggle-list'>
-                <div className='toggle-row'>
-                  <div>
-                    <p className='toggle-label'>Email notifications</p>
-                    <p className='toggle-desc'>
-                      Master switch — disabling this suppresses all email alerts
-                    </p>
-                  </div>
-                  <label className='switch'>
-                    <input
-                      type='checkbox'
-                      name='emailNotifications'
-                      checked={!!settings.emailNotifications}
-                      onChange={handleChange}
-                    />
-                    <span className='slider' />
-                  </label>
-                </div>
-
-                <div className='toggle-row'>
-                  <div>
-                    <p className='toggle-label'>Payment alerts</p>
-                    <p className='toggle-desc'>
-                      Show a notification each time a payment is recorded
-                    </p>
-                  </div>
-                  <label className='switch'>
-                    <input
-                      type='checkbox'
-                      name='paymentAlerts'
-                      checked={!!settings.paymentAlerts}
-                      onChange={handleChange}
-                    />
-                    <span className='slider' />
-                  </label>
-                </div>
-
-                <div className='toggle-row'>
-                  <div>
-                    <p className='toggle-label'>Overdue reminders</p>
-                    <p className='toggle-desc'>
-                      Alert when students have outstanding balances before term ends
-                    </p>
-                  </div>
-                  <label className='switch'>
-                    <input
-                      type='checkbox'
-                      name='overdueReminders'
-                      checked={!!settings.overdueReminders}
-                      onChange={handleChange}
-                    />
-                    <span className='slider' />
-                  </label>
-                </div>
-
-                {settings.overdueReminders && (
-                  <div className='input-group sp-inline-setting-input'>
-                    <label>Remind this many days before term ends</label>
+                  <div className='input-group full-width'>
+                    <label>
+                      Tagline / Description <span className='optional'>(optional)</span>
+                    </label>
                     <div className='input-wrapper'>
-                      <HiBell className='input-icon' />
                       <input
-                        type='number'
-                        name='reminderDaysBefore'
-                        value={settings.reminderDaysBefore || 3}
+                        name='tagline'
+                        value={settings.tagline || ""}
                         onChange={handleChange}
-                        min='1'
-                        max='30'
+                        placeholder='e.g. Excellence in Education'
                       />
                     </div>
                   </div>
-                )}
 
-                <div className='toggle-row'>
-                  <div>
-                    <p className='toggle-label'>Weekly summary report</p>
-                    <p className='toggle-desc'>
-                      Include a weekly collection summary in the notification panel
-                    </p>
-                  </div>
-                  <label className='switch'>
-                    <input
-                      type='checkbox'
-                      name='weeklyReport'
-                      checked={!!settings.weeklyReport}
-                      onChange={handleChange}
-                    />
-                    <span className='slider' />
-                  </label>
-                </div>
-              </div>
-
-              <div className='section-divider' />
-              <div className='sp-info-banner'>
-                <HiInformationCircle />
-                <span>
-                  The notification bell (🔔) in the top bar reads these settings and your live
-                  Firestore data to generate real-time alerts about fee collections, unpaid
-                  families, and term deadlines.
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════
-               SECURITY
-          ══════════════════════════════════════════ */}
-          {activeTab === "security" && (
-            <div className='settings-section'>
-              <div className='section-header'>
-                <h2>Security</h2>
-                <p>Protect access to sensitive financial data and manage account settings.</p>
-              </div>
-
-              <div className='toggle-list'>
-                <div className='toggle-row'>
-                  <div>
-                    <p className='toggle-label'>Require PIN to view balances</p>
-                    <p className='toggle-desc'>
-                      Prompt for a 4-digit PIN before displaying financial data
-                    </p>
-                  </div>
-                  <label className='switch'>
-                    <input
-                      type='checkbox'
-                      name='requirePin'
-                      checked={!!settings.requirePin}
-                      onChange={handleChange}
-                    />
-                    <span className='slider' />
-                  </label>
-                </div>
-
-                {settings.requirePin && (
-                  <div className='input-group sp-inline-setting-input'>
-                    <label>4-Digit PIN</label>
+                  <div className='input-group full-width'>
+                    <label>
+                      School Motto <span className='optional'>(optional)</span>
+                    </label>
                     <div className='input-wrapper'>
-                      <HiLockClosed className='input-icon' />
+                      <HiStar className='input-icon sp-star-icon' />
                       <input
-                        type={showPin ? "text" : "password"}
-                        name='pin'
-                        value={settings.pin || ""}
+                        name='motto'
+                        value={settings.motto || ""}
                         onChange={handleChange}
-                        placeholder='••••'
-                        maxLength={4}
-                        pattern='\d{4}'
+                        placeholder='e.g. Province of Knowledge'
                       />
-                      <button
-                        type='button'
-                        className='pin-toggle'
-                        onClick={() => setShowPin((v) => !v)}
-                      >
-                        {showPin ? <HiEyeOff /> : <HiEye />}
-                      </button>
+                    </div>
+                    <small className='hint'>
+                      Printed on official letters and the document letterhead
+                    </small>
+                  </div>
+
+                  <div className='input-group'>
+                    <label>Official Email</label>
+                    <div className='input-wrapper'>
+                      <HiMail className='input-icon' />
+                      <input
+                        type='email'
+                        name='contactEmail'
+                        value={settings.contactEmail}
+                        onChange={handleChange}
+                        placeholder='admin@school.com'
+                      />
                     </div>
                   </div>
-                )}
 
-                <div className='toggle-row'>
-                  <div>
-                    <p className='toggle-label'>Auto log-out on inactivity</p>
-                    <p className='toggle-desc'>
-                      Automatically sign out after a period of no activity
-                    </p>
-                  </div>
-                  <label className='switch'>
-                    <input
-                      type='checkbox'
-                      name='autoLogout'
-                      checked={!!settings.autoLogout}
-                      onChange={handleChange}
-                    />
-                    <span className='slider' />
-                  </label>
-                </div>
-
-                {settings.autoLogout && (
-                  <div className='input-group sp-inline-setting-input'>
-                    <label>Inactivity timeout</label>
+                  <div className='input-group'>
+                    <label>Phone Number</label>
                     <div className='input-wrapper'>
-                      <HiClock className='input-icon' />
+                      <HiPhone className='input-icon' />
+                      <input
+                        name='contactPhone'
+                        value={settings.contactPhone}
+                        onChange={handleChange}
+                        placeholder='+234 800 000 0000'
+                      />
+                    </div>
+                  </div>
+
+                  <div className='input-group'>
+                    <label>
+                      Website <span className='optional'>(optional)</span>
+                    </label>
+                    <div className='input-wrapper'>
+                      <HiGlobe className='input-icon' />
+                      <input
+                        name='website'
+                        value={settings.website || ""}
+                        onChange={handleChange}
+                        placeholder='https://www.school.com'
+                      />
+                    </div>
+                  </div>
+
+                  <div className='input-group'>
+                    <label>Currency</label>
+                    <div className='input-wrapper'>
+                      <HiCurrencyDollar className='input-icon' />
                       <select
-                        name='sessionTimeout'
-                        value={settings.sessionTimeout || "30"}
+                        name='currency'
+                        value={settings.currency || "NGN (₦)"}
                         onChange={handleChange}
                       >
-                        {["5", "10", "15", "30", "60", "120"].map((v) => (
-                          <option key={v} value={v}>
-                            {v} minutes
-                          </option>
+                        {CURRENCIES.map((c) => (
+                          <option key={c}>{c}</option>
                         ))}
                       </select>
                     </div>
                   </div>
+
+                  <div className='input-group'>
+                    <label>Timezone</label>
+                    <div className='input-wrapper'>
+                      <HiClock className='input-icon' />
+                      <select
+                        name='timezone'
+                        value={settings.timezone || "Africa/Lagos"}
+                        onChange={handleChange}
+                      >
+                        {TIMEZONES.map((t) => (
+                          <option key={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live preview of letterhead */}
+                {(settings.name || settings.logo) && (
+                  <div className='sp-letterhead-preview'>
+                    <p className='sp-preview-label'>Letterhead preview</p>
+                    <div className='sp-letter-mock'>
+                      <div className='sp-letter-mock-head'>
+                        {settings.logo ? (
+                          <img src={settings.logo} className='sp-mock-logo' alt='logo' />
+                        ) : (
+                          <div className='sp-mock-logo-ph'>
+                            <HiOfficeBuilding />
+                          </div>
+                        )}
+                        <div className='sp-mock-info'>
+                          <strong>{settings.name || "School Name"}</strong>
+                          {settings.address && <span>{settings.address}</span>}
+                          {(settings.contactPhone || settings.contactEmail) && (
+                            <span>
+                              {settings.contactPhone && `Tel: ${settings.contactPhone}`}
+                              {settings.contactPhone && settings.contactEmail && " · "}
+                              {settings.contactEmail && `Email: ${settings.contactEmail}`}
+                            </span>
+                          )}
+                          {settings.motto && (
+                            <span className='sp-mock-motto'>Motto: {settings.motto}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className='sp-mock-rule' />
+                    </div>
+                  </div>
                 )}
               </div>
+            )}
 
-              <div className='section-divider' />
-              <h3 className='sub-section-title'>Admin Account</h3>
-              <div className='info-row'>
-                <HiUser className='info-icon' />
-                <div>
-                  <p className='info-label'>Signed in as</p>
-                  <p className='info-value'>{user?.email || settings.contactEmail || "—"}</p>
-                </div>
-              </div>
-              <div className='sp-inline-actions-lg'>
-                <button className='outline-btn' onClick={handlePasswordReset}>
-                  <HiLockClosed /> Send Password Reset Email
-                </button>
-              </div>
-              <p className='sp-sub-desc sp-sub-desc-top'>
-                A reset link will be sent to{" "}
-                <strong>{user?.email || settings.contactEmail || "your email"}</strong>.
-              </p>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════
-               DATA & EXPORT
+            {/* ══════════════════════════════════════════
+               ACADEMIC
           ══════════════════════════════════════════ */}
-          {activeTab === "data" && (
-            <div className='settings-section'>
-              <div className='section-header'>
-                <h2>Data &amp; Export</h2>
-                <p>Download records as CSV files or a full JSON backup, and manage your data.</p>
-              </div>
-
-              {/* ── Export ── */}
-              <h3 className='sub-section-title'>Export Records</h3>
-              <div className='data-action-grid'>
-                <div className='data-action-card'>
-                  <div className='sp-export-icon sp-icon-blue'>
-                    <HiAcademicCap />
-                  </div>
+            {activeTab === "academic" && (
+              <div className='settings-section'>
+                <div className='section-header'>
                   <div>
-                    <p className='data-action-title'>Students</p>
-                    <p className='data-action-desc'>
-                      All enrolled students with class and family IDs
+                    <h2>Academic Settings</h2>
+                    <p>
+                      Current session and term drive all fee calculations, payment records, and
+                      student promotion across the system.
                     </p>
                   </div>
                   <button
-                    className='sp-export-btn'
-                    disabled={exporting.students}
-                    onClick={exportStudents}
-                  >
-                    {exporting.students ? (
-                      <>
-                        <div className='sp-btn-spinner sp-btn-spinner--sm' /> Exporting…
-                      </>
-                    ) : (
-                      <>
-                        <HiDownload /> CSV
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className='data-action-card'>
-                  <div className='sp-export-icon sp-icon-green'>
-                    <HiUserGroup />
-                  </div>
-                  <div>
-                    <p className='data-action-title'>Families</p>
-                    <p className='data-action-desc'>Family directory with contact information</p>
-                  </div>
-                  <button
-                    className='sp-export-btn'
-                    disabled={exporting.families}
-                    onClick={exportFamilies}
-                  >
-                    {exporting.families ? (
-                      <>
-                        <div className='sp-btn-spinner sp-btn-spinner--sm' /> Exporting…
-                      </>
-                    ) : (
-                      <>
-                        <HiDownload /> CSV
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className='data-action-card'>
-                  <div className='sp-export-icon sp-icon-purple'>
-                    <HiCurrencyDollar />
-                  </div>
-                  <div>
-                    <p className='data-action-title'>Payments</p>
-                    <p className='data-action-desc'>
-                      All payment records with amounts, methods and dates
-                    </p>
-                  </div>
-                  <button
-                    className='sp-export-btn'
-                    disabled={exporting.payments}
-                    onClick={exportPayments}
-                  >
-                    {exporting.payments ? (
-                      <>
-                        <div className='sp-btn-spinner sp-btn-spinner--sm' /> Exporting…
-                      </>
-                    ) : (
-                      <>
-                        <HiDownload /> CSV
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className='data-action-card'>
-                  <div className='sp-export-icon sp-icon-amber'>
-                    <HiChartBar />
-                  </div>
-                  <div>
-                    <p className='data-action-title'>Classes</p>
-                    <p className='data-action-desc'>
-                      Class list with session and section information
-                    </p>
-                  </div>
-                  <button
-                    className='sp-export-btn'
-                    disabled={exporting.classes}
-                    onClick={exportClasses}
-                  >
-                    {exporting.classes ? (
-                      <>
-                        <div className='sp-btn-spinner sp-btn-spinner--sm' /> Exporting…
-                      </>
-                    ) : (
-                      <>
-                        <HiDownload /> CSV
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className='data-action-card sp-backup-card'>
-                  <div className='sp-export-icon sp-icon-teal'>
-                    <HiDocumentText />
-                  </div>
-                  <div>
-                    <p className='data-action-title'>Full Backup</p>
-                    <p className='data-action-desc'>
-                      All records — students, families, classes, payments, fees — in a single JSON
-                      file. Use for data migration or disaster recovery.
-                    </p>
-                  </div>
-                  <button
-                    className='sp-export-btn sp-export-btn--primary'
-                    disabled={exporting.backup}
-                    onClick={exportFullBackup}
-                  >
-                    {exporting.backup ? (
-                      <>
-                        <div className='sp-btn-spinner sp-btn-spinner--sm' /> Preparing…
-                      </>
-                    ) : (
-                      <>
-                        <HiDownload /> Backup JSON
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className='section-divider' />
-              {/* ── Maintenance ── */}
-              <h3 className='sub-section-title'>Maintenance</h3>
-              <div className='data-action-grid'>
-                <div className='data-action-card'>
-                  <div className='sp-export-icon sp-icon-blue'>
-                    <HiRefresh />
-                  </div>
-                  <div>
-                    <p className='data-action-title'>Recalculate Balances</p>
-                    <p className='data-action-desc'>
-                      Balances are calculated live from fee and payment records — no separate
-                      recalculation is needed. Navigate to any student or family page to see the
-                      latest figures.
-                    </p>
-                  </div>
-                  <button
-                    className='outline-btn'
-                    onClick={() =>
-                      showToast("success", "Balances are always computed live — no action needed.")
+                    className='sp-save-btn sp-tab-save-btn'
+                    onClick={() => handleSaveTab("academic")}
+                    disabled={savingTab === "academic" || !canEditTab("academic")}
+                    title={
+                      !canEditTab("academic")
+                        ? "You do not have edit access for this tab"
+                        : "Save Academic Settings"
                     }
                   >
-                    <HiInformationCircle /> How it works
+                    {savingTab === "academic" ? (
+                      <>
+                        <div className='sp-btn-spinner' /> Saving…
+                      </>
+                    ) : (
+                      <>
+                        <HiSave /> Save Tab
+                      </>
+                    )}
                   </button>
                 </div>
-              </div>
 
-              <div className='section-divider' />
-              {/* ── Danger Zone ── */}
-              <h3 className='sub-section-title danger-title'>Danger Zone</h3>
-              <div className='danger-zone'>
-                {/* Card 1: Clear fee overrides */}
-                <div className='danger-card'>
+                {/* Status card */}
+                <div className='academic-status-card'>
+                  <div className='academic-status-item'>
+                    <span className='status-label'>Current Session</span>
+                    <span className='status-value'>{settings.academicYear || "—"}</span>
+                  </div>
+                  <div className='academic-status-divider' />
+                  <div className='academic-status-item'>
+                    <span className='status-label'>Current Term</span>
+                    <span className='status-value highlight'>{settings.currentTerm || "—"}</span>
+                  </div>
+                  <div className='academic-status-divider' />
+                  <div className='academic-status-item'>
+                    <span className='status-label'>Term End</span>
+                    <span className={`status-value ${termEndClass}`}>
+                      {settings.termEndDate
+                        ? new Date(settings.termEndDate).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "Not set"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Promotion readiness banner */}
+                {isThirdTermEnded ? (
+                  <div className='sp-promote-ready-banner'>
+                    <HiAcademicCap />
+                    <div>
+                      <strong>3rd Term has ended — promotion window is open</strong>
+                      <p>
+                        The Promote button is now visible on class pages. Go to{" "}
+                        <strong>Class Management</strong> to promote students to their next class.
+                      </p>
+                    </div>
+                  </div>
+                ) : settings.currentTerm === "3rd Term" && !termEndPassed ? (
+                  <div className='sp-info-banner'>
+                    <HiInformationCircle />
+                    <span>
+                      You are in the <strong>3rd Term</strong>. The Promote button will appear on
+                      class pages once the term end date (
+                      <strong>{settings.termEndDate || "not set"}</strong>) passes.
+                    </span>
+                  </div>
+                ) : settings.currentTerm && settings.currentTerm !== "3rd Term" ? (
+                  <div className='sp-info-banner'>
+                    <HiInformationCircle />
+                    <span>
+                      Student promotion is only available after <strong>3rd Term</strong> ends.
+                      Currently in <strong>{settings.currentTerm}</strong>.
+                    </span>
+                  </div>
+                ) : null}
+
+                <div className='form-grid settings-grid'>
+                  <div className='input-group'>
+                    <label>
+                      Academic Year <span className='sp-required'>*</span>
+                    </label>
+                    <div className='input-wrapper'>
+                      <HiCalendar className='input-icon' />
+                      <select
+                        name='academicYear'
+                        value={settings.academicYear}
+                        onChange={handleChange}
+                      >
+                        <option value=''>Select year</option>
+                        {generateSessions().map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className='input-group'>
+                    <label>
+                      Current Term <span className='sp-required'>*</span>
+                    </label>
+                    <div className='input-wrapper'>
+                      <HiClock className='input-icon' />
+                      <select
+                        name='currentTerm'
+                        value={settings.currentTerm}
+                        onChange={handleChange}
+                      >
+                        <option value=''>Select term</option>
+                        {TERMS.map((t) => (
+                          <option key={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className='input-group'>
+                    <label>Term Start Date</label>
+                    <div className='input-wrapper'>
+                      <HiCalendar className='input-icon' />
+                      <input
+                        type='date'
+                        name='termStartDate'
+                        value={settings.termStartDate || ""}
+                        onChange={handleChange}
+                      />
+                    </div>
+                  </div>
+
+                  <div className='input-group'>
+                    <label>Term End Date</label>
+                    <div className='input-wrapper'>
+                      <HiCalendar className='input-icon' />
+                      <input
+                        type='date'
+                        name='termEndDate'
+                        value={settings.termEndDate || ""}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    {settings.termEndDate && (
+                      <small className={`hint ${termEndClass}`}>
+                        {termEndPassed
+                          ? "This term has ended"
+                          : `${Math.ceil((new Date(settings.termEndDate) - new Date()) / 86400000)} days remaining`}
+                      </small>
+                    )}
+                  </div>
+
+                  <div className='input-group'>
+                    <label>Next Term Start Date</label>
+                    <div className='input-wrapper'>
+                      <HiCalendar className='input-icon' />
+                      <input
+                        type='date'
+                        name='nextTermStart'
+                        value={settings.nextTermStart || ""}
+                        onChange={handleChange}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className='section-divider' />
+                <h3 className='sub-section-title'>Payment Behaviour</h3>
+                <div className='toggle-list'>
+                  <div className='toggle-row'>
+                    <div>
+                      <p className='toggle-label'>Allow partial payments</p>
+                      <p className='toggle-desc'>
+                        Students can pay any portion of their fee balance
+                      </p>
+                    </div>
+                    <label className='switch'>
+                      <input
+                        type='checkbox'
+                        name='allowPartialPayment'
+                        checked={!!settings.allowPartialPayment}
+                        onChange={handleChange}
+                      />
+                      <span className='slider' />
+                    </label>
+                  </div>
+
+                  <div className='toggle-row'>
+                    <div>
+                      <p className='toggle-label'>Enable late payment fee</p>
+                      <p className='toggle-desc'>
+                        Automatically add a surcharge for overdue balances
+                      </p>
+                    </div>
+                    <label className='switch'>
+                      <input
+                        type='checkbox'
+                        name='lateFeeEnabled'
+                        checked={!!settings.lateFeeEnabled}
+                        onChange={handleChange}
+                      />
+                      <span className='slider' />
+                    </label>
+                  </div>
+
+                  {settings.lateFeeEnabled && (
+                    <div className='input-group sp-inline-setting-input'>
+                      <label>Late Fee Amount (₦)</label>
+                      <div className='input-wrapper'>
+                        <input
+                          type='number'
+                          name='lateFeeAmount'
+                          value={settings.lateFeeAmount || ""}
+                          onChange={handleChange}
+                          placeholder='e.g. 500'
+                          min='0'
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════
+               APPEARANCE
+          ══════════════════════════════════════════ */}
+            {activeTab === "appearance" && (
+              <div className='settings-section'>
+                <div className='section-header'>
                   <div>
-                    <p className='danger-title'>Clear all fee overrides</p>
-                    <p className='danger-desc'>
-                      Remove all per-student fee exclusions. Students will revert to their full
-                      class fee structure. Cannot be undone.
+                    <h2>Appearance</h2>
+                    <p>
+                      Changes apply immediately as you select them. Save to persist across sessions.
                     </p>
                   </div>
-                  {confirmClear ? (
-                    <div className='sp-inline-actions'>
-                      <button
-                        className='danger-btn'
-                        disabled={clearingOverrides}
-                        onClick={clearFeeOverrides}
-                      >
-                        {clearingOverrides ? "Clearing…" : "Confirm"}
-                      </button>
-                      <button className='cancel-btn' onClick={() => setConfirmClear(false)}>
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button className='danger-btn-outline' onClick={() => setConfirmClear(true)}>
-                      <HiTrash /> Clear overrides
+                  <button
+                    className='sp-save-btn sp-tab-save-btn'
+                    onClick={() => handleSaveTab("appearance")}
+                    disabled={savingTab === "appearance" || !canEditTab("appearance")}
+                    title={
+                      !canEditTab("appearance")
+                        ? "You do not have edit access for this tab"
+                        : "Save Appearance"
+                    }
+                  >
+                    {savingTab === "appearance" ? (
+                      <>
+                        <div className='sp-btn-spinner' /> Saving…
+                      </>
+                    ) : (
+                      <>
+                        <HiSave /> Save Tab
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <h3 className='sub-section-title'>Theme</h3>
+                <div className='theme-options'>
+                  {THEMES.map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type='button'
+                      className={`theme-option ${settings.theme === id ? "active" : ""}`}
+                      onClick={() => handleThemeChange(id)}
+                    >
+                      <div className={`theme-preview theme-preview-${id}`}>
+                        <div className='preview-sidebar' />
+                        <div className='preview-content'>
+                          <div className='preview-bar' />
+                          <div className='preview-bar short' />
+                        </div>
+                      </div>
+                      <span>{label}</span>
                     </button>
+                  ))}
+                </div>
+
+                <div className='section-divider' />
+                <h3 className='sub-section-title'>Accent Colour</h3>
+                <p className='sp-sub-desc'>
+                  Sets the primary colour for buttons, links, and active states throughout the app.
+                </p>
+                <div className='accent-colors'>
+                  {ACCENT_COLORS.map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type='button'
+                      title={label}
+                      className={`accent-dot accent-dot-${id} ${settings.accentColor === id ? "active" : ""}`}
+                      onClick={() => handleAccentChange(id)}
+                    >
+                      {settings.accentColor === id && <HiCheckCircle />}
+                    </button>
+                  ))}
+                </div>
+                {settings.accentColor && (
+                  <p className='sp-accent-label'>
+                    Selected:{" "}
+                    <strong>
+                      {ACCENT_COLORS.find((c) => c.id === settings.accentColor)?.label}
+                    </strong>
+                  </p>
+                )}
+
+                <div className='section-divider' />
+                <h3 className='sub-section-title'>Layout</h3>
+                <div className='toggle-list'>
+                  <div className='toggle-row'>
+                    <div>
+                      <p className='toggle-label'>Compact sidebar</p>
+                      <p className='toggle-desc'>Show icons only, hide text labels</p>
+                    </div>
+                    <label className='switch'>
+                      <input
+                        type='checkbox'
+                        name='sidebarCompact'
+                        checked={!!settings.sidebarCompact}
+                        onChange={handleChange}
+                      />
+                      <span className='slider' />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════
+               NOTIFICATIONS
+          ══════════════════════════════════════════ */}
+            {activeTab === "notifications" && (
+              <div className='settings-section'>
+                <div className='section-header'>
+                  <div>
+                    <h2>Notifications</h2>
+                    <p>
+                      Control which alerts and reports are generated. The notification bell in the
+                      top bar uses these preferences.
+                    </p>
+                  </div>
+                  <button
+                    className='sp-save-btn sp-tab-save-btn'
+                    onClick={() => handleSaveTab("notifications")}
+                    disabled={savingTab === "notifications" || !canEditTab("notifications")}
+                    title={
+                      !canEditTab("notifications")
+                        ? "You do not have edit access for this tab"
+                        : "Save Notifications"
+                    }
+                  >
+                    {savingTab === "notifications" ? (
+                      <>
+                        <div className='sp-btn-spinner' /> Saving…
+                      </>
+                    ) : (
+                      <>
+                        <HiSave /> Save Tab
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className='toggle-list'>
+                  <div className='toggle-row'>
+                    <div>
+                      <p className='toggle-label'>Email notifications</p>
+                      <p className='toggle-desc'>
+                        Master switch — disabling this suppresses all email alerts
+                      </p>
+                    </div>
+                    <label className='switch'>
+                      <input
+                        type='checkbox'
+                        name='emailNotifications'
+                        checked={!!settings.emailNotifications}
+                        onChange={handleChange}
+                      />
+                      <span className='slider' />
+                    </label>
+                  </div>
+
+                  <div className='toggle-row'>
+                    <div>
+                      <p className='toggle-label'>Payment alerts</p>
+                      <p className='toggle-desc'>
+                        Show a notification each time a payment is recorded
+                      </p>
+                    </div>
+                    <label className='switch'>
+                      <input
+                        type='checkbox'
+                        name='paymentAlerts'
+                        checked={!!settings.paymentAlerts}
+                        onChange={handleChange}
+                      />
+                      <span className='slider' />
+                    </label>
+                  </div>
+
+                  <div className='toggle-row'>
+                    <div>
+                      <p className='toggle-label'>Overdue reminders</p>
+                      <p className='toggle-desc'>
+                        Alert when students have outstanding balances before term ends
+                      </p>
+                    </div>
+                    <label className='switch'>
+                      <input
+                        type='checkbox'
+                        name='overdueReminders'
+                        checked={!!settings.overdueReminders}
+                        onChange={handleChange}
+                      />
+                      <span className='slider' />
+                    </label>
+                  </div>
+
+                  {settings.overdueReminders && (
+                    <div className='input-group sp-inline-setting-input'>
+                      <label>Remind this many days before term ends</label>
+                      <div className='input-wrapper'>
+                        <HiBell className='input-icon' />
+                        <input
+                          type='number'
+                          name='reminderDaysBefore'
+                          value={settings.reminderDaysBefore || 3}
+                          onChange={handleChange}
+                          min='1'
+                          max='30'
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className='toggle-row'>
+                    <div>
+                      <p className='toggle-label'>Weekly summary report</p>
+                      <p className='toggle-desc'>
+                        Include a weekly collection summary in the notification panel
+                      </p>
+                    </div>
+                    <label className='switch'>
+                      <input
+                        type='checkbox'
+                        name='weeklyReport'
+                        checked={!!settings.weeklyReport}
+                        onChange={handleChange}
+                      />
+                      <span className='slider' />
+                    </label>
+                  </div>
+                </div>
+
+                <div className='section-divider' />
+                <div className='sp-info-banner'>
+                  <HiInformationCircle />
+                  <span>
+                    The notification bell (🔔) in the top bar reads these settings and your live
+                    Firestore data to generate real-time alerts about fee collections, unpaid
+                    families, and term deadlines.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════
+               SECURITY
+          ══════════════════════════════════════════ */}
+            {activeTab === "security" && (
+              <div className='settings-section'>
+                <div className='section-header'>
+                  <div>
+                    <h2>Security</h2>
+                    <p>Protect access to sensitive financial data and manage account settings.</p>
+                  </div>
+                  <button
+                    className='sp-save-btn sp-tab-save-btn'
+                    onClick={() => handleSaveTab("security")}
+                    disabled={savingTab === "security" || !canEditTab("security")}
+                    title={
+                      !canEditTab("security")
+                        ? "You do not have edit access for this tab"
+                        : "Save Security"
+                    }
+                  >
+                    {savingTab === "security" ? (
+                      <>
+                        <div className='sp-btn-spinner' /> Saving…
+                      </>
+                    ) : (
+                      <>
+                        <HiSave /> Save Tab
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className='toggle-list'>
+                  <div className='toggle-row'>
+                    <div>
+                      <p className='toggle-label'>Require PIN to view balances</p>
+                      <p className='toggle-desc'>
+                        Prompt for a 4-digit PIN before displaying financial data
+                      </p>
+                    </div>
+                    <label className='switch'>
+                      <input
+                        type='checkbox'
+                        name='requirePin'
+                        checked={!!settings.requirePin}
+                        onChange={handleChange}
+                      />
+                      <span className='slider' />
+                    </label>
+                  </div>
+
+                  {settings.requirePin && (
+                    <div className='input-group sp-inline-setting-input'>
+                      <label>4-Digit PIN</label>
+                      <div className='input-wrapper'>
+                        <HiLockClosed className='input-icon' />
+                        <input
+                          type={showPin ? "text" : "password"}
+                          name='pin'
+                          value={settings.pin || ""}
+                          onChange={handleChange}
+                          placeholder='••••'
+                          maxLength={4}
+                          pattern='\d{4}'
+                        />
+                        <button
+                          type='button'
+                          className='pin-toggle'
+                          onClick={() => setShowPin((v) => !v)}
+                        >
+                          {showPin ? <HiEyeOff /> : <HiEye />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className='toggle-row'>
+                    <div>
+                      <p className='toggle-label'>Auto log-out on inactivity</p>
+                      <p className='toggle-desc'>
+                        Automatically sign out after a period of no activity
+                      </p>
+                    </div>
+                    <label className='switch'>
+                      <input
+                        type='checkbox'
+                        name='autoLogout'
+                        checked={!!settings.autoLogout}
+                        onChange={handleChange}
+                      />
+                      <span className='slider' />
+                    </label>
+                  </div>
+
+                  {settings.autoLogout && (
+                    <div className='input-group sp-inline-setting-input'>
+                      <label>Inactivity timeout</label>
+                      <div className='input-wrapper'>
+                        <HiClock className='input-icon' />
+                        <select
+                          name='sessionTimeout'
+                          value={settings.sessionTimeout || "30"}
+                          onChange={handleChange}
+                        >
+                          {["5", "10", "15", "30", "60", "120"].map((v) => (
+                            <option key={v} value={v}>
+                              {v} minutes
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                {/* Card 2: Wipe all data */}
-                <div className='danger-card wipe-card sp-wipe-card'>
-                  <div className='sp-grow'>
-                    <p className='danger-title'>Clear all data (keep families)</p>
-                    <p className='danger-desc'>
-                      Permanently deletes all{" "}
-                      <strong>students, fees, payments, classes, balances, discounts</strong> and
-                      overrides. <strong>Families are preserved.</strong>
-                    </p>
-
-                    {wipeStep === "idle" && (
-                      <button
-                        className='danger-btn-outline wipe-trigger-btn'
-                        onClick={() => setWipeStep("confirm1")}
-                      >
-                        <HiTrash /> Clear all data
-                      </button>
-                    )}
-
-                    {wipeStep === "confirm1" && (
-                      <div className='wipe-confirm-box'>
-                        <p className='wipe-warning-text'>
-                          ⚠ You are about to delete all records except families. This cannot be
-                          undone.
-                        </p>
-                        <div className='sp-inline-actions sp-inline-actions-top'>
-                          <button className='danger-btn' onClick={() => setWipeStep("confirm2")}>
-                            Yes, continue
-                          </button>
-                          <button className='cancel-btn' onClick={() => setWipeStep("idle")}>
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {wipeStep === "confirm2" && (
-                      <div className='wipe-confirm-box wipe-final'>
-                        <p className='wipe-warning-text'>
-                          <strong>Final warning.</strong> Students, fees, payments, classes,
-                          discounts and balances will be permanently deleted. Type{" "}
-                          <code>DELETE</code> to confirm.
-                        </p>
-                        <WipeConfirmInput
-                          onConfirm={clearAllData}
-                          onCancel={() => setWipeStep("idle")}
-                        />
-                      </div>
-                    )}
-
-                    {wipeStep === "wiping" && (
-                      <div className='wipe-progress'>
-                        <span className='wipe-spinner' />
-                        <span>{wipeProgress || "Clearing data…"}</span>
-                      </div>
-                    )}
-
-                    {wipeStep === "done" && (
-                      <div className='sp-wipe-done'>
-                        <HiCheckCircle />
-                        All data cleared. Families preserved.
-                        <button className='cancel-btn' onClick={() => setWipeStep("idle")}>
-                          Dismiss
-                        </button>
-                      </div>
-                    )}
+                <div className='section-divider' />
+                <h3 className='sub-section-title'>Admin Account</h3>
+                <div className='info-row'>
+                  <HiUser className='info-icon' />
+                  <div>
+                    <p className='info-label'>Signed in as</p>
+                    <p className='info-value'>{user?.email || settings.contactEmail || "—"}</p>
                   </div>
                 </div>
+                <div className='sp-inline-actions-lg'>
+                  <button className='outline-btn' onClick={handlePasswordReset}>
+                    <HiLockClosed /> Send Password Reset Email
+                  </button>
+                </div>
+                <p className='sp-sub-desc sp-sub-desc-top'>
+                  A reset link will be sent to{" "}
+                  <strong>{user?.email || settings.contactEmail || "your email"}</strong>.
+                </p>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* ══════════════════════════════════════════
+               DATA & EXPORT
+          ══════════════════════════════════════════ */}
+            {activeTab === "data" && (
+              <div className='settings-section'>
+                <div className='section-header'>
+                  <h2>Data &amp; Export</h2>
+                  <p>Download records as CSV files or a full JSON backup, and manage your data.</p>
+                </div>
+
+                {/* ── Export ── */}
+                <h3 className='sub-section-title'>Export Records</h3>
+                <div className='data-action-grid'>
+                  <div className='data-action-card'>
+                    <div className='sp-export-icon sp-icon-blue'>
+                      <HiAcademicCap />
+                    </div>
+                    <div>
+                      <p className='data-action-title'>Students</p>
+                      <p className='data-action-desc'>
+                        All enrolled students with class and family IDs
+                      </p>
+                    </div>
+                    <button
+                      className='sp-export-btn'
+                      disabled={exporting.students}
+                      onClick={exportStudents}
+                    >
+                      {exporting.students ? (
+                        <>
+                          <div className='sp-btn-spinner sp-btn-spinner--sm' /> Exporting…
+                        </>
+                      ) : (
+                        <>
+                          <HiDownload /> CSV
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className='data-action-card'>
+                    <div className='sp-export-icon sp-icon-green'>
+                      <HiUserGroup />
+                    </div>
+                    <div>
+                      <p className='data-action-title'>Families</p>
+                      <p className='data-action-desc'>Family directory with contact information</p>
+                    </div>
+                    <button
+                      className='sp-export-btn'
+                      disabled={exporting.families}
+                      onClick={exportFamilies}
+                    >
+                      {exporting.families ? (
+                        <>
+                          <div className='sp-btn-spinner sp-btn-spinner--sm' /> Exporting…
+                        </>
+                      ) : (
+                        <>
+                          <HiDownload /> CSV
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className='data-action-card'>
+                    <div className='sp-export-icon sp-icon-purple'>
+                      <HiCurrencyDollar />
+                    </div>
+                    <div>
+                      <p className='data-action-title'>Payments</p>
+                      <p className='data-action-desc'>
+                        All payment records with amounts, methods and dates
+                      </p>
+                    </div>
+                    <button
+                      className='sp-export-btn'
+                      disabled={exporting.payments}
+                      onClick={exportPayments}
+                    >
+                      {exporting.payments ? (
+                        <>
+                          <div className='sp-btn-spinner sp-btn-spinner--sm' /> Exporting…
+                        </>
+                      ) : (
+                        <>
+                          <HiDownload /> CSV
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className='data-action-card'>
+                    <div className='sp-export-icon sp-icon-amber'>
+                      <HiChartBar />
+                    </div>
+                    <div>
+                      <p className='data-action-title'>Classes</p>
+                      <p className='data-action-desc'>
+                        Class list with session and section information
+                      </p>
+                    </div>
+                    <button
+                      className='sp-export-btn'
+                      disabled={exporting.classes}
+                      onClick={exportClasses}
+                    >
+                      {exporting.classes ? (
+                        <>
+                          <div className='sp-btn-spinner sp-btn-spinner--sm' /> Exporting…
+                        </>
+                      ) : (
+                        <>
+                          <HiDownload /> CSV
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className='data-action-card sp-backup-card'>
+                    <div className='sp-export-icon sp-icon-teal'>
+                      <HiDocumentText />
+                    </div>
+                    <div>
+                      <p className='data-action-title'>Full Backup</p>
+                      <p className='data-action-desc'>
+                        All records — students, families, classes, payments, fees — in a single JSON
+                        file. Use for data migration or disaster recovery.
+                      </p>
+                    </div>
+                    <button
+                      className='sp-export-btn sp-export-btn--primary'
+                      disabled={exporting.backup}
+                      onClick={exportFullBackup}
+                    >
+                      {exporting.backup ? (
+                        <>
+                          <div className='sp-btn-spinner sp-btn-spinner--sm' /> Preparing…
+                        </>
+                      ) : (
+                        <>
+                          <HiDownload /> Backup JSON
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className='section-divider' />
+                {/* ── Maintenance ── */}
+                <h3 className='sub-section-title'>Maintenance</h3>
+                <div className='data-action-grid'>
+                  <div className='data-action-card'>
+                    <div className='sp-export-icon sp-icon-blue'>
+                      <HiRefresh />
+                    </div>
+                    <div>
+                      <p className='data-action-title'>Recalculate Balances</p>
+                      <p className='data-action-desc'>
+                        Balances are calculated live from fee and payment records — no separate
+                        recalculation is needed. Navigate to any student or family page to see the
+                        latest figures.
+                      </p>
+                    </div>
+                    <button
+                      className='outline-btn'
+                      onClick={() =>
+                        showToast(
+                          "success",
+                          "Balances are always computed live — no action needed.",
+                        )
+                      }
+                    >
+                      <HiInformationCircle /> How it works
+                    </button>
+                  </div>
+                </div>
+
+                <div className='section-divider' />
+                {/* ── Danger Zone ── */}
+                {canUseDangerZone ? (
+                  <>
+                    <h3 className='sub-section-title danger-title'>Danger Zone</h3>
+                    <div className='danger-zone'>
+                      {/* Card 1: Clear fee overrides */}
+                      <div className='danger-card'>
+                        <div>
+                          <p className='danger-title'>Clear all fee overrides</p>
+                          <p className='danger-desc'>
+                            Remove all per-student fee exclusions. Students will revert to their
+                            full class fee structure. Cannot be undone.
+                          </p>
+                        </div>
+                        {confirmClear ? (
+                          <div className='sp-inline-actions'>
+                            <button
+                              className='danger-btn'
+                              disabled={clearingOverrides}
+                              onClick={clearFeeOverrides}
+                            >
+                              {clearingOverrides ? "Clearing…" : "Confirm"}
+                            </button>
+                            <button className='cancel-btn' onClick={() => setConfirmClear(false)}>
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className='danger-btn-outline'
+                            onClick={() => setConfirmClear(true)}
+                          >
+                            <HiTrash /> Clear overrides
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Card 2: Wipe all data */}
+                      <div className='danger-card wipe-card sp-wipe-card'>
+                        <div className='sp-grow'>
+                          <p className='danger-title'>Clear all data (keep families)</p>
+                          <p className='danger-desc'>
+                            Permanently deletes all{" "}
+                            <strong>students, fees, payments, classes, balances, discounts</strong>{" "}
+                            and overrides. <strong>Families are preserved.</strong>
+                          </p>
+
+                          {wipeStep === "idle" && (
+                            <button
+                              className='danger-btn-outline wipe-trigger-btn'
+                              onClick={() => setWipeStep("confirm1")}
+                            >
+                              <HiTrash /> Clear all data
+                            </button>
+                          )}
+
+                          {wipeStep === "confirm1" && (
+                            <div className='wipe-confirm-box'>
+                              <p className='wipe-warning-text'>
+                                ⚠ You are about to delete all records except families. This cannot
+                                be undone.
+                              </p>
+                              <div className='sp-inline-actions sp-inline-actions-top'>
+                                <button
+                                  className='danger-btn'
+                                  onClick={() => setWipeStep("confirm2")}
+                                >
+                                  Yes, continue
+                                </button>
+                                <button className='cancel-btn' onClick={() => setWipeStep("idle")}>
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {wipeStep === "confirm2" && (
+                            <div className='wipe-confirm-box wipe-final'>
+                              <p className='wipe-warning-text'>
+                                <strong>Final warning.</strong> Students, fees, payments, classes,
+                                discounts and balances will be permanently deleted. Type{" "}
+                                <code>DELETE</code> to confirm.
+                              </p>
+                              <WipeConfirmInput
+                                onConfirm={clearAllData}
+                                onCancel={() => setWipeStep("idle")}
+                              />
+                            </div>
+                          )}
+
+                          {wipeStep === "wiping" && (
+                            <div className='wipe-progress'>
+                              <span className='wipe-spinner' />
+                              <span>{wipeProgress || "Clearing data…"}</span>
+                            </div>
+                          )}
+
+                          {wipeStep === "done" && (
+                            <div className='sp-wipe-done'>
+                              <HiCheckCircle />
+                              All data cleared. Families preserved.
+                              <button className='cancel-btn' onClick={() => setWipeStep("idle")}>
+                                Dismiss
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className='sp-info-banner settings-access-note'>
+                    <HiInformationCircle />
+                    <span>
+                      Danger Zone actions require the <strong>Danger zone</strong> permission.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </fieldset>
         </div>
       </div>
     </div>

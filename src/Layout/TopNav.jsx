@@ -25,6 +25,7 @@ import {
   HiCheckCircle,
   HiClock,
   HiRefresh,
+  HiChevronDown,
   HiChevronRight,
   HiFilter,
   HiInformationCircle,
@@ -1081,7 +1082,7 @@ export default function TopNav() {
     <>
       {/* ── Top bar ── */}
       <header className='top-nav'>
-        <h1 className='app-title'>School Fees System</h1>
+        <h1 className='app-title'>Feesman</h1>
         <div className='top-nav-actions'>
           {/* Search */}
           {canUseSearch && (
@@ -1155,7 +1156,10 @@ export default function TopNav() {
                   </span>
                 )}
               </div>
-              <span className='user-menu-caret'>▾</span>
+              <HiChevronDown
+                className={`user-menu-caret ${userMenuOpen ? "open" : ""}`}
+                aria-hidden='true'
+              />
             </button>
 
             {userMenuOpen && (
