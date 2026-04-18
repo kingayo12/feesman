@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { createClass } from "../../pages/classes/classService";
 import { HiPresentationChartBar, HiCollection, HiCalendar, HiPlus } from "react-icons/hi";
+import CustomInput from "../common/Input";
+import CustomSelect from "../common/SelectInput";
+import CustomButton from "../common/CustomButton";
 
 export default function ClassForm({ onSuccess }) {
   const [form, setForm] = useState({
@@ -65,60 +68,65 @@ export default function ClassForm({ onSuccess }) {
 
       <form className='modern-form' onSubmit={handleSubmit}>
         <div className='form-grid'>
-          <div className='input-group'>
-            <label>Class Name</label>
-            <div className='input-wrapper'>
-              <HiPresentationChartBar className='input-icon' />
-              <input
-                name='name'
-                placeholder='e.g. Primary 3A'
-                value={form.name}
-                onChange={handleChange}
-                required
-              />
-            </div>
-          </div>
+          <CustomInput
+            name='name'
+            value={form.name}
+            placeholder='e.g. Primary 3A'
+            onChange={handleChange}
+            labelName='Class Name'
+            icon=<HiPresentationChartBar />
+            variant='default'
+            required={true}
+          />
 
-          <div className='input-group'>
-            <label>Academic Section</label>
-            <div className='input-wrapper'>
-              <HiCollection className='input-icon' />
-              <input value={form.section || "Auto-detected"} disabled className='disabled-input' />
-            </div>
-            <small className='hint'>Detected from class name</small>
-          </div>
+          <CustomInput
+            name='name'
+            value={form.section || "Auto-detected"}
+            placeholder='e.g. Primary 3A'
+            onChange={handleChange}
+            labelName='Academic Section'
+            icon=<HiCollection />
+            variant='default'
+            required={true}
+            disabled={true}
+            hint='Detected from class name'
+          />
 
-          <div className='input-group'>
-            <label>Academic Year</label>
-            <div className='input-wrapper'>
-              <HiCalendar className='input-icon' />
-              <select name='session' value={form.session} onChange={handleChange} required>
-                <option value='' disabled>
-                  Select Year
-                </option>
-                {generateSessions().map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          <CustomSelect
+            name='session'
+            value={form.session}
+            onChange={handleChange}
+            options={generateSessions()}
+            icon=<HiCalendar />
+            labelName='Academic Year'
+            placeholder=' Select Year'
+            variant='default'
+            required={true}
+          />
 
-          {/* ✅ FIXED: options changed from "First Term" to "1st Term" etc. */}
-          <div className='input-group'>
-            <label>Current Term</label>
-            <div className='input-wrapper'>
-              <select name='term' value={form.term} onChange={handleChange} required>
-                <option value='1st Term'>1st Term</option>
-                <option value='2nd Term'>2nd Term</option>
-                <option value='3rd Term'>3rd Term</option>
-              </select>
-            </div>
-          </div>
+          <CustomSelect
+            name='term'
+            value={form.term}
+            onChange={handleChange}
+            options={["1st Term", "2nd Term", "3rd Term"]}
+            icon=<HiCalendar />
+            labelName='Current Term'
+            placeholder=' Select Year'
+            variant='default'
+            required={true}
+          />
         </div>
 
-        <button type='submit' className='submit-btn' disabled={isSubmitting}>
+        <CustomButton
+          type='submit'
+          variant='primary'
+          otherClass='submit-btn'
+          loading={isSubmitting}
+          icon={<HiPlus />}
+        >
+          Create Class Record
+        </CustomButton>
+        {/* <button type='submit' className='submit-btn' disabled={isSubmitting}>
           {isSubmitting ? (
             "Processing..."
           ) : (
@@ -126,7 +134,7 @@ export default function ClassForm({ onSuccess }) {
               <HiPlus /> Create Class Record
             </>
           )}
-        </button>
+        </button> */}
       </form>
     </div>
   );

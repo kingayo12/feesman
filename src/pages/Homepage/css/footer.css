@@ -1,0 +1,128 @@
+.footer {
+  background: url(../imgs/mapng.png) no-repeat #161515;
+  color: #fff;
+  text-align: center;
+  background-size: 100%;
+  background-position: 10px;
+  background-blend-mode: multiply;
+}
+
+.footer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 50px;
+}
+
+.footer-logo img {
+  width: 120px;
+  margin-bottom: 10px;
+}
+
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.footer-links h3 {
+  margin-bottom: 10px;
+}
+
+.footer-links ul {
+  list-style-type: none;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.footer-links ul li {
+  margin: 5px 0;
+}
+
+.footer-links ul li a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.footer-links ul li a:hover {
+  text-decoration: underline;
+  text-underline-offset: 8px;
+}
+
+.footer-gallery {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.footer-gallery h3 {
+  margin-bottom: 10px;
+}
+
+.footer-gallery .gallery-images {
+  display: flex;
+  gap: 10px;
+}
+
+.footer-gallery .gallery-images img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+}
+
+@media (min-width: 768px) {
+  .footer-container {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 20px 50px;
+  }
+
+  .footer-links ul {
+    list-style-type: none;
+    padding: 0;
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .footer-links ul li {
+    margin: 0;
+  }
+}
+
+.footer-bottom {
+  background: var(--primary-color-dark);
+  bottom: 0;
+  color: var(--background-color);
+  font-size: 10px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer_gallery {
+  width: 80px;
+  height: 80px;
+  background: #ccc;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  img {
+    width: 100%;
+  }
+}

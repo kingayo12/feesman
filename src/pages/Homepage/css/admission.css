@@ -1,0 +1,47 @@
+.hero {
+  background: url("../assets/admission-hero.jpg") no-repeat center center;
+  background-size: cover;
+  color: #fff;
+  text-align: center;
+  padding: 100px 20px;
+}
+
+.hero h1 {
+  font-size: 3em;
+  margin-bottom: 10px;
+}
+
+.hero p {
+  font-size: 1.5em;
+}
+
+.admission-process,
+.admission-requirements,
+.tuition-fees,
+.important-dates,
+.contact-info {
+  padding: 50px 20px;
+  background: #f9f9f9;
+  margin: 20px 0;
+}
+
+.admission-process h2,
+.admission-requirements h2,
+.tuition-fees h2,
+.important-dates h2,
+.contact-info h2 {
+  font-size: 2em;
+  margin-bottom: 20px;
+}
+
+.admission-process ol,
+.admission-requirements ul,
+.important-dates ul {
+  margin-left: 20px;
+}
+
+.admission-process li,
+.admission-requirements li,
+.important-dates li {
+  margin-bottom: 10px;
+}

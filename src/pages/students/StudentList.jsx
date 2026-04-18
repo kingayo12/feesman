@@ -1,41 +1,58 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getAllStudents, deleteStudent } from "./studentService";
-import { HiSearch, HiOutlineAcademicCap, HiEye, HiFilter, HiTrash } from "react-icons/hi";
+import { getAllStudents, deleteStudent, updateStudent } from "./studentService";
+import {
+  HiSearch,
+  HiOutlineAcademicCap,
+  HiEye,
+  HiFilter,
+  HiTrash,
+  HiPlus,
+  HiPencilAlt,
+} from "react-icons/hi";
 import { filterData } from "../../utils/helpers";
 import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS } from "../../config/permissions";
 import TableToolbar from "../../components/common/TableToolbar";
+import StudentForm from "../../components/forms/StudentForm";
 import { getClasses } from "../classes/classService";
 import { getFamilies } from "../families/familyService";
 import { StudentListSkeleton } from "../../components/common/Skeleton";
+import CustomButton from "../../components/common/CustomButton";
+import { FormModal, ConfirmModal } from "../../components/common/Modal";
 
 export default function StudentList() {
   const [students, setStudents] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
   const [classes, setClasses] = useState([]);
   const [families, setFamilies] = useState([]);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [editStudent, setEditStudent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showAddStudent, setShowAddStudent] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { can } = useRole();
 
-  useEffect(() => {
-    async function loadAllData() {
-      try {
-        setLoading(true);
-        const [studentData, classData, familyData] = await Promise.all([
-          getAllStudents(),
-          getClasses(),
-          getFamilies(),
-        ]);
-        setStudents(studentData || []);
-        setClasses(classData || []);
-        setFamilies(familyData || []);
-      } catch (error) {
-        console.error("Error loading Student List data:", error);
-      } finally {
-        setLoading(false);
-      }
+  const loadAllData = async () => {
+    try {
+      setLoading(true);
+      const [studentData, classData, familyData] = await Promise.all([
+        getAllStudents(),
+        getClasses(),
+        getFamilies(),
+      ]);
+      setStudents(studentData || []);
+      setClasses(classData || []);
+      setFamilies(familyData || []);
+    } catch (error) {
+      console.error("Error loading Student List data:", error);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadAllData();
   }, []);
 
@@ -97,6 +114,46 @@ export default function StudentList() {
         </div>
       </div>
 
+      <div className='add_button'>
+        {can(PERMISSIONS.CREATE_STUDENT) && (
+          <CustomButton
+            onClick={() => {
+              setEditStudent(null);
+              setModalOpen(true);
+            }}
+            icon={!showAddStudent && <HiPlus />}
+            variant={showAddStudent ? "cancel" : "primary"}
+            otherClass='rounded-full'
+          >
+            {showAddStudent ? "Cancel" : "Add Student"}
+          </CustomButton>
+        )}
+      </div>
+
+      {/* ───────── FORM MODAL ───────── */}
+      {modalOpen && (
+        <FormModal
+          title={editStudent ? "Edit Student" : "Add Student"}
+          onClose={() => {
+            setModalOpen(false);
+            setEditStudent(null);
+          }}
+        >
+          <StudentForm
+            initialData={editStudent}
+            onSuccess={async () => {
+              await loadAllData();
+              setModalOpen(false);
+              setEditStudent(null);
+            }}
+            onCancel={() => {
+              setModalOpen(false);
+              setEditStudent(null);
+            }}
+          />
+        </FormModal>
+      )}
+
       <div className='table-controls'>
         <div className='search-box'>
           <HiSearch className='search-icon' />
@@ -151,17 +208,33 @@ export default function StudentList() {
                   <td>
                     <span className='status-badge active'>Active</span>
                   </td>
-                  <td className='actions-cell'>
+                  <td className='actions-btn'>
                     <Link to={`/students/${student.id}`} className='view-btn'>
-                      <HiEye /> View
+                      <HiEye />
+                      <p>View</p>
                     </Link>
                     {can(PERMISSIONS.DELETE_STUDENT) && (
                       <button
                         className='delete-btn'
-                        onClick={() => handleDelete(student.id)}
+                        onClick={() => setDeleteTarget(student)}
                         title='Delete Student'
                       >
-                        <HiTrash /> Delete
+                        <HiTrash />
+                        <p>Delete</p>
+                      </button>
+                    )}
+
+                    {can(PERMISSIONS.EDIT_STUDENT) && (
+                      <button
+                        className='edit-btn'
+                        onClick={() => {
+                          setEditStudent(student);
+                          setModalOpen(true);
+                        }}
+                        title='Edit Student'
+                      >
+                        <HiPencilAlt />
+                        <p>Edit</p>
                       </button>
                     )}
                   </td>
@@ -177,6 +250,26 @@ export default function StudentList() {
           </tbody>
         </table>
       </div>
+
+      {deleteTarget && (
+        <ConfirmModal
+          entityName={`${deleteTarget.firstName} ${deleteTarget.lastName}`}
+          loading={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={async () => {
+            setDeleting(true);
+            try {
+              await deleteStudent(deleteTarget.id);
+              setStudents((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+              setDeleteTarget(null);
+            } catch (err) {
+              console.error(err);
+            } finally {
+              setDeleting(false);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

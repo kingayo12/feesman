@@ -1,0 +1,199 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
+:root {
+  --primary-color: #0000ff; /* Blue */
+  --secondary-color: #ff0000; /* Red */
+
+  /* Optional: additional colors for consistency */
+  --primary-color-light: #5a5aff; /* Light Blue */
+  --primary-color-dark: #00008b; /* Dark Blue */
+  --secondary-color-light: #ff6347; /* Light Red (Tomato) */
+  --secondary-color-dark: #8b0000; /* Dark Red */
+
+  /* Optional: additional design variables */
+  --background-color: #ffffff; /* White */
+  --text-color: #000000; /* Black */
+  --font-family: "poppins", sans-serif;
+}
+
+.red_bg {
+  background: var(--secondary-color) !important;
+}
+.red_bg-thick {
+  background: var(--secondary-color-dark);
+}
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-weight: 300;
+}
+/* Example usage */
+html {
+  scroll-behavior: smooth;
+}
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: var(--font-family);
+  scroll-behavior: smooth;
+}
+
+h1 {
+  font-weight: 700;
+}
+h2 {
+  font-weight: 600;
+}
+h3 {
+  font-weight: 500;
+}
+h4 {
+  font-weight: 500;
+}
+h5 {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+nav a {
+  color: var(--primary-color);
+}
+
+nav a:hover {
+  color: var(--secondary-color);
+}
+
+.link_white {
+  color: #fff;
+}
+
+.red_bd {
+  border-color: var(--secondary-color) !important;
+}
+
+.link_style {
+  text-decoration: none;
+  font-size: 15px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.text-bold {
+  font-weight: 600;
+}
+
+.text-spacing {
+  letter-spacing: 4px;
+}
+/* ----------------------Home styling------------------- */
+
+/* -------------animations----------------------- */
+@keyframes arrowanimate {
+  0% {
+    transform: translateX(0px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  80% {
+    transform: translateX(0px);
+  }
+}
+
+.shapset:hover .fa-arrow-right {
+  animation: arrowanimate 800ms infinite ease;
+}
+
+.explore_cont {
+  width: 200px;
+  height: 50px;
+
+  a {
+    text-decoration: none;
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 20px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    background: #fff;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 30px;
+  }
+}
+
+.home_container,
+.about-us-page,
+.admission_container,
+.schoolHistory_container,
+.academics-page {
+  background: url(../imgs/bg1.jpg) #fffffff1;
+  background-blend-mode: screen;
+  background-size: 40%;
+  background-repeat: repeat;
+}
+
+.home_featured_content_section {
+  background: url(../imgs/pattern1.png) var(--primary-color-dark);
+  transform: skewY(-1deg);
+  background-attachment: fixed;
+  background-blend-mode: overlay;
+}
+
+h2 {
+  font-size: 2em;
+}
+
+section {
+  max-width: 1600px;
+  margin: auto;
+  clear: both;
+}
+
+.map {
+  h2 {
+    padding: 10px;
+  }
+
+  small {
+    max-width: 800px;
+    text-align: center;
+    padding: 10px;
+  }
+}
+
+marker {
+  color: #ff0000;
+}
+
+.home_contact_us_section {
+  height: calc(100dvh - 120px);
+}
+
+.nav_top {
+  width: 100%;
+  height: 80px;
+}
+
+.topnav {
+  height: 100%;
+}
+
+.not_found_cont {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  h1 {
+    font-size: 100px;
+    color: var(--primary-color-dark);
+  }
+}

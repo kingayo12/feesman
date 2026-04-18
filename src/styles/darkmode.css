@@ -21,6 +21,10 @@
   background: var(--nav-bg);
 }
 
+[data-theme="dark"] aside.side-nav .nav-divider {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* ── Top Nav ─────────────────────────────────────────────── */
 [data-theme="dark"] .top-nav {
   background: var(--bg-primary) !important;
@@ -902,4 +906,41 @@
 [data-theme="dark"] .fee-setup-table .fee-parent-row:hover td,
 [data-theme="dark"] .fee-setup-table .fee-parent-row.is-open td {
   background: #0f172a !important;
+}
+
+/* ── Dashboard promo slider dark compatibility ───────────── */
+[data-theme="dark"] .dashboard-wrapper > .left {
+  background: linear-gradient(180deg, #0f172a 0%, #111827 45%, #0b1220 100%);
+  border-color: #334155;
+  box-shadow: 0 16px 36px rgba(2, 6, 23, 0.5);
+}
+
+[data-theme="dark"] .promo-chip {
+  background: rgba(37, 99, 235, 0.2);
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .dashboard-wrapper .left .top h3 {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .dashboard-wrapper .left .top p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .promo-dot {
+  background: #334155;
+}
+
+[data-theme="dark"] .promo-dot.active {
+  background: #60a5fa;
+}
+
+[data-theme="dark"] .dashboard-wrapper .left .bottom {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.96));
+}
+
+[data-theme="dark"] .dashboard-promo.is-skeleton {
+  background: #0f172a;
+  border-color: #334155;
 }

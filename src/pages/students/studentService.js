@@ -10,6 +10,7 @@ import {
   orderBy,
   writeBatch,
   deleteDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
 import { getSettings } from "../settings/settingService";
@@ -96,6 +97,24 @@ export const getStudentsByFamily = async (familyId, session) => {
 export const deleteStudent = async (id) => {
   const ref = doc(db, "students", id);
   await deleteDoc(ref);
+};
+
+export const updateStudent = async (id, data) => {
+  try {
+    if (!id) throw new Error("Student ID is required");
+
+    const ref = doc(db, "students", id);
+
+    await updateDoc(ref, {
+      ...data,
+      updatedAt: serverTimestamp(), // ✅ track edits
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Error updating student:", error);
+    throw error;
+  }
 };
 
 export const getAllStudents = async () => {

@@ -21,12 +21,15 @@ import { HiOutlineUsers, HiChevronRight, HiPencilAlt, HiTrash } from "react-icon
 import TableToolbar from "../../components/common/TableToolbar";
 import $ from "jquery";
 import "datatables.net";
+import { ConfirmModal } from "../../components/common/Modal";
 
 export default function FamilyList() {
   const [families, setFamilies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingFamily, setEditingFamily] = useState(null);
   const [currentTerm, setCurrentTerm] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const tableRef = useRef(null);
   const dataTableRef = useRef(null);
   const { can } = useRole();
@@ -237,13 +240,7 @@ export default function FamilyList() {
                       </button>
                     )}
                     {can(PERMISSIONS.DELETE_FAMILY) && (
-                      <button
-                        className='delete-btn'
-                        onClick={() => {
-                          if (window.confirm("Delete family?"))
-                            deleteFamily(family.id).then(loadFamilies);
-                        }}
-                      >
+                      <button className='delete-btn' onClick={() => setDeleteTarget(family)}>
                         <HiTrash />
                       </button>
                     )}
@@ -256,6 +253,26 @@ export default function FamilyList() {
             ))}
           </tbody>
         </table>
+
+        {deleteTarget && (
+          <ConfirmModal
+            entityName={"family(" + deleteTarget?.familyName + ")"}
+            loading={deleting}
+            onClose={() => setDeleteTarget(null)}
+            onConfirm={async () => {
+              setDeleting(true);
+              try {
+                await deleteFamily(deleteTarget.id);
+                await loadFamilies();
+                setDeleteTarget(null);
+              } catch (err) {
+                console.error("Delete failed", err);
+              } finally {
+                setDeleting(false);
+              }
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,0 +1,38 @@
+.student-parent-resources {
+  padding: 20px;
+  background-color: #f9f9f9;
+}
+
+.resources-container {
+  display: flex;
+  justify-content: space-between;
+}
+
+.quick-links,
+.downloads {
+  flex: 1;
+  margin: 10px;
+}
+
+.quick-links ul,
+.downloads ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.quick-links li,
+.downloads li {
+  margin: 5px 0;
+}
+
+.quick-links a,
+.downloads a {
+  text-decoration: none;
+  color: #007bff;
+  font-weight: bold;
+}
+
+.quick-links a:hover,
+.downloads a:hover {
+  text-decoration: underline;
+}

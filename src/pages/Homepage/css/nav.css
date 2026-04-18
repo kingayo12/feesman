@@ -1,0 +1,338 @@
+.nav {
+  display: flex;
+  box-shadow: 1px 2px 3px #0909092f;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 9999;
+  background: #fff;
+}
+
+.nav .nav_logo {
+  width: 80px;
+  height: 80px;
+  /* border-right: 2px solid var(--primary-color); */
+}
+
+.nav .nav_logo .nav_logo_img {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+}
+
+.nav .nav_logo .nav_logo_img img {
+  width: 100%;
+}
+
+.nav .nav_contents {
+  display: flex;
+  flex-direction: column;
+  width: calc(100% - 80px);
+}
+
+.nav .nav_contents .nav_social_media {
+  width: 100%;
+  height: 40px;
+  background: var(--primary-color-dark);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  font-size: 25px;
+  color: #fff;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.nav .nav_contents .nav_social_media .social_media {
+  display: flex;
+  gap: 10px;
+}
+
+.nav .nav_contents .nav_social_media .social_media a {
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+  transition: background 400ms ease;
+  padding: 5px;
+}
+
+.nav .nav_contents .nav_social_media .social_media a:hover {
+  cursor: pointer;
+  background: var(--secondary-color);
+}
+
+.nav .nav_contents .nav_links {
+  width: 100%;
+  background: #fff;
+  height: 40px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav .nav_contents .nav_links ul {
+  display: flex;
+  gap: 20px;
+}
+
+.nav .nav_contents .nav_links ul .nav_link {
+  list-style: none;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav .nav_contents .nav_links ul .nav_link a {
+  text-decoration: none;
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  border-bottom: 2px solid transparent;
+  position: relative;
+  font-size: 14px;
+  /* background: var(--secondary-color); */
+}
+
+.nav .nav_contents .nav_links ul .nav_link a::before {
+  position: absolute;
+  bottom: 0;
+  content: "";
+  width: 0%;
+  left: 0;
+  height: 1.5px;
+  background: var(--primary-color);
+  transition: all 400ms ease;
+}
+
+.nav .nav_contents .nav_links ul .nav_link > a:hover::before,
+.nav .nav_contents .nav_links ul .nav_link.active > a:hover,
+.nav .nav_contents .nav_links ul .nav_link.active > a::before {
+  text-decoration: none;
+  color: var(--secondary-color);
+  width: 100%;
+}
+
+.nav .nav_contents .nav_links ul .nav_link.active {
+  color: var(--secondary-color);
+}
+
+.nav .nav_contents .nav_links ul .nav_link .dropdown ul li.active > a {
+  color: var(--secondary-color);
+}
+
+.nav .nav_contents .nav_links ul .nav_link .dropdown {
+  position: absolute;
+  top: 0px;
+  left: 0;
+  display: none;
+  flex-direction: column;
+  background: transparent !important;
+  padding: 10px;
+  box-shadow: none !important;
+}
+
+/* .nav .nav_contents .nav_links ul .nav_link .dropdown::before {
+  content: "";
+  position: absolute;
+  background: rgb(255, 255, 255);
+  top: 20px;
+  left: 9%;
+  right: 50%;
+  width: 20px;
+  height: 20px;
+  transform: rotate(45deg);
+  box-shadow: 1px 2px 3px #0808082c;
+  z-index: 1;
+} */
+
+.nav .nav_contents .nav_links ul .nav_link:hover .dropdown {
+  display: flex;
+  background: #fff;
+}
+
+.nav .nav_contents .nav_links ul .nav_link .dropdown ul {
+  background: #fff;
+  padding: 5px 10px;
+  text-wrap: nowrap;
+  display: flex;
+  align-items: start;
+  flex-direction: column;
+  gap: 0;
+  height: auto;
+  margin-top: 20px;
+  box-shadow: 1px 2px 3px #0808082c;
+  position: relative;
+  border-radius: 4px;
+}
+
+.nav .nav_contents .nav_links ul .nav_link .dropdown ul::before {
+  content: "";
+  position: absolute;
+  background: rgb(255, 255, 255);
+  top: 20px;
+  left: 9%;
+  right: 50%;
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  box-shadow: 1px 2px 3px #0808082c;
+  z-index: -1;
+}
+
+.nav .nav_contents .nav_links ul .nav_link .dropdown ul li {
+  list-style: none;
+}
+
+.nav .nav_contents .nav_links ul .nav_link .dropdown ul li a {
+  text-align: left !important;
+  /* background: brown; */
+}
+
+/* .nav .nav_contents .nav_links ul .nav_link .dropdown ul li a::before {
+  position: absolute;
+  bottom: 0;
+  content: "";
+  width: 0%;
+  height: 2px;
+  background: var(--primary-color);
+  transition: all 400ms ease;
+} */
+
+.nav .nav_contents .nav_links ul .nav_link .dropdown ul li a:hover::before,
+.nav .nav_contents .nav_links ul .nav_link.active .dropdown ul li a:hover::before {
+  text-decoration: none;
+  color: var(--secondary-color);
+  width: 100%;
+}
+
+.nav .nav_contents .nav_links .action {
+  display: flex;
+  gap: 10px;
+}
+
+.nav .nav_contents .nav_links .action div {
+  width: 35px;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: var(--primary-color);
+  border-radius: 5px;
+}
+
+.nav .nav_contents .nav_links .action .mobile_menu {
+  background: #dddddd;
+  display: none;
+  cursor: pointer;
+  transition: background 400ms ease;
+}
+
+.nav .nav_contents .nav_links .action .mobile_menu:hover {
+  background: #808080c4;
+}
+
+.school_name {
+  font-weight: 900;
+  font-size: 20px;
+}
+
+/* Mobile Styles */
+@media (max-width: 1200px) {
+  .nav .nav_contents .nav_links ul {
+    margin-left: -1000%;
+    transition: all 400ms cubic-bezier(0.445, 0.05, 0.55, 0.95);
+    position: fixed;
+    top: 100px;
+    left: 0;
+    height: calc(100% - 100px);
+    width: 250px;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    box-shadow: 2px 0px 5px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    overflow-y: scroll;
+  }
+
+  .nav .nav_contents .nav_links.show ul {
+    margin-left: 0;
+    transition: all 400ms ease;
+  }
+
+  .nav .nav_contents .nav_links ul .nav_link {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .nav .nav_contents .nav_links ul .nav_link .dropdown {
+    position: unset;
+    display: none;
+  }
+
+  .nav .nav_contents .nav_links ul .nav_link.active .dropdown {
+    display: flex;
+  }
+
+  .nav .nav_contents .nav_links .action {
+    width: 100%;
+    justify-content: end;
+  }
+
+  .nav .nav_contents .nav_links .action .mobile_menu {
+    display: flex;
+  }
+
+  .nav .nav_contents .nav_links ul .nav_link .dropdown ul {
+    box-shadow: none;
+    padding: 5px 20px;
+    border-left: 2px solid var(--primary-color);
+    position: relative;
+    top: 0;
+    height: 100%;
+    box-shadow: none;
+  }
+
+  .nav .nav_contents .nav_links ul .nav_link .dropdown::before {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .school_name {
+    font-size: 10px;
+  }
+
+  .social_media {
+    width: 100%;
+    justify-content: end;
+
+    a i {
+      font-size: 18px;
+    }
+  }
+}
+
+@media (max-width: 385px) {
+  .school_name {
+    display: none;
+  }
+
+  .social_media {
+    width: 100%;
+    justify-content: end;
+
+    a i {
+      font-size: 18px;
+    }
+  }
+}

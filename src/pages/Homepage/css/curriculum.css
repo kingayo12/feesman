@@ -1,0 +1,110 @@
+.curriculum-intro {
+  background: #f9f9f9;
+}
+
+/* =====================
+   CURRICULUM STRUCTURE
+===================== */
+.structure-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 30px;
+  margin-top: 40px;
+  /* max-width: 1600px; */
+  /* clear: both; */
+  padding: 0 20px;
+}
+
+.text-center {
+  text-align: center;
+  width: 100%;
+}
+
+.structure-item {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.structure-item:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+}
+
+.structure-item img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.structure-item h3 {
+  padding: 20px 20px 10px;
+  font-size: 1.4rem;
+  color: #0b3d91;
+}
+
+.structure-item p {
+  padding: 0 20px 25px;
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+/* =====================
+   KEY SUBJECTS
+===================== */
+
+.key-subjects ul {
+  margin: auto 20px;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  clear: both;
+  /* align-items: center; */
+  /* justify-content: center; */
+  padding: 0;
+  gap: 20px;
+}
+
+.key-subjects li {
+  display: flex;
+  flex-direction: column;
+  max-width: 225px;
+  width: 100%;
+  background: #f5f7fb;
+  margin-bottom: 12px;
+  padding: 15px 20px;
+  border-top: 5px solid #0b3d91;
+  font-size: 0.95rem;
+}
+
+.key-subjects strong {
+  color: #0b3d91;
+}
+
+/* =====================
+   SPECIAL PROGRAMS
+===================== */
+.special-programs {
+  background: #0b3d91;
+  color: #fff;
+}
+
+.special-programs h2 {
+  color: #fff;
+  text-align: center;
+}
+
+.special-programs p {
+  color: #f1f1f1;
+}
+
+/* =====================
+   CURRICULUM SUMMARY
+===================== */
+.curriculum-summary {
+  background: #f9f9f9;
+}

@@ -1,0 +1,40 @@
+.ripple-button {
+  position: relative;
+  overflow: hidden;
+  padding: 10px 20px;
+  font-size: 16px;
+  border: none;
+  background: #fff;
+  color: var(--primary-color);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  width: 200px;
+  height: 50px;
+  font-weight: 700px;
+  transition: background 500ms ease;
+}
+
+.ripple-button:hover {
+  background: var(--secondary-color);
+  color: #fff;
+}
+
+.anlinks {
+  font-weight: 700px;
+}
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.5);
+  transform: scale(0);
+  animation: ripple-animation 0.6s linear;
+}
+
+@keyframes ripple-animation {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}

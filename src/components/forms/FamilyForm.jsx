@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { createFamily, updateFamily } from "../../pages/families/familyService";
 import { HiUserGroup, HiPhone, HiMail, HiLocationMarker, HiPlus, HiPencil } from "react-icons/hi";
+import CustomInput from "../common/Input";
+import CustomButton from "../common/CustomButton";
+import useToast from "../../hooks/UseToast";
 
 const EMPTY_FORM = {
   familyName: "",
@@ -11,9 +14,10 @@ const EMPTY_FORM = {
 
 export default function FamilyForm({ onSuccess, initialData, onCancel }) {
   const [form, setForm] = useState(EMPTY_FORM);
+  const [errors, setErrors] = useState({}); // ✅ THIS WAS MISSING
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { showToast, ToastComponent } = useToast();
 
-  // Sync form with initialData when editing or clearing
   useEffect(() => {
     if (initialData) {
       setForm({
@@ -23,7 +27,7 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
         address: initialData.address || "",
       });
     } else {
-      setForm(EMPTY_FORM); // Ensure form clears when initialData is null
+      setForm(EMPTY_FORM);
     }
   }, [initialData]);
 
@@ -32,14 +36,44 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const validate = () => {
+    const newErrors = {};
+
+    if (!form.familyName.trim()) {
+      newErrors.familyName = "Family name is required";
+    }
+
+    if (!form.phone.trim()) {
+      newErrors.phone = "Phone number is required";
+    } else if (!/^\d{10,15}$/.test(form.phone.replace(/\s/g, ""))) {
+      newErrors.phone = "Invalid phone number";
+    }
+
+    if (!form.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!/^\S+@\S+\.\S+$/.test(form.email)) {
+      newErrors.email = "Invalid email format";
+    }
+
+    if (!form.address.trim()) {
+      newErrors.address = "Address is required";
+    }
+
+    setErrors(newErrors);
+
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isSubmitting) return; // Prevent double clicks
+    if (isSubmitting) return;
+
+    const isValid = validate();
+    if (!isValid) return;
 
     setIsSubmitting(true);
 
     try {
-      // Clean data before sending
       const submissionData = {
         ...form,
         familyName: form.familyName.trim(),
@@ -53,7 +87,8 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
       }
 
       setForm(EMPTY_FORM);
-      if (onSuccess) onSuccess();
+      setErrors({});
+      onSuccess?.();
     } catch (error) {
       console.error("Family save failed:", error);
       alert("Failed to save family details. Please try again.");
@@ -64,6 +99,7 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
 
   return (
     <div className='form-container'>
+      <ToastComponent />
       <div className='form-header'>
         <h3>{initialData ? "Edit Family Profile" : "Register New Family"}</h3>
         <p>Fill in the details below to update the system records.</p>
@@ -71,98 +107,82 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
 
       <form className='modern-form' onSubmit={handleSubmit}>
         <div className='form-grid'>
-          {/* Family Name */}
-          <div className='input-group'>
-            <label>Family Name</label>
-            <div className='input-wrapper'>
-              <HiUserGroup className='input-icon' />
-              <input
-                name='familyName'
-                placeholder='e.g. Thompson Family'
-                value={form.familyName}
-                onChange={handleChange}
-                required
-                autoComplete='off'
-              />
-            </div>
-          </div>
+          <CustomInput
+            name='familyName'
+            value={form.familyName}
+            placeholder='e.g. Adewumi Family'
+            onChange={handleChange}
+            labelName='Family Name'
+            icon={<HiUserGroup />}
+            variant='default'
+            required={true}
+            autoComplete='off'
+            error={errors.familyName} // ✅ Wire up error display
+          />
 
-          {/* Phone */}
-          <div className='input-group'>
-            <label>Phone Number</label>
-            <div className='input-wrapper'>
-              <HiPhone className='input-icon' />
-              <input
-                type='tel'
-                name='phone'
-                placeholder='0800 000 0000'
-                value={form.phone}
-                onChange={handleChange}
-              />
-            </div>
-          </div>
+          <CustomInput
+            name='phone'
+            value={form.phone}
+            placeholder='e.g. 0800 000 0000'
+            onChange={handleChange}
+            labelName='Phone Number'
+            icon={<HiPhone />}
+            variant='default'
+            required={true}
+            autoComplete='off'
+            error={errors.phone} // ✅ Wire up error display
+          />
 
-          {/* Email */}
-          <div className='input-group'>
-            <label>Email Address</label>
-            <div className='input-wrapper'>
-              <HiMail className='input-icon' />
-              <input
-                type='email'
-                name='email'
-                placeholder='family@example.com'
-                value={form.email}
-                onChange={handleChange}
-              />
-            </div>
-          </div>
+          <CustomInput
+            name='email'
+            value={form.email}
+            placeholder='family@example.com'
+            onChange={handleChange}
+            labelName='Email Address'
+            icon={<HiMail />}
+            variant='default'
+            required={true}
+            autoComplete='off'
+            error={errors.email} // ✅ Wire up error display
+          />
 
-          {/* Address */}
-          <div className='input-group'>
-            <label>Residential Address</label>
-            <div className='input-wrapper'>
-              <HiLocationMarker className='input-icon' />
-              <input
-                name='address'
-                placeholder='Street address, City'
-                value={form.address}
-                onChange={handleChange}
-              />
-            </div>
-          </div>
+          <CustomInput
+            name='address'
+            value={form.address}
+            placeholder='Street address, City'
+            onChange={handleChange}
+            labelName='Residential Address'
+            icon={<HiLocationMarker />}
+            variant='default'
+            required={true}
+            autoComplete='off'
+            error={errors.address} // ✅ Wire up error display
+          />
         </div>
 
         <div className='form-actions'>
-          <button
+          <CustomButton
             type='submit'
-            className={`submit-btn ${isSubmitting ? "loading" : ""}`}
-            disabled={isSubmitting}
+            loading={isSubmitting}
+            loadingText='Saving...'
+            otherClass='submit-btn'
+            icon={initialData ? <HiPencil /> : <HiPlus />}
           >
-            {isSubmitting ? (
-              "Saving..."
-            ) : initialData ? (
-              <>
-                <HiPencil /> Update Family
-              </>
-            ) : (
-              <>
-                <HiPlus /> Add Family Profile
-              </>
-            )}
-          </button>
+            {initialData ? "Update Family" : "Add Family Profile"}
+          </CustomButton>
 
-          {/* Show Cancel button if editing OR if form is partially filled */}
           {(initialData || form.familyName) && (
-            <button
+            <CustomButton
               type='button'
-              className='cancel-btn'
+              variant='cancel'
               onClick={() => {
                 setForm(EMPTY_FORM);
+                setErrors({});
                 if (onCancel) onCancel();
               }}
             >
               Cancel
-            </button>
+            </CustomButton>
           )}
         </div>
       </form>

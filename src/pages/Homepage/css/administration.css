@@ -1,0 +1,147 @@
+.administration {
+  padding: 20px;
+}
+
+.administration-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.administration-header h1 {
+  font-size: 2.5rem;
+  color: #333;
+}
+
+.administration-header p {
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.admin-team {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 20px;
+}
+
+.admin-member {
+  width: 300px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.admin-member h2 {
+  font-size: 1.5rem;
+  margin-top: 15px;
+  color: #333;
+}
+
+.admin-member p {
+  color: #666;
+}
+
+.admin-mission {
+  margin-top: 50px;
+}
+
+.admin-mission h2 {
+  font-size: 2rem;
+  color: #333;
+  text-align: center;
+}
+
+.admin-mission p {
+  font-size: 1.2rem;
+  color: #666;
+  margin-top: 20px;
+  text-align: center;
+}
+
+.admin-team .admin-member {
+  position: relative;
+  border: 2px solid #ccc;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 1px 2px 3px #ccc;
+  transition: all 400ms ease;
+}
+
+.admin-team .admin-member:hover {
+  border-color: var(--primary-color);
+}
+
+.admin-member .admin-member_img {
+  width: 100%;
+  height: 250px;
+  background: #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+  }
+}
+
+.admin-member .admin_article {
+  background: rgba(0, 0, 255, 0.062);
+}
+.admin-member .admin_article .admin_name {
+  text-transform: capitalize;
+}
+
+.admin-member .admin_article .admin_title {
+  padding: 10px;
+  color: var(--primary-color-dark);
+}
+
+.admin_description {
+  padding: 20px;
+  border-top: 2px solid #ccc;
+}
+
+.admin-team .admin-member:hover .member_social_media {
+  right: 0px;
+}
+
+.admin-team .admin-member .member_social_media {
+  position: absolute;
+  height: 100%;
+  width: 50px;
+  background: rgba(255, 255, 255, 0.664);
+  backdrop-filter: blur(10px);
+  top: 0;
+  right: -100px;
+  transition: all 500ms ease;
+}
+
+.member_social_media .social-icon {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 20px;
+  margin: 0;
+  justify-content: center;
+  height: 100%;
+  margin: 5px;
+}
+
+.member_social_media .social-icon a,
+.member_social_media .social-icon div {
+  width: 100%;
+  height: 40px;
+  /* background: #cccccc75; */
+  font-size: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: var(--primary-color);
+  transition: all 400ms ease;
+}
+
+.member_social_media .social-icon a:hover,
+.member_social_media .social-icon div:hover {
+  background: #cccccc75;
+}

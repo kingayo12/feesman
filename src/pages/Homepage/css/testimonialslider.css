@@ -1,0 +1,125 @@
+.testimonial_swiper_container {
+  width: 100%;
+  /* height: 300px; */
+  /* margin: 10px auto; */
+}
+
+.testimonial-cards {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 300px;
+  /* background: blue; */
+}
+
+.testimonial-card {
+  width: 100%;
+  min-width: 250px;
+  max-width: 400px;
+  height: 200px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  clear: both;
+  margin: auto;
+  filter: drop-shadow(1px 1px 4px #00000048);
+  transition: scale 400ms ease;
+}
+
+.testimonial-card:hover h4 {
+  color: var(--secondary-color);
+}
+
+.testimonial-card .testimonial_content {
+  padding: 20px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.testimonial-card .testimonial_content .testimonial_role {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.testimonial_img_container {
+  width: 100px;
+  min-width: 100px;
+  height: 150px;
+  background: #ccc;
+  margin-left: -50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50px/20px;
+  box-shadow: 3px 3px 4px #0b014691;
+
+  img {
+    width: max-content;
+  }
+}
+
+hr {
+  width: 100%;
+  background: #cccccc25;
+  /* height: 1px; */
+}
+
+@media (max-width: 520px) {
+  .testimonial-card {
+    scale: 0.9; /* Slightly reduce size on small screens */
+    max-width: 100%; /* Allow full width usage */
+    margin: 0 auto;
+    flex-direction: column;
+    height: 300px;
+  }
+  .testimonial_img_container {
+    margin: 0;
+    margin-top: -30px;
+    min-height: 120px;
+    width: 200px;
+    display: flex;
+    align-items: baseline;
+    box-shadow: none;
+    border-radius: 5%;
+  }
+
+  .testimonial-cards {
+    min-height: 500px;
+  }
+
+  .testimonial-cards .swiper-button-prev,
+  .testimonial-cards .swiper-button-next {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    top: 85%;
+    transition: background 400ms ease;
+  }
+
+  .testimonial-cards .swiper-button-prev {
+    left: 30px;
+    background: transparent;
+    border: 2px solid var(--primary-color);
+  }
+
+  .testimonial-cards .swiper-button-next {
+    left: 100px;
+    background: transparent;
+    border: 2px solid var(--primary-color);
+  }
+
+  .testimonial-cards .swiper-button-prev::after,
+  .testimonial-cards .swiper-button-next::after {
+    font-size: 20px;
+    color: var(--primary-color);
+  }
+}
