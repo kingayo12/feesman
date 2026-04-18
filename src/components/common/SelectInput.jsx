@@ -13,10 +13,14 @@ const CustomSelect = ({
 }) => {
   return (
     <div className='input-group'>
-      <label>
-        {labelName}
-        {required && <span className='required-star'>*</span>}
-      </label>
+      {typeof labelName === "string" ? (
+        <label>
+          {labelName}
+          {required && <span className='required-star'>*</span>}
+        </label>
+      ) : (
+        labelName
+      )}
 
       <div className={`input-wrapper ${variant}`}>
         {icon && <span className='input-icon'>{icon}</span>}

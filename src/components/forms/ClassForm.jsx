@@ -60,9 +60,8 @@ export default function ClassForm({ onSuccess }) {
   };
 
   return (
-    <div className='form-container'>
+    <div>
       <div className='form-header'>
-        <h3>Add New Class</h3>
         <p>Define a class, academic session and current term.</p>
       </div>
 

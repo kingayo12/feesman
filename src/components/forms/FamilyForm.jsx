@@ -98,10 +98,10 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
   };
 
   return (
-    <div className='form-container'>
+    <div className=''>
       <ToastComponent />
       <div className='form-header'>
-        <h3>{initialData ? "Edit Family Profile" : "Register New Family"}</h3>
+        {/* <h3>{initialData ? "Edit Family Profile" : "Register New Family"}</h3> */}
         <p>Fill in the details below to update the system records.</p>
       </div>
 

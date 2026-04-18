@@ -77,7 +77,6 @@ export function FormModal({ title, subtitle, onClose, children, maxWidth = "560p
           <h3
             style={{
               margin: "0 0 0.2rem",
-              fontSize: "var(--font-size-lg)",
               color: "var(--text-primary)",
             }}
           >

@@ -23,7 +23,8 @@ const CustomButton = ({
       ) : (
         <>
           {icon && <span className='btn-icon'>{icon}</span>}
-          <span>{children}</span>
+
+          {typeof children === "string" ? <p>{children}</p> : children}
         </>
       )}
     </button>

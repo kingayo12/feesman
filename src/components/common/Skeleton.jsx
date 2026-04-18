@@ -231,26 +231,23 @@ export function StudentDetailsSkeleton() {
 export function FamilyListSkeleton() {
   return (
     <div className='page-wrapper'>
-      {/* FamilyForm placeholder */}
-      <div
-        style={{
-          marginBottom: "1.5rem",
-          padding: "1.5rem",
-          borderRadius: 12,
-          border: "1px solid var(--border-light,#f1f5f9)",
-        }}
-      >
-        <Bone w={200} h={22} style={{ marginBottom: 8 }} />
-        <Bone w={300} h={14} style={{ marginBottom: 20 }} />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} style={col({ gap: 6 })}>
-              <Bone w={80} h={12} />
-              <Bone w='100%' h={40} r={4} />
-            </div>
-          ))}
+      <div className='list-page-header'>
+        <div style={row()}>
+          <Bone w={52} h={52} r={12} />
+          <div style={col()}>
+            <Bone w={180} h={22} />
+            <Bone w={240} h={14} />
+          </div>
         </div>
-        <Bone w={160} h={42} r={10} style={{ marginTop: 20 }} />
+        <Bone w={90} h={30} r={99} />
+      </div>
+      <div className='add_button'>
+        <Bone w={150} h={42} r={50} />
+      </div>
+      {/* Controls */}
+      <div className='table-controls'>
+        <Bone w='100%' h={42} r={10} />
+        <Bone w={90} h={42} r={10} />
       </div>
 
       {/* Table */}

@@ -1431,6 +1431,11 @@ main {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
+  background: #ffffff1d;
+  backdrop-filter: blur(30px);
+  box-shadow: var(--shadow-md);
+  padding: 10px;
+  border-radius: var(--border-radius-lg);
 }
 
 .header-title {
@@ -1459,7 +1464,7 @@ main {
 .stat-pill {
   background: #4f46e5;
   color: white;
-  padding: 4px 12px;
+  padding: 12px;
   border-radius: 99px;
   font-size: 0.85rem;
   font-weight: 600;
@@ -1503,14 +1508,27 @@ main {
 .filter-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  background: white;
+
   border: 1px solid #e2e8f0;
   padding: 0 1.2rem;
   border-radius: 10px;
   color: #475569;
   font-weight: 600;
   cursor: pointer;
+}
+
+.billing-card {
+  box-shadow: var(--shadow-md);
+  padding: 20px;
+  border-radius: var(--border-radius-lg);
+}
+
+.input-group .input-wrapper.filter-btn select {
+  background: transparent !important;
+  outline: none;
+  border: none !important;
 }
 
 /* Table Card */
@@ -2690,6 +2708,10 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.btn-primary p {
+  margin-left: 10px;
 }
 
 .btn-secondary {

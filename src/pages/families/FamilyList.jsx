@@ -5,6 +5,9 @@ import { getPaymentsByFamily } from "../fees/paymentService";
 import { getFeesByClass } from "../fees/feesService";
 import { getStudentFeeOverrides } from "../students/studentFeeOverrideService";
 import { getPreviousBalanceAmount } from "../previous_balance/Previousbalanceservice";
+import CustomButton from "../../components/common/CustomButton";
+import { filterData } from "../../utils/helpers";
+import CustomSelect from "../../components/common/SelectInput";
 import {
   getActiveDiscounts,
   getAssignmentsForFamily,
@@ -16,23 +19,40 @@ import FamilyForm from "../../components/forms/FamilyForm";
 import { FamilyListSkeleton } from "../../components/common/Skeleton";
 import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS } from "../../config/permissions";
-import { Link } from "react-router-dom";
-import { HiOutlineUsers, HiChevronRight, HiPencilAlt, HiTrash } from "react-icons/hi";
+import {
+  HiOutlineUsers,
+  HiChevronRight,
+  HiPencilAlt,
+  HiTrash,
+  HiFilter,
+  HiSearch,
+} from "react-icons/hi";
 import TableToolbar from "../../components/common/TableToolbar";
 import $ from "jquery";
 import "datatables.net";
-import { ConfirmModal } from "../../components/common/Modal";
+import { ConfirmModal, FormModal } from "../../components/common/Modal";
+import { createRoot } from "react-dom/client";
 
 export default function FamilyList() {
   const [families, setFamilies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingFamily, setEditingFamily] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [currentTerm, setCurrentTerm] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const tableRef = useRef(null);
   const dataTableRef = useRef(null);
+  const actionRootsRef = useRef([]);
   const { can } = useRole();
+
+  const formatDate = (ts) => {
+    if (!ts) return "—";
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" });
+  };
 
   const calculateFamilyFinancials = async (familyId, settings, activeDiscounts) => {
     const { academicYear, currentTerm } = settings;
@@ -42,9 +62,7 @@ export default function FamilyList() {
       getPaymentsByFamily(familyId, academicYear, currentTerm),
     ]);
 
-    // Family-level discount assignments (fetched once per family)
     const famAssignments = await getAssignmentsForFamily(familyId, academicYear);
-
     let totalAssessed = 0;
 
     for (const student of students) {
@@ -102,8 +120,6 @@ export default function FamilyList() {
       }
 
       setCurrentTerm(settings.currentTerm);
-
-      // Pre-load active discounts once for the session
       const activeDiscounts = await getActiveDiscounts(settings.academicYear);
 
       const fullData = await Promise.all(
@@ -132,23 +148,134 @@ export default function FamilyList() {
     loadFamilies();
   }, []);
 
+  const cleanupActionRoots = () => {
+    actionRootsRef.current.forEach((root) => {
+      try {
+        root.unmount();
+      } catch (_) {}
+    });
+    actionRootsRef.current = [];
+  };
+
   useEffect(() => {
-    if (families.length === 0 || loading) return;
-    if ($.fn.DataTable.isDataTable(tableRef.current)) $(tableRef.current).DataTable().destroy();
-    dataTableRef.current = $(tableRef.current).DataTable({
+    if (loading || !tableRef.current) return;
+
+    const filteredFamilies = filterData(families, searchQuery, [
+      "familyName",
+      "phone",
+      "email",
+      "status",
+    ]).filter((family) => {
+      if (!statusFilter) return true;
+      return family.status?.toLowerCase() === statusFilter.toLowerCase();
+    });
+
+    // Tear down previous DataTables instance completely
+    cleanupActionRoots();
+    if ($.fn.DataTable.isDataTable(tableRef.current)) {
+      $(tableRef.current).DataTable().destroy();
+      $(tableRef.current).find("tbody").empty();
+    }
+
+    // Build rows as plain HTML strings — DataTables owns the DOM entirely
+    const rows = filteredFamilies.map((family) => [
+      `<div class="family-cell">
+        <strong>${family.familyName ?? ""}</strong>
+      </div>`,
+      `<div class="contact-cell">
+        <span>${family.phone ?? ""}</span><br/>
+        <small>${family.email ?? ""}</small>
+      </div>`,
+      `₦${(family.totalAmount || 0).toLocaleString()}`,
+      `₦${(family.totalPaid || 0).toLocaleString()}`,
+      `₦${(family.outstanding || 0).toLocaleString()}`,
+      `<span class="status-pill align-center ${(family.status ?? "").toLowerCase()}">${family.status ?? ""}</span>`,
+      formatDate(family.createdAt),
+      // Empty div — React will mount buttons here after draw
+      `<div class="action-btn" data-family-id="${family.id}"></div>`,
+    ]);
+
+    const dt = $(tableRef.current).DataTable({
       pageLength: 10,
       responsive: true,
-      columnDefs: [{ orderable: false, targets: [-1] }],
+      searching: false,
+      info: true,
+      lengthChange: false,
+      data: rows,
+      columns: [
+        { title: "Family Name" },
+        { title: "Contact" },
+        { title: "Term Fees (net)", className: "" },
+        { title: "Term Paid", className: "text-success" },
+        { title: "Outstanding" },
+        { title: "Status" },
+        { title: "Created" },
+        { title: "Actions", orderable: false, className: "align-center" },
+      ],
       order: [[3, "desc"]],
     });
-    return () => dataTableRef.current?.destroy(false);
-  }, [families, loading]);
 
-  const formatDate = (ts) => {
-    if (!ts) return "—";
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" });
-  };
+    dataTableRef.current = dt;
+
+    // Mount React action buttons into each row's placeholder div
+    const mountActionButtons = () => {
+      cleanupActionRoots();
+
+      $(tableRef.current)
+        .find("tbody [data-family-id]")
+        .each(function () {
+          const familyId = $(this).attr("data-family-id");
+          const family = filteredFamilies.find((f) => f.id === familyId);
+          if (!family) return;
+
+          const root = createRoot(this);
+          actionRootsRef.current.push(root);
+
+          root.render(
+            <>
+              {can(PERMISSIONS.EDIT_FAMILY) && (
+                <button
+                  onClick={() => {
+                    setEditingFamily(family);
+                    setModalOpen(true);
+                  }}
+                  className='edit-btn'
+                >
+                  <HiPencilAlt />
+                </button>
+              )}
+              {can(PERMISSIONS.DELETE_FAMILY) && (
+                <button className='delete-btn' onClick={() => setDeleteTarget(family)}>
+                  <HiTrash />
+                </button>
+              )}
+              <a href={`/families/${family.id}`} className='view-link'>
+                <HiChevronRight />
+              </a>
+            </>,
+          );
+        });
+    };
+
+    dt.on("draw", mountActionButtons);
+    mountActionButtons();
+
+    return () => {
+      cleanupActionRoots();
+      dt.off("draw", mountActionButtons);
+      try {
+        if ($.fn.DataTable.isDataTable(tableRef.current)) dt.destroy();
+      } catch (_) {}
+    };
+  }, [families, searchQuery, statusFilter, loading]);
+
+  // Used only for the stat pill and export — does NOT drive table rows
+  const filteredFamilies = filterData(families, searchQuery, [
+    "familyName",
+    "phone",
+    "email",
+    "status",
+  ]);
 
   const exportHeaders = [
     "Family Name",
@@ -173,16 +300,85 @@ export default function FamilyList() {
 
   return (
     <div className='page-wrapper'>
-      {(can(PERMISSIONS.CREATE_FAMILY) || (editingFamily && can(PERMISSIONS.EDIT_FAMILY))) && (
-        <FamilyForm
-          initialData={editingFamily}
-          onSuccess={() => {
+      <div className='list-page-header'>
+        <div className='header-title'>
+          <HiOutlineUsers className='main-icon' />
+          <div>
+            <h2>Family Directory</h2>
+            <p>Manage and view all enrolled families</p>
+          </div>
+        </div>
+        <div className='header-stats'>
+          <span className='stat-pill'>Total: {filteredFamilies.length}</span>
+        </div>
+      </div>
+
+      <div className='add_button'>
+        {can(PERMISSIONS.CREATE_FAMILY) && (
+          <CustomButton
+            onClick={() => {
+              setEditingFamily(null);
+              setModalOpen(true);
+            }}
+            icon={<HiOutlineUsers />}
+            variant='primary'
+            otherClass='rounded-full'
+          >
+            Add Family
+          </CustomButton>
+        )}
+      </div>
+
+      {modalOpen && (
+        <FormModal
+          title={editingFamily ? "Edit Family Profile" : "Register New Family"}
+          onClose={() => {
+            setModalOpen(false);
             setEditingFamily(null);
-            loadFamilies();
           }}
-          onCancel={() => setEditingFamily(null)}
-        />
+        >
+          <FamilyForm
+            initialData={editingFamily}
+            onSuccess={async () => {
+              await loadFamilies();
+              setModalOpen(false);
+              setEditingFamily(null);
+            }}
+            onCancel={() => {
+              setModalOpen(false);
+              setEditingFamily(null);
+            }}
+          />
+        </FormModal>
       )}
+
+      <div className='table-controls'>
+        <div className='search-box'>
+          <HiSearch className='search-icon' />
+          <input
+            type='text'
+            placeholder='Search by name, phone, email or status...'
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <CustomSelect
+          value={statusFilter}
+          placeholder='All Status'
+          options={[
+            { label: "All Status", value: "" },
+            { label: "Paid", value: "Paid" },
+            { label: "Partial", value: "Partial" },
+            { label: "Unpaid", value: "Unpaid" },
+            { label: "Error", value: "Error" },
+          ]}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          icon={<HiFilter />}
+          variant='filter-btn'
+        />
+      </div>
+
       <div className='table-card'>
         {currentTerm && (
           <p
@@ -192,6 +388,12 @@ export default function FamilyList() {
           </p>
         )}
         <TableToolbar fileName='families' headers={exportHeaders} rows={exportRows} />
+
+        {/*
+          tbody is intentionally left empty.
+          DataTables fully owns row rendering via the `data` option.
+          React only mounts action buttons into placeholder divs after each draw.
+        */}
         <table ref={tableRef} className='data-table display'>
           <thead>
             <tr>
@@ -205,53 +407,7 @@ export default function FamilyList() {
               <th className='align-center'>Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {families.map((family) => (
-              <tr key={family.id}>
-                <td>
-                  <div className='family-cell'>
-                    <HiOutlineUsers className='icon' />
-                    <strong>{family.familyName}</strong>
-                  </div>
-                </td>
-                <td>
-                  <div className='contact-cell'>
-                    <span>{family.phone}</span>
-                    <br />
-                    <small>{family.email}</small>
-                  </div>
-                </td>
-                <td>₦{(family.totalAmount || 0).toLocaleString()}</td>
-                <td className='text-success'>₦{(family.totalPaid || 0).toLocaleString()}</td>
-                <td className={family.outstanding > 0 ? "text-danger" : "text-success"}>
-                  ₦{(family.outstanding || 0).toLocaleString()}
-                </td>
-                <td>
-                  <span className={`status-pill align-center ${family.status?.toLowerCase()}`}>
-                    {family.status}
-                  </span>
-                </td>
-                <td>{formatDate(family.createdAt)}</td>
-                <td>
-                  <div className='action-btn'>
-                    {can(PERMISSIONS.EDIT_FAMILY) && (
-                      <button onClick={() => setEditingFamily(family)} className='edit-btn'>
-                        <HiPencilAlt />
-                      </button>
-                    )}
-                    {can(PERMISSIONS.DELETE_FAMILY) && (
-                      <button className='delete-btn' onClick={() => setDeleteTarget(family)}>
-                        <HiTrash />
-                      </button>
-                    )}
-                    <Link to={`/families/${family.id}`} className='view-link'>
-                      <HiChevronRight />
-                    </Link>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
+          <tbody />
         </table>
 
         {deleteTarget && (
