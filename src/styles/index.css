@@ -10844,6 +10844,7 @@ a {
 .dashboard-wrapper > .right {
   flex: 1;
   min-width: 0;
+  width: 100%;
 }
 
 .dashboard-wrapper > .left {
