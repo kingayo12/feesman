@@ -1,12 +1,14 @@
-﻿import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Logo from "../../assets/logo.svg";
 import { HiMail, HiLockClosed, HiEye, HiEyeOff, HiExclamationCircle } from "react-icons/hi";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || "/dashboard";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -14,13 +16,21 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(from, { replace: true });
+    }
+  }, [authLoading, user, from, navigate]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setError("");
     setLoading(true);
+
     try {
       await login(email.trim(), password);
-      navigate("/dashboard");
+      // Wait for auth state listener to update user, then redirect in useEffect.
     } catch (err) {
       const map = {
         "auth/user-not-found": "No account found with this email.",

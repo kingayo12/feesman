@@ -1075,7 +1075,7 @@ export default function TopNav() {
   const handleLogout = async () => {
     setUserMenuOpen(false);
     await logout();
-    navigate("/login");
+    navigate("/");
   };
 
   return (

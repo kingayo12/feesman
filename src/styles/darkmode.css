@@ -937,7 +937,7 @@
 }
 
 [data-theme="dark"] .dashboard-wrapper .left .bottom {
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.96));
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0), rgba(15, 23, 42, 0.96));
 }
 
 [data-theme="dark"] .dashboard-promo.is-skeleton {
