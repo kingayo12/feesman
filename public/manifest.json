@@ -4,7 +4,7 @@
   "description": "Comprehensive school fee management system for tracking payments, managing students and families, and generating financial reports",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#2424ff",

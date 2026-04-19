@@ -3,6 +3,9 @@ import { getClasses } from "../classes/classService";
 import { getAllStudents } from "../students/studentService";
 import { useSettings } from "../../hooks/Usesettings";
 import { calculateStudentBalance } from "../../hooks/Usestudentbalance";
+// ─── Multi-sheet XLSX download (SheetJS) ──────────────────────────────────
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import {
   HiChartBar,
   HiRefresh,
@@ -723,7 +726,7 @@ async function downloadDOCX({
       ],
       spacing: { before: 200, after: 80 },
     }),
-    ...ins.body.split("\n").map((line) => body(line.trim())),
+    ...(ins.body || "").split("\n").map((line) => body(line.trim())),
   ]);
 
   const doc = new Document({
@@ -853,14 +856,19 @@ async function downloadDOCX({
     ],
   });
 
-  const buffer = await Packer.toBuffer(doc);
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  });
+  const blob = await Packer.toBlob(doc);
+
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+
+  a.href = url;
   a.download = `fees_report_${session}_${selectedTerm}.docx`.replace(/[\s/]/g, "_");
+
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
+
+  URL.revokeObjectURL(url);
 }
 
 // ─── PDF download (client-side via jsPDF + autoTable) ─────────────────────
@@ -875,7 +883,7 @@ async function downloadPDF({
   insights,
 }) {
   const { default: jsPDF } = await import("jspdf");
-  await import("jspdf-autotable");
+  const { default: autoTable } = await import("jspdf-autotable");
 
   const now = new Date().toLocaleDateString("en-NG", {
     year: "numeric",
@@ -948,7 +956,7 @@ async function downloadPDF({
   doc.text("Executive Summary", 14, y);
   y += 8;
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: y,
     head: [["Metric", "Value"]],
     body: [
@@ -979,7 +987,7 @@ async function downloadPDF({
   doc.text("Class-by-Class Breakdown", 14, y);
   y += 6;
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: y,
     head: [
       [
@@ -1116,7 +1124,6 @@ async function downloadPDF({
   doc.save(`fees_report_${session}_${selectedTerm}.pdf`.replace(/[\s/]/g, "_"));
 }
 
-// ─── Multi-sheet XLSX download (SheetJS) ──────────────────────────────────
 async function downloadXLSX({
   reportData,
   grandFees,
@@ -1126,11 +1133,66 @@ async function downloadXLSX({
   selectedTerm,
   session,
 }) {
-  const XLSX = await import("xlsx");
+  const workbook = new ExcelJS.Workbook();
 
-  const wb = XLSX.utils.book_new();
+  /* ─────────────────────────────────────
+     REUSABLE STYLES
+  ───────────────────────────────────── */
+  const applyHeaderStyle = (row) => {
+    row.eachCell((cell) => {
+      cell.font = {
+        bold: true,
+        size: 12,
+        color: { argb: "FFFFFFFF" },
+      };
 
-  // ── Sheet 1: Summary (All Classes) ──
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "1F4E78" },
+      };
+
+      cell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+      };
+
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+  };
+
+  const applySectionTitle = (cell) => {
+    cell.font = {
+      bold: true,
+      size: 13,
+    };
+
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "D9EAD3" },
+    };
+
+    cell.alignment = {
+      horizontal: "left",
+      vertical: "middle",
+    };
+  };
+
+  const applyCurrencyStyle = (cell) => {
+    cell.numFmt = "#,##0.00";
+  };
+
+  /* ─────────────────────────────────────
+     SHEET 1: SUMMARY
+  ───────────────────────────────────── */
+  const summarySheet = workbook.addWorksheet("All Classes");
+
   const summaryRows = [
     [`SCHOOL FEES COLLECTION REPORT — ${session} — ${selectedTerm}`],
     [],
@@ -1176,21 +1238,70 @@ async function downloadXLSX({
       reportData.reduce((s, r) => s + r.withBalance, 0),
     ],
   ];
-  const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
-  summarySheet["!cols"] = [
-    { wch: 35 },
-    { wch: 12 },
-    { wch: 20 },
-    { wch: 20 },
-    { wch: 22 },
-    { wch: 20 },
-    { wch: 14 },
-    { wch: 14 },
-  ];
-  XLSX.utils.book_append_sheet(wb, summarySheet, "All Classes");
 
-  // ── One sheet per class ──
+  summaryRows.forEach((row) => {
+    summarySheet.addRow(row);
+  });
+
+  summarySheet.columns = [
+    { width: 35 },
+    { width: 15 },
+    { width: 20 },
+    { width: 20 },
+    { width: 22 },
+    { width: 20 },
+    { width: 14 },
+    { width: 14 },
+  ];
+
+  /* Title */
+  summarySheet.mergeCells("A1:H1");
+  const titleCell = summarySheet.getCell("A1");
+
+  titleCell.font = {
+    bold: true,
+    size: 16,
+    color: { argb: "000000" },
+  };
+
+  titleCell.alignment = {
+    horizontal: "center",
+    vertical: "middle",
+  };
+
+  titleCell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "E2F0D9" },
+  };
+
+  /* Section Titles */
+  applySectionTitle(summarySheet.getCell("A3"));
+  applySectionTitle(summarySheet.getCell("A12"));
+
+  /* Table Header */
+  applyHeaderStyle(summarySheet.getRow(13));
+
+  /* Totals Row */
+  const totalsRowNumber = 14 + reportData.length + 1;
+  applyHeaderStyle(summarySheet.getRow(totalsRowNumber));
+
+  /* Currency formatting */
+  for (let i = 4; i <= totalsRowNumber; i++) {
+    applyCurrencyStyle(summarySheet.getCell(`B${i}`));
+    applyCurrencyStyle(summarySheet.getCell(`C${i}`));
+    applyCurrencyStyle(summarySheet.getCell(`D${i}`));
+    applyCurrencyStyle(summarySheet.getCell(`E${i}`));
+  }
+
+  /* ─────────────────────────────────────
+     CLASS SHEETS
+  ───────────────────────────────────── */
   for (const row of reportData) {
+    const safeName = row.className.replace(/[:/\\?*[\]]/g, "").slice(0, 31);
+
+    const classSheet = workbook.addWorksheet(safeName);
+
     const sheetRows = [
       [`CLASS REPORT: ${row.className}`],
       [`Session: ${session}   |   Term: ${selectedTerm}`],
@@ -1219,14 +1330,50 @@ async function downloadXLSX({
           : "No — all students have paid",
       ],
     ];
-    const classSheet = XLSX.utils.aoa_to_sheet(sheetRows);
-    classSheet["!cols"] = [{ wch: 30 }, { wch: 30 }];
-    // Sanitise sheet name — Excel limits to 31 chars, no special chars
-    const safeName = row.className.replace(/[:/\\?*[\]]/g, "").slice(0, 31);
-    XLSX.utils.book_append_sheet(wb, classSheet, safeName);
+
+    sheetRows.forEach((sheetRow) => {
+      classSheet.addRow(sheetRow);
+    });
+
+    classSheet.columns = [{ width: 30 }, { width: 40 }];
+
+    /* Title */
+    classSheet.mergeCells("A1:B1");
+    const classTitle = classSheet.getCell("A1");
+
+    classTitle.font = {
+      bold: true,
+      size: 15,
+    };
+
+    classTitle.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+    };
+
+    classTitle.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "D9EAD3" },
+    };
+
+    /* Metric Header */
+    applyHeaderStyle(classSheet.getRow(4));
+
+    /* Currency rows */
+    [8, 9, 10].forEach((rowNum) => {
+      applyCurrencyStyle(classSheet.getCell(`B${rowNum}`));
+    });
   }
 
-  XLSX.writeFile(wb, `fees_data_${session}_${selectedTerm}.xlsx`.replace(/[\s/]/g, "_"));
+  /* ─────────────────────────────────────
+     DOWNLOAD
+  ───────────────────────────────────── */
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  const fileName = `fees_data_${session}_${selectedTerm}.xlsx`.replace(/[\s/]/g, "_");
+
+  saveAs(new Blob([buffer]), fileName);
 }
 
 // ─── Milestone tracker ────────────────────────────────────────────────────
