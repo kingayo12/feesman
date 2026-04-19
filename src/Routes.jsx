@@ -1,16 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-
-// import PublicLayout from "./pages/Homepage/layouts/PublicLayout.jsx";
-// import Home from "./pages/Homepage/Home.jsx";
-// import About from "./pages/Homepage/About.jsx";
-// import Aboutus from "./pages/Homepage/layouts/About.jsx";
-// import SchoolHistory from "./pages/Homepage/SchoolHistory.jsx";
-// import Administration from "./pages/Homepage/Administration.jsx";
-// import PoliciesDocuments from "./pages/Homepage/PoliciesDocuments.jsx";
-// import Academics from "./pages/Homepage/Academics.jsx";
-// import Curriculum from "./pages/Homepage/Curriculum.jsx";
-// import Admissions from "./pages/Homepage/Admissions.jsx";
-
 import Login from "./pages/auth/Login.jsx";
 import Register from "./pages/auth/Register.jsx";
 import ForgotPassword from "./pages/auth/ForgotPassword.jsx";

@@ -153,7 +153,7 @@ export default function ForgotPassword() {
             </form>
           )}
 
-          <Link to='/login' className='auth-back-link'>
+          <Link to='/' className='auth-back-link'>
             <HiArrowLeft style={{ width: 14, height: 14 }} />
             Back to sign in
           </Link>

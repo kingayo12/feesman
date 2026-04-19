@@ -6,10 +6,12 @@
   --primary-gradient: linear-gradient(to bottom, #2424ff 0%, rgb(0, 29, 87) 100%) !important;
   --bg-primary: color-mix(in srgb, #fff 80%, #5900ff09 20%);
   --bg-secondary: #f8fafc;
+  --color-background-secondary: #f8fafc;
   --bg-tertiary: #f1f5f9;
   --text-primary: #1e293b;
   --text-secondary: #64748b;
   --text-tertiary: #94a3b8;
+  --color-border-tertiary: #94a3b8;
   --border-color: #e2e8f0;
   --border-light: #057aef;
   --nav-bg: #ffffff;

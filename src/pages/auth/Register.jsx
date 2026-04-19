@@ -192,7 +192,7 @@ export default function Register() {
 
           <p className='auth-footer-text'>
             Already have an account?{" "}
-            <Link to='/login' className='auth-footer-link'>
+            <Link to='/' className='auth-footer-link'>
               Sign in
             </Link>
           </p>
