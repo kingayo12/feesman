@@ -229,7 +229,7 @@ export default function StudentForm({ familyId, onSuccess, initialData, onCancel
           labelName='Other Name (optional)'
           icon={<HiUser />}
           variant='default'
-          required={true}
+          required={false}
           autoComplete='off'
           // error={errors.otherName}
         />
