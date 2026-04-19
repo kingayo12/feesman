@@ -3989,6 +3989,200 @@ a {
   border-color: #bbf7d0;
 }
 
+/* ── Metric cards grid ─────────────────────────────────────── */
+.db-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  margin-bottom: 1.25rem;
+}
+
+.db-metric-card {
+  background: linear-gradient(to top, var(--modal-bg), var(--bg-secondary));
+  backdrop-filter: blur(30px);
+  border-radius: var(--border-radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--card-shadow-sm);
+  gap: 4px;
+  border: 1px solid var(--border-muted);
+}
+
+.db-metric-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.db-metric-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* Icon badge inside metric card */
+.db-metric-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.db-metric-value {
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.1;
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.db-metric-sub {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+/* ── Status pills ──────────────────────────────────────────── */
+.pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-top: 5px;
+  width: fit-content;
+}
+
+.pill-green {
+  background: #eaf3de;
+  color: #3b6d11;
+}
+
+.pill-amber {
+  background: #faeeda;
+  color: #854f0b;
+}
+
+.pill-red {
+  background: #fcebeb;
+  color: #a32d2d;
+}
+
+/* ── Collection rate card ──────────────────────────────────── */
+.db-rate-ring-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.db-rate-text {
+  flex: 1;
+}
+
+.db-rate-big {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.db-rate-sub {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 3px;
+}
+
+/* ── Progress bar ──────────────────────────────────────────── */
+.db-progress-row {
+  margin-bottom: 10px;
+}
+
+.db-progress-row:last-child {
+  margin-bottom: 0;
+}
+
+.db-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+.db-progress-track {
+  height: 6px;
+  background: var(--color-background-secondary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.db-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+/* ── Transaction table filter tabs ────────────────────────── */
+.db-tab-row {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.db-tab-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 0.5px solid var(--color-border-secondary);
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: all 0.15s ease;
+}
+
+.db-tab-btn:hover {
+  background: var(--color-background-secondary);
+}
+
+.db-tab-btn.active {
+  background: var(--color-background-info);
+  border-color: var(--color-border-info);
+  color: var(--color-text-info);
+}
+
+/* ── Method badge variants ─────────────────────────────────── */
+.method-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.method-blue {
+  background: #e6f1fb;
+  color: #185fa5;
+}
+.method-teal {
+  background: #e1f5ee;
+  color: #0f6e56;
+}
+.method-purple {
+  background: #eeedfe;
+  color: #534ab7;
+}
+.method-amber {
+  background: #faeeda;
+  color: #854f0b;
+}
+
 .settings-page {
   max-width: 1100px;
   margin: 0 auto;

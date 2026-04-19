@@ -9,6 +9,8 @@ import PaymentForm from "../../components/forms/PaymentForm";
 import StudentReceipt from "./StudentReciept";
 import { formatDate } from "../../utils/helpers";
 import { getSettings } from "../settings/settingService";
+import { useRole } from "../../hooks/useRole";
+import { PERMISSIONS } from "../../config/permissions";
 import {
   disableStudentFee,
   enableStudentFee,
@@ -53,6 +55,7 @@ export default function StudentDetails() {
   const [receiptPayment, setReceiptPayment] = useState(null);
   const [prevBalance, setPrevBalance] = useState(0);
   const [discountData, setDiscountData] = useState({ totalDiscount: 0, breakdown: [] });
+  const { can } = useRole();
 
   const loadPayments = async () => {
     try {
@@ -213,19 +216,24 @@ export default function StudentDetails() {
             </p>
           </div>
         </div>
+
         <div className='hero-actions'>
-          <button
-            className={`pay-toggle-btn ${showPaymentForm ? "active" : ""}`}
-            onClick={() => setShowPaymentForm(!showPaymentForm)}
-          >
-            {showPaymentForm ? "Cancel" : "+ Record Payment"}
-          </button>
-          <button
-            className='outline-btn'
-            onClick={() => navigate(`/letters?context=student&id=${id}&template=fees`)}
-          >
-            <HiDocumentText /> Generate Letter
-          </button>
+          {can(PERMISSIONS.EDIT_STUDENT) && (
+            <button
+              className={`pay-toggle-btn ${showPaymentForm ? "active" : ""}`}
+              onClick={() => setShowPaymentForm(!showPaymentForm)}
+            >
+              {showPaymentForm ? "Cancel" : "+ Record Payment"}
+            </button>
+          )}
+          {can(PERMISSIONS.VIEW_LETTERS) && (
+            <button
+              className='outline-btn'
+              onClick={() => navigate(`/letters?context=student&id=${id}&template=fees`)}
+            >
+              <HiDocumentText /> Generate Letter
+            </button>
+          )}
         </div>
       </div>
 
@@ -336,7 +344,7 @@ export default function StudentDetails() {
                 <tr>
                   <th>Description</th>
                   <th className='text-right'>Amount</th>
-                  <th className='text-center'>Status</th>
+                  {can(PERMISSIONS.MANAGE_DISCOUNTS) && <th className='text-center'>Status</th>}
                 </tr>
               </thead>
               <tbody>
@@ -386,22 +394,24 @@ export default function StudentDetails() {
                         <td className='text-right font-bold'>
                           ₦{Number(f.amount).toLocaleString()}
                         </td>
-                        <td className='text-center'>
-                          <button
-                            className={`toggle-btn ${dis ? "btn-enable" : "btn-disable"}`}
-                            onClick={() => handleToggleFee(f.id)}
-                          >
-                            {dis ? (
-                              <>
-                                <HiCheckCircle /> Include
-                              </>
-                            ) : (
-                              <>
-                                <HiMinusCircle /> Exclude
-                              </>
-                            )}
-                          </button>
-                        </td>
+                        {can(PERMISSIONS.MANAGE_DISCOUNTS) && (
+                          <td className='text-center'>
+                            <button
+                              className={`toggle-btn ${dis ? "btn-enable" : "btn-disable"}`}
+                              onClick={() => handleToggleFee(f.id)}
+                            >
+                              {dis ? (
+                                <>
+                                  <HiCheckCircle /> Include
+                                </>
+                              ) : (
+                                <>
+                                  <HiMinusCircle /> Exclude
+                                </>
+                              )}
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })
@@ -463,7 +473,7 @@ export default function StudentDetails() {
                   <td className='text-right'>
                     <strong>₦{netFees.toLocaleString()}</strong>
                   </td>
-                  <td></td>
+                  {can(PERMISSIONS.MANAGE_DISCOUNTS) && <td></td>}
                 </tr>
               </tbody>
             </table>

@@ -36,7 +36,8 @@ import { getFeesByClass } from "../fees/feesService";
 import { getPaymentsByStudent } from "../fees/paymentService";
 import { getStudentFeeOverrides } from "../students/studentFeeOverrideService";
 import { getPreviousBalanceAmount } from "../previous_balance/Previousbalanceservice";
-
+import { useRole } from "../../hooks/useRole";
+import { PERMISSIONS } from "../../config/permissions";
 /* ─────────────────────────────────────────────────────────────
    STORAGE & CONSTANTS
 ───────────────────────────────────────────────────────────── */
@@ -211,6 +212,7 @@ export default function LetterTemplates() {
   const [modal, setModal] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [exportBusy, setExportBusy] = useState(false);
+  const { can } = useRole();
 
   // Ref to the rendered live-preview letter sheet (for image export)
   const sheetRef = useRef(null);
@@ -702,9 +704,11 @@ export default function LetterTemplates() {
           <button className='lp-btn lp-btn-teal' onClick={openBulk}>
             <HiLightningBolt /> Auto-Generate Letters
           </button>
-          <button className='lp-btn lp-btn-primary' onClick={openNew}>
-            <HiPlus /> New Template
-          </button>
+          {can(PERMISSIONS.MANAGE_LETERS) && (
+            <button className='lp-btn lp-btn-primary' onClick={openNew}>
+              <HiPlus /> New Template
+            </button>
+          )}
         </div>
       </div>
 
@@ -716,9 +720,11 @@ export default function LetterTemplates() {
             <span className='lp-sidebar-label'>
               Templates <span className='lp-cnt'>{templates.length}</span>
             </span>
-            <button className='lp-new-mini' onClick={openNew} title='New template'>
-              <HiPlus />
-            </button>
+            {can(PERMISSIONS.MANAGE_LETERS) && (
+              <button className='lp-new-mini' onClick={openNew} title='New template'>
+                <HiPlus />
+              </button>
+            )}
           </div>
           <div className='lp-tpl-list'>
             {templates.map((t) => {
@@ -755,36 +761,42 @@ export default function LetterTemplates() {
                     >
                       <HiEye />
                     </button>
-                    <button
-                      className='lp-ib'
-                      title='Edit'
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEdit(t);
-                      }}
-                    >
-                      <HiOutlinePencil />
-                    </button>
-                    <button
-                      className='lp-ib'
-                      title='Duplicate'
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDuplicate(t);
-                      }}
-                    >
-                      <HiDuplicate />
-                    </button>
-                    <button
-                      className='lp-ib lp-ib--del'
-                      title='Delete'
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        confirmDelete(t.id);
-                      }}
-                    >
-                      <HiTrash />
-                    </button>
+                    {can(PERMISSIONS.MANAGE_LETERS) && (
+                      <button
+                        className='lp-ib'
+                        title='Edit'
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(t);
+                        }}
+                      >
+                        <HiOutlinePencil />
+                      </button>
+                    )}
+                    {can(PERMISSIONS.MANAGE_LETERS) && (
+                      <button
+                        className='lp-ib'
+                        title='Duplicate'
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDuplicate(t);
+                        }}
+                      >
+                        <HiDuplicate />
+                      </button>
+                    )}
+                    {can(PERMISSIONS.MANAGE_LETERS) && (
+                      <button
+                        className='lp-ib lp-ib--del'
+                        title='Delete'
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          confirmDelete(t.id);
+                        }}
+                      >
+                        <HiTrash />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -801,12 +813,14 @@ export default function LetterTemplates() {
             </div>
             {selectedTemplate && (
               <div className='lp-content-actions'>
-                <button
-                  className='lp-btn lp-btn-ghost lp-btn-sm'
-                  onClick={() => openEdit(selectedTemplate)}
-                >
-                  <HiOutlinePencil /> Edit
-                </button>
+                {can(PERMISSIONS.MANAGE_LETERS) && (
+                  <button
+                    className='lp-btn lp-btn-ghost lp-btn-sm'
+                    onClick={() => openEdit(selectedTemplate)}
+                  >
+                    <HiOutlinePencil /> Edit
+                  </button>
+                )}
                 <button
                   className='lp-btn lp-btn-primary lp-btn-sm'
                   onClick={() => openPreview(selectedId)}

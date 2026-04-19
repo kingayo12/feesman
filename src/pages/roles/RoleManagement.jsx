@@ -148,6 +148,8 @@ function RoleManagementInner() {
   const [roleForm, setRoleForm] = useState({ ...EMPTY_ROLE_FORM });
   const [roleFormDirty, setRoleFormDirty] = useState(false);
   const [toast, setToast] = useState(null);
+  const canManageLetters = hasPermission(PERMISSIONS.MANAGE_LETTERS);
+  // const { can } = useRole();
 
   const rolesMap = useMemo(() => {
     return roles.reduce((acc, role) => {
@@ -609,6 +611,7 @@ function RoleManagementInner() {
                   These role definitions are the ones that permission checks now use.
                 </p>
               </div>
+
               <button
                 type='button'
                 className='btn-secondary'
