@@ -1331,7 +1331,7 @@ export default function Reports() {
     if (!settings.academicYear || !selectedTerm) return;
     setTodayLoading(true);
     try {
-      const data = await fetchTodayPayments(settings.academicYear, selectedTerm);
+      const data = await getTodayPayments(settings.academicYear, selectedTerm);
       setTodayData(data);
     } finally {
       setTodayLoading(false);

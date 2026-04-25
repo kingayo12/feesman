@@ -98,8 +98,11 @@ export const getPaymentsByFamily = async (familyId, session, term) => {
     .filter((p) => p.term === normalizedTerm);
 };
 
-export const getPaymentsByStudent = async (studentId) => {
-  const q = query(paymentRef, where("studentId", "==", studentId), orderBy("date", "desc"));
+export const getPaymentsByStudent = async (studentId, session = null, term = null) => {
+  let q = query(paymentRef, where("studentId", "==", studentId));
+  if (session) q = query(q, where("session", "==", session));
+  if (term) q = query(q, where("term", "==", normalizeTerm(term)));
+  q = query(q, orderBy("date", "desc"));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({
     id: d.id,

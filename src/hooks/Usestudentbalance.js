@@ -25,7 +25,7 @@ export async function calculateStudentBalance(studentId, classId, session, term)
   const [classFees, overrides, allPayments] = await Promise.all([
     getFeesByClass(classId, session, term),
     getStudentFeeOverrides(studentId),
-    getPaymentsByStudent(studentId),
+    getPaymentsByStudent(studentId, session, term),
   ]);
 
   const disabledFeeIds = new Set(overrides.map((o) => o.feeId));
@@ -34,14 +34,13 @@ export async function calculateStudentBalance(studentId, classId, session, term)
 
   const totalFees = effectiveFees.reduce((sum, f) => sum + Number(f.amount || 0), 0);
 
-  const termPayments = allPayments.filter((p) => p.term === term && p.session === session);
-  const totalPaid = termPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const totalPaid = allPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
   return {
     totalFees,
     totalPaid,
     balance: totalFees - totalPaid,
     effectiveFees,
-    termPayments,
+    termPayments: allPayments,
   };
 }

@@ -1,5 +1,6 @@
 import { collection, getDocs, query, where, orderBy, limit, Timestamp } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
+import { getStudentById } from "../students/studentService";
 import {
   getCachedStudentFeeOverrides,
   getCachedPreviousBalanceAmount,
@@ -251,17 +252,34 @@ export async function getTodayPayments(academicYear, currentTerm) {
         collection(db, "payments"),
         where("session", "==", academicYear),
         where("term", "==", normalizeTerm(currentTerm)),
-        where("date", ">=", Timestamp.fromDate(today)),
+        where("createdAt", ">=", Timestamp.fromDate(today)),
         where("date", "<", Timestamp.fromDate(tomorrow)),
+        orderBy("createdAt", "desc"),
       ),
     );
 
     const payments = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const total = payments.reduce((s, p) => s + (p.amount || 0), 0);
+    const studentsPaid = new Set(payments.map((p) => p.studentId)).size;
+    const methodsUsed = new Set(payments.map((p) => p.method)).size;
 
-    return { total, payments, count: payments.length };
+    // Fetch student names for recent payments
+    const recentPaymentsSlice = payments.slice(0, 10);
+    const uniqueStudentIds = [...new Set(recentPaymentsSlice.map((p) => p.studentId).filter(Boolean))];
+    const studentPromises = uniqueStudentIds.map((id) => getStudentById(id));
+    const students = await Promise.all(studentPromises);
+    const studentMap = new Map(students.filter(Boolean).map((s) => [s.id, `${s.firstName} ${s.lastName}`]));
+
+    const recentPayments = recentPaymentsSlice.map((p) => ({
+      id: p.id,
+      studentName: studentMap.get(p.studentId) || "Unknown",
+      method: p.method,
+      amount: p.amount,
+    }));
+
+    return { total, count: payments.length, studentsPaid, methodsUsed, recentPayments };
   } catch (err) {
     console.warn("[dashboardService] Failed to load today payments:", err);
-    return { total: 0, payments: [], count: 0 };
+    return { total: 0, count: 0, studentsPaid: 0, methodsUsed: 0, recentPayments: [] };
   }
 }
