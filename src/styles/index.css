@@ -872,7 +872,10 @@ main {
 
 .input-icon {
   position: absolute;
+  top: 50%;
   left: var(--spacing-md);
+  transform: translateY(-50%);
+  z-index: 1;
   color: var(--text-tertiary);
   font-size: var(--font-size-md);
   pointer-events: none;
@@ -892,6 +895,8 @@ main {
   color: var(--input-text);
   background-color: var(--input-bg);
   transition: all 0.3s ease;
+  outline: 4px solid var(--bg-info);
+  padding-top: 12px;
 }
 .input-wrapper .rselect__control {
   padding: 0;
@@ -899,7 +904,6 @@ main {
 
 /* Focus States */
 .input-wrapper .rselect__control:focus,
-.input-wrapper .rselect__control:hover,
 .input-wrapper input:focus {
   outline: none;
   border-color: var(--accent);
@@ -11487,4 +11491,12 @@ a {
 
 .min-w-100 {
   min-width: 100%;
+}
+
+.rselect__value-container {
+  margin-left: 40px !important;
+}
+
+.rselect__control {
+  min-width: 230px !important;
 }

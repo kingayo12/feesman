@@ -265,10 +265,14 @@ export async function getTodayPayments(academicYear, currentTerm) {
 
     // Fetch student names for recent payments
     const recentPaymentsSlice = payments.slice(0, 10);
-    const uniqueStudentIds = [...new Set(recentPaymentsSlice.map((p) => p.studentId).filter(Boolean))];
+    const uniqueStudentIds = [
+      ...new Set(recentPaymentsSlice.map((p) => p.studentId).filter(Boolean)),
+    ];
     const studentPromises = uniqueStudentIds.map((id) => getStudentById(id));
     const students = await Promise.all(studentPromises);
-    const studentMap = new Map(students.filter(Boolean).map((s) => [s.id, `${s.firstName} ${s.lastName}`]));
+    const studentMap = new Map(
+      students.filter(Boolean).map((s) => [s.id, `${s.firstName} ${s.lastName}`]),
+    );
 
     const recentPayments = recentPaymentsSlice.map((p) => ({
       id: p.id,
