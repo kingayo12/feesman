@@ -1,13 +1,26 @@
-import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs, query, where, orderBy, limit, Timestamp } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
-import { getStudentFeeOverrides } from "../students/studentFeeOverrideService";
-import { getPreviousBalanceAmount } from "../previous_balance/Previousbalanceservice";
 import {
-  getActiveDiscounts,
-  getAssignmentsForFamily,
-  getAssignmentsForStudent,
-  computeStudentDiscount,
-} from "../discount/Discountservice";
+  getCachedStudentFeeOverrides,
+  getCachedPreviousBalanceAmount,
+  getCachedAssignmentsForFamily,
+  getCachedAssignmentsForStudent,
+  getCachedDiscounts,
+} from "../../utils/offlineDataManager";
+import { computeStudentDiscount } from "../discount/Discountservice";
+
+function normalizeTerm(term) {
+  if (!term) return "";
+  const map = {
+    "first term": "1st Term",
+    "second term": "2nd Term",
+    "third term": "3rd Term",
+    "1st term": "1st Term",
+    "2nd term": "2nd Term",
+    "3rd term": "3rd Term",
+  };
+  return map[term.toLowerCase()] ?? term;
+}
 
 export const getDashboardFinanceStats = async (selectedSession, selectedTerm) => {
   const empty = {
@@ -36,14 +49,14 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
       query(
         collection(db, "payments"),
         where("session", "==", selectedSession),
-        where("term", "==", selectedTerm),
+        where("term", "==", normalizeTerm(selectedTerm)),
       ),
     ),
     getDocs(
       query(
         collection(db, "payments"),
         where("session", "==", selectedSession),
-        where("term", "==", selectedTerm),
+        where("term", "==", normalizeTerm(selectedTerm)),
         orderBy("date", "desc"),
         limit(5),
       ),
@@ -55,8 +68,8 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
   const payments = paymentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const allPayments = allTermPaymentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  // Pre-load active discounts once for the whole session
-  const activeDiscounts = await getActiveDiscounts(selectedSession);
+  // Pre-load active discounts once for the whole session using the cached import
+  const activeDiscounts = await getCachedDiscounts(selectedSession);
 
   // ── Per-student fee + arrears + discount calculation ─────────────────────
   let totalExpectedRevenue = 0;
@@ -73,22 +86,54 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
   // Pre-load family-level assignments in bulk (one call per unique family)
   const familyAssignmentCache = {};
   for (const familyId of Object.keys(familyGroups)) {
-    familyAssignmentCache[familyId] = await getAssignmentsForFamily(familyId, selectedSession);
+    try {
+      familyAssignmentCache[familyId] = await getCachedAssignmentsForFamily(
+        familyId,
+        selectedSession,
+      );
+    } catch (err) {
+      console.warn(
+        "[dashboardService] Failed to load family discount assignments for",
+        familyId,
+        err,
+      );
+      familyAssignmentCache[familyId] = [];
+    }
   }
 
   for (const student of students) {
-    const [feesSnap, overrides, prevBal, stuAssignments] = await Promise.all([
-      getDocs(
-        query(
+    const feeQuery = student.classId
+      ? query(
           collection(db, "fees"),
           where("classId", "==", student.classId),
           where("session", "==", selectedSession),
-          where("term", "==", selectedTerm),
-        ),
-      ),
-      getStudentFeeOverrides(student.id),
-      getPreviousBalanceAmount(student.id, selectedSession),
-      getAssignmentsForStudent(student.id, selectedSession),
+          where("term", "==", normalizeTerm(selectedTerm)),
+        )
+      : null;
+
+    const [feesSnap, overrides, prevBal, stuAssignments] = await Promise.all([
+      feeQuery
+        ? getDocs(feeQuery).catch((err) => {
+            console.warn("[dashboardService] Failed to load class fees for", student.classId, err);
+            return { docs: [] };
+          })
+        : { docs: [] },
+      getCachedStudentFeeOverrides(student.id).catch((err) => {
+        console.warn("[dashboardService] Failed to load fee overrides for", student.id, err);
+        return [];
+      }),
+      getCachedPreviousBalanceAmount(student.id, selectedSession).catch((err) => {
+        console.warn("[dashboardService] Failed to load previous balance for", student.id, err);
+        return 0;
+      }),
+      getCachedAssignmentsForStudent(student.id, selectedSession).catch((err) => {
+        console.warn(
+          "[dashboardService] Failed to load student discount assignments for",
+          student.id,
+          err,
+        );
+        return [];
+      }),
     ]);
 
     const classFees = feesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -98,6 +143,7 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
 
     const siblings = familyGroups[student.familyId] || [student];
     const famAssignments = familyAssignmentCache[student.familyId] || [];
+    const studentClassKey = student.classId || "unknown";
 
     const { totalDiscount } = computeStudentDiscount({
       studentId: student.id,
@@ -117,22 +163,27 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
     totalDiscountsSum += totalDiscount;
 
     // Per-class breakdown
-    if (!classTotalsMap[student.classId]) {
-      classTotalsMap[student.classId] = { classId: student.classId, fees: 0, paid: 0 };
+    if (!classTotalsMap[studentClassKey]) {
+      classTotalsMap[studentClassKey] = { classId: studentClassKey, fees: 0, paid: 0 };
     }
-    classTotalsMap[student.classId].fees += netFees;
+    classTotalsMap[studentClassKey].fees += netFees;
     const studentPaid = payments
       .filter((p) => p.studentId === student.id)
       .reduce((s, p) => s + Number(p.amount || 0), 0);
-    classTotalsMap[student.classId].paid += studentPaid;
+    classTotalsMap[studentClassKey].paid += studentPaid;
   }
 
   // ── Class names ───────────────────────────────────────────────────────────
-  const classSnap = await getDocs(collection(db, "classes"));
-  const classNames = {};
-  classSnap.docs.forEach((d) => {
-    classNames[d.id] = d.data().name;
-  });
+  let classNames = {};
+  try {
+    const classSnap = await getDocs(collection(db, "classes"));
+    classSnap.docs.forEach((d) => {
+      classNames[d.id] = d.data().name;
+    });
+  } catch (err) {
+    console.warn("[dashboardService] Failed to load classes:", err);
+    classNames = {};
+  }
 
   const classBreakdown = Object.values(classTotalsMap)
     .map((c) => ({
@@ -176,14 +227,41 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
 
   return {
     totalStudents: students.length,
-    totalFees: totalExpectedRevenue, // net of discounts + arrears
+    totalFees: totalExpectedRevenue,
     totalPayments: totalPaymentsReceived,
     outstanding: Math.max(totalExpectedRevenue - totalPaymentsReceived, 0),
-    totalDiscounts: totalDiscountsSum, // ← new
-    totalArrears: totalArrearsSum, // ← new
+    totalDiscounts: totalDiscountsSum,
+    totalArrears: totalArrearsSum,
     recentPayments,
     classBreakdown,
     termTrend,
     collectionByMethod,
   };
 };
+
+export async function getTodayPayments(academicYear, currentTerm) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, "payments"),
+        where("session", "==", academicYear),
+        where("term", "==", normalizeTerm(currentTerm)),
+        where("date", ">=", Timestamp.fromDate(today)),
+        where("date", "<", Timestamp.fromDate(tomorrow)),
+      ),
+    );
+
+    const payments = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const total = payments.reduce((s, p) => s + (p.amount || 0), 0);
+
+    return { total, payments, count: payments.length };
+  } catch (err) {
+    console.warn("[dashboardService] Failed to load today payments:", err);
+    return { total: 0, payments: [], count: 0 };
+  }
+}

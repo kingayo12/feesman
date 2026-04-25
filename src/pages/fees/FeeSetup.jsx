@@ -3,58 +3,70 @@ import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS } from "../../config/permissions";
 import TableToolbar from "../../components/common/TableToolbar";
 import { Bone } from "../../components/common/Skeleton";
-import { createFee, getFees, updateFee, deleteFee, createBulkFees } from "./feesService";
+import { getFees, deleteFee } from "./feesService";
 import { getClasses } from "../classes/classService";
 import { getSettings } from "../settings/settingService";
 import {
-  HiCash,
-  HiLibrary,
-  HiCalendar,
-  HiTag,
-  HiClock,
   HiPencil,
   HiTrash,
   HiDuplicate,
   HiSearch,
   HiChevronDown,
+  HiPlus,
+  HiOutlineCash,
 } from "react-icons/hi";
+import CustomButton from "../../components/common/CustomButton";
+import { FormModal, ConfirmModal } from "../../components/common/Modal";
+import FeeForm from "../../components/forms/FeeForm";
 
 const TERMS = ["1st Term", "2nd Term", "3rd Term"];
-
-const EMPTY_FORM = {
-  classId: "",
-  session: "",
-  term: "",
-  feeType: "",
-  amount: "",
-};
 
 export default function FeeSetup() {
   const [classes, setClasses] = useState([]);
   const [feeList, setFeeList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingId, setEditingId] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingFee, setEditingFee] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [filterTerm, setFilterTerm] = useState("");
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState(EMPTY_FORM);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const { can } = useRole();
   const canManageFees = can(PERMISSIONS.CREATE_FEE) || can(PERMISSIONS.EDIT_FEE);
 
-  // ─── Detect Group (fallback if DB doesn't have it) ────────────────
+  // ─── Helpers ──────────────────────────────────────────────────────────
+  const getClassLevel = (name = "") => {
+    const n = name.toLowerCase();
+    if (n.includes("creche") || n.includes("daycare")) return 0;
+    if (n.includes("kg")) return 1;
+    if (n.includes("nursery")) return 2;
+    if (n.includes("primary")) return 3;
+    if (n.includes("jss")) return 4;
+    if (n.includes("ss")) return 5;
+    return 6;
+  };
+
+  const getClassOrderNumber = (name = "") => {
+    const match = name.match(/\d+/);
+    return match ? Number(match[0]) : 0;
+  };
+
   const detectGroup = (cls) => {
     if (cls.group) return cls.group;
-
     const name = cls.name?.toLowerCase() || "";
-
     if (name.includes("primary") || name.includes("nursery")) return "primary";
-
     if (name.includes("jss") || name.includes("ss") || name.includes("secondary"))
       return "secondary";
-
     return "unknown";
   };
+
+  const sortClasses = (list = []) =>
+    [...list].sort((a, b) => {
+      const levelDiff = getClassLevel(a.name) - getClassLevel(b.name);
+      if (levelDiff !== 0) return levelDiff;
+      return getClassOrderNumber(a.name) - getClassOrderNumber(b.name);
+    });
 
   // ─── Load ──────────────────────────────────────────────────────────────
   const loadData = async () => {
@@ -66,24 +78,12 @@ export default function FeeSetup() {
         getSettings(),
       ]);
 
-      const enhancedClasses = (clsData || []).map((c) => ({
-        ...c,
-        group: detectGroup(c),
-      }));
-
-      // ✅ SORT HERE
-      const sortedClasses = sortClasses(enhancedClasses);
-
-      setClasses(sortedClasses);
-
-      // setClasses(enhancedClasses);
+      const enhanced = (clsData || []).map((c) => ({ ...c, group: detectGroup(c) }));
+      setClasses(sortClasses(enhanced));
       setFeeList(feesData || []);
 
-      if (!editingId) {
-        const term = appSettings?.currentTerm || "1st Term";
-        const session = appSettings?.academicYear || "";
-        setForm((prev) => ({ ...prev, session, term }));
-        setFilterTerm(term);
+      if (!filterTerm) {
+        setFilterTerm(appSettings?.currentTerm || "");
       }
     } catch (err) {
       console.error("FeeSetup load error:", err);
@@ -94,155 +94,53 @@ export default function FeeSetup() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Optimized Class Map ─────────────────────────────────────────
+  // ─── Class map ────────────────────────────────────────────────────────
   const classMap = useMemo(() => Object.fromEntries(classes.map((c) => [c.id, c.name])), [classes]);
-
   const getClassName = (id) => classMap[id] || "Unknown";
 
-  // ─── Handlers ───────────────────────────────────────────────────
-  const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-
-  const resetForm = () => {
-    setEditingId(null);
-    setForm((prev) => ({
-      ...EMPTY_FORM,
-      session: prev.session,
-      term: prev.term,
-    }));
+  // ─── Modal helpers ────────────────────────────────────────────────────
+  const openModal = (fee = null) => {
+    setEditingFee(fee);
+    setModalOpen(true);
   };
 
-  const handleEdit = (fee) => {
-    setEditingId(fee.id);
-    setForm({
-      classId: fee.classId,
-      session: fee.session,
-      term: fee.term,
-      feeType: fee.feeType,
-      amount: fee.amount,
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingFee(null);
   };
 
-  const handleDuplicate = (fee) => {
-    setEditingId(null);
-    setForm({
-      classId: fee.classId,
-      session: fee.session,
-      term: fee.term,
-      feeType: fee.feeType,
-      amount: fee.amount,
-    });
+  // ─── Action handlers ──────────────────────────────────────────────────
+  const handleEdit = (fee) => openModal(fee);
+
+  // Duplicate: open modal pre-filled but no id → create mode
+  const handleDuplicate = (fee) => openModal({ ...fee, id: null });
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteFee(deleteTarget.id);
+      setFeeList((prev) => prev.filter((f) => f.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error("Failed to delete fee:", err);
+    } finally {
+      setDeleting(false);
+    }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this fee?")) return;
-    await deleteFee(id);
-    loadData();
-  };
-
+  // ─── Group toggle ─────────────────────────────────────────────────────
   const toggleGroup = (groupKey) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(groupKey)) next.delete(groupKey);
-      else next.add(groupKey);
+      next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey);
       return next;
     });
   };
 
-  const getClassLevel = (name = "") => {
-    const n = name.toLowerCase();
-
-    if (n.includes("creche") || n.includes("daycare")) return 0;
-    if (n.includes("kg")) return 1;
-
-    if (n.includes("nursery")) return 2;
-
-    if (n.includes("primary")) return 3;
-
-    if (n.includes("jss")) return 4;
-
-    if (n.includes("ss")) return 5;
-
-    return 6; // unknown last
-  };
-
-  const getClassOrderNumber = (name = "") => {
-    const match = name.match(/\d+/);
-    return match ? Number(match[0]) : 0;
-  };
-
-  const sortClasses = (classes = []) => {
-    return [...classes].sort((a, b) => {
-      const levelA = getClassLevel(a.name);
-      const levelB = getClassLevel(b.name);
-
-      if (levelA !== levelB) return levelA - levelB;
-
-      return getClassOrderNumber(a.name) - getClassOrderNumber(b.name);
-    });
-  };
-
-  // ─── Submit Logic (Upgraded) ─────────────────────────────────────
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!canManageFees) {
-      alert("You do not have permission to manage fees.");
-      return;
-    }
-    setIsSubmitting(true);
-
-    try {
-      const payload = {
-        ...form,
-        amount: Number(form.amount),
-        feeType: form.feeType.trim().toLowerCase(),
-      };
-
-      let targetClasses = [];
-
-      if (form.classId === "all") {
-        targetClasses = classes;
-      } else if (form.classId === "primary") {
-        targetClasses = classes.filter((c) => c.group === "primary");
-      } else if (form.classId === "secondary") {
-        targetClasses = classes.filter((c) => c.group === "secondary");
-      }
-
-      if (["all", "primary", "secondary"].includes(form.classId)) {
-        if (!targetClasses.length) {
-          alert("No classes found for selected group.");
-          return;
-        }
-
-        await createBulkFees(
-          targetClasses.map((cls) => ({
-            ...payload,
-            classId: cls.id,
-          })),
-        );
-      } else if (editingId) {
-        await updateFee(editingId, payload);
-      } else {
-        await createFee(payload);
-      }
-
-      resetForm();
-      loadData();
-    } catch (err) {
-      console.error("Fee save failed:", err);
-      alert("Failed to save fee.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // ─── Submit ────────────────────────────────────────────────────────────
-
-  // ─── Filtering — pure React state, no DataTables ───────────────────────
-  // This is what was causing the crash: DataTables moves DOM rows,
-  // then React can't find them to update/remove → "removeChild" error.
+  // ─── Filtered + grouped fees ──────────────────────────────────────────
   const visibleFees = feeList
     .filter((f) => {
       const matchesTerm = !filterTerm || f.term === filterTerm;
@@ -254,19 +152,16 @@ export default function FeeSetup() {
       return matchesTerm && matchesSearch;
     })
     .sort((a, b) => {
-      const nameA = getClassName(a.classId);
-      const nameB = getClassName(b.classId);
-
-      const levelDiff = getClassLevel(nameA) - getClassLevel(nameB);
-
+      const levelDiff =
+        getClassLevel(getClassName(a.classId)) - getClassLevel(getClassName(b.classId));
       if (levelDiff !== 0) return levelDiff;
-
-      return getClassOrderNumber(nameA) - getClassOrderNumber(nameB);
+      return (
+        getClassOrderNumber(getClassName(a.classId)) - getClassOrderNumber(getClassName(b.classId))
+      );
     });
 
   const groupedFees = useMemo(() => {
     const groups = new Map();
-
     visibleFees.forEach((fee) => {
       const key = `${fee.classId}__${fee.session}__${fee.term}`;
       if (!groups.has(key)) {
@@ -279,7 +174,6 @@ export default function FeeSetup() {
           totalAmount: 0,
         });
       }
-
       const group = groups.get(key);
       group.fees.push(fee);
       group.totalAmount += Number(fee.amount || 0);
@@ -293,15 +187,11 @@ export default function FeeSetup() {
 
   const totalVisible = visibleFees.reduce((sum, f) => sum + Number(f.amount || 0), 0);
   const allGroupsExpanded =
-    groupedFees.length > 0 && groupedFees.every((group) => expandedGroups.has(group.key));
+    groupedFees.length > 0 && groupedFees.every((g) => expandedGroups.has(g.key));
 
   const toggleAllGroups = () => {
     if (!groupedFees.length) return;
-    if (allGroupsExpanded) {
-      setExpandedGroups(new Set());
-      return;
-    }
-    setExpandedGroups(new Set(groupedFees.map((group) => group.key)));
+    setExpandedGroups(allGroupsExpanded ? new Set() : new Set(groupedFees.map((g) => g.key)));
   };
 
   const exportHeaders = ["Class", "Session", "Term", "Fee Type", "Amount"];
@@ -316,156 +206,52 @@ export default function FeeSetup() {
   // ─── Render ────────────────────────────────────────────────────────────
   return (
     <div className='form-container'>
-      {/* ── Form ───────────────────────────────────────────────── */}
-      {canManageFees ? (
-        <>
-          <div className='form-header'>
-            <h3>{editingId ? "Edit Fee" : "Add Fee"}</h3>
-            <p>Set a charge for a class, session, and term.</p>
+      {/* ── Page Header ────────────────────────────────────────── */}
+      <div className='list-page-header'>
+        <div className='header-title'>
+          <HiOutlineCash className='main-icon' />
+          <div>
+            <h2>Fee Setup</h2>
+            <p>Define charges per class, session, and term.</p>
           </div>
-
-          <form className='modern-form' onSubmit={handleSubmit}>
-            <div className='form-grid'>
-              <div className='input-group'>
-                <label>Class</label>
-                <div className='input-wrapper'>
-                  <HiLibrary className='input-icon' />
-                  <select name='classId' value={form.classId} onChange={handleChange} required>
-                    <option value=''>Select class</option>
-
-                    <optgroup label='Bulk Actions'>
-                      <option value='all'>All Classes</option>
-                      <option value='primary'>All Primary</option>
-                      <option value='secondary'>All Secondary</option>
-                    </optgroup>
-
-                    <optgroup label='Creche / Daycare'>
-                      {classes
-                        .filter((c) => getClassLevel(c.name) === 0)
-                        .map((cls) => (
-                          <option key={cls.id} value={cls.id}>
-                            {cls.name}
-                          </option>
-                        ))}
-                    </optgroup>
-
-                    <optgroup label='Nursery'>
-                      {classes
-                        .filter((c) => getClassLevel(c.name) === 1)
-                        .map((cls) => (
-                          <option key={cls.id} value={cls.id}>
-                            {cls.name}
-                          </option>
-                        ))}
-                    </optgroup>
-
-                    <optgroup label='Primary'>
-                      {classes
-                        .filter((c) => getClassLevel(c.name) === 2)
-                        .map((cls) => (
-                          <option key={cls.id} value={cls.id}>
-                            {cls.name}
-                          </option>
-                        ))}
-                    </optgroup>
-
-                    <optgroup label='Secondary'>
-                      {classes
-                        .filter((c) => getClassLevel(c.name) >= 3)
-                        .map((cls) => (
-                          <option key={cls.id} value={cls.id}>
-                            {cls.name}
-                          </option>
-                        ))}
-                    </optgroup>
-                  </select>
-                </div>
-              </div>
-
-              <div className='input-group'>
-                <label>Session</label>
-                <div className='input-wrapper'>
-                  <HiCalendar className='input-icon' />
-                  <input
-                    name='session'
-                    value={form.session}
-                    onChange={handleChange}
-                    placeholder='e.g. 2024/2025'
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className='input-group'>
-                <label>Term</label>
-                <div className='input-wrapper'>
-                  <HiClock className='input-icon' />
-                  <select name='term' value={form.term} onChange={handleChange} required>
-                    <option value=''>Select term</option>
-                    {TERMS.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className='input-group'>
-                <label>Fee Type</label>
-                <div className='input-wrapper'>
-                  <HiTag className='input-icon' />
-                  <input
-                    name='feeType'
-                    value={form.feeType}
-                    onChange={handleChange}
-                    placeholder='e.g. Tuition, PTA Levy'
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className='input-group'>
-                <label>Amount (₦)</label>
-                <div className='input-wrapper'>
-                  <HiCash className='input-icon' />
-                  <input
-                    name='amount'
-                    type='number'
-                    value={form.amount}
-                    onChange={handleChange}
-                    placeholder='0'
-                    required
-                    min='1'
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: "0.75rem" }}>
-              <button className='submit-btn' disabled={isSubmitting}>
-                {isSubmitting ? "Saving…" : editingId ? "Update Fee" : "Add Fee"}
-              </button>
-              {editingId && (
-                <button type='button' className='cancel-btn' onClick={() => resetForm()}>
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
-        </>
-      ) : (
-        <div className='form-header'>
-          <h3>Fee Setup</h3>
-          <p>You can view fees, but you do not have permission to create or edit them.</p>
         </div>
+        <div className='header-stats'>
+          <span className='stat-pill'>Total: {feeList.length}</span>
+        </div>
+      </div>
+
+      {/* ── Add Fee Button ──────────────────────────────────────── */}
+      <div className='add_button'>
+        {canManageFees && (
+          <CustomButton
+            onClick={() => openModal(null)}
+            icon={<HiPlus />}
+            variant='primary'
+            otherClass='rounded-full'
+          >
+            Add Fee
+          </CustomButton>
+        )}
+      </div>
+
+      {/* ── Form Modal ──────────────────────────────────────────── */}
+      {modalOpen && (
+        <FormModal title={editingFee?.id ? "Edit Fee" : "Add Fee"} onClose={closeModal}>
+          <FeeForm
+            editingFee={editingFee}
+            onSaved={async () => {
+              await loadData();
+              closeModal();
+            }}
+            onCancel={closeModal}
+          />
+        </FormModal>
       )}
 
       {/* ── Table ──────────────────────────────────────────────── */}
       <div className='table-card fee-setup-card' style={{ marginTop: "2rem" }}>
         {/* Controls row */}
         <div className='fee-table-controls'>
-          {/* Term tabs */}
           <div className='fee-term-tabs'>
             <button
               className={`term-tab ${filterTerm === "" ? "active" : ""}`}
@@ -485,7 +271,6 @@ export default function FeeSetup() {
           </div>
 
           <div className='fee-controls-right'>
-            {/* Search */}
             <div className='search-box fee-search-box'>
               <HiSearch className='search-icon' />
               <input
@@ -495,7 +280,6 @@ export default function FeeSetup() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-
             {!!groupedFees.length && (
               <button type='button' className='fee-expand-all-btn' onClick={toggleAllGroups}>
                 {allGroupsExpanded ? "Collapse all" : "Expand all"}
@@ -517,7 +301,7 @@ export default function FeeSetup() {
           </>
         )}
 
-        {/* Table — rendered by React only, no DataTables */}
+        {/* Table */}
         <div className='fee-table-wrapper'>
           <table className='data-table fee-setup-table'>
             <thead>
@@ -556,9 +340,7 @@ export default function FeeSetup() {
                   return [
                     <tr
                       key={`${group.key}-parent`}
-                      className={`fee-parent-row ${isOpen ? "is-open" : ""} ${
-                        group.fees.some((fee) => editingId === fee.id) ? "row-editing" : ""
-                      }`}
+                      className={`fee-parent-row ${isOpen ? "is-open" : ""}`}
                     >
                       <td className='fee-class-cell'>
                         <strong>{getClassName(group.classId)}</strong>
@@ -637,7 +419,7 @@ export default function FeeSetup() {
                                           <button
                                             title='Delete'
                                             className='delete-btn'
-                                            onClick={() => handleDelete(fee.id)}
+                                            onClick={() => setDeleteTarget(fee)}
                                           >
                                             <HiTrash />
                                           </button>
@@ -667,6 +449,16 @@ export default function FeeSetup() {
           </table>
         </div>
       </div>
+
+      {/* ── Confirm Delete Modal ────────────────────────────────── */}
+      {deleteTarget && (
+        <ConfirmModal
+          entityName={`${deleteTarget.feeType} fee for ${getClassName(deleteTarget.classId)}`}
+          loading={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
+        />
+      )}
     </div>
   );
 }

@@ -1,9 +1,12 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getClasses } from "../classes/classService";
 import { getAllStudents } from "../students/studentService";
 import { useSettings } from "../../hooks/Usesettings";
 import { calculateStudentBalance } from "../../hooks/Usestudentbalance";
-// ─── Multi-sheet XLSX download (SheetJS) ──────────────────────────────────
+import { useRole } from "../../hooks/useRole";
+import { PERMISSIONS, ROLES } from "../../config/permissions";
+import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
+import { db } from "../../firebase/firestore";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import {
@@ -18,6 +21,7 @@ import {
   HiDocumentText,
   HiStar,
   HiPresentationChartLine,
+  HiLockClosed,
 } from "react-icons/hi";
 import {
   Chart as ChartJS,
@@ -34,6 +38,9 @@ import {
   Filler,
 } from "chart.js";
 import { Bar, Doughnut, Pie, Radar } from "react-chartjs-2";
+import { MetricCard, Bone } from "./DashboardWidgets";
+import { InlineBar, Donut, MilestoneTracker, InsightCard } from "./ReportComponents";
+import { getTodayPayments } from "./dashboardService";
 
 ChartJS.register(
   CategoryScale,
@@ -49,81 +56,120 @@ ChartJS.register(
   Filler,
 );
 
-// ─── Skeleton bone ────────────────────────────────────────────────────────
-function Bone({ w = "100%", h = 16, r = 6, style = {} }) {
-  return <div className='skel-bone' style={{ width: w, height: h, borderRadius: r, ...style }} />;
-}
-
-// ─── Inline progress bar ──────────────────────────────────────────────────
-function InlineBar({ pct }) {
-  const col = pct >= 80 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#ef4444";
+// ─── Restricted view for non-finance-admin roles ──────────────────────────
+function RestrictedBanner({ todayData, loading }) {
+  const fmt = (n) => `NGN ${Math.round(n).toLocaleString()}`;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <div
-        style={{ flex: 1, height: 6, background: "#e5e7eb", borderRadius: 3, overflow: "hidden" }}
-      >
-        <div
-          style={{
-            width: `${pct}%`,
-            height: "100%",
-            background: col,
-            borderRadius: 3,
-            transition: "width 0.6s ease",
-          }}
-        />
+    <div
+      style={{
+        background: "var(--color-background-secondary)",
+        border: "1px solid var(--color-border-secondary)",
+        borderRadius: 12,
+        padding: "1.5rem",
+        marginBottom: "1.5rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "1rem",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <HiLockClosed style={{ fontSize: 18, color: "var(--color-text-secondary)" }} />
+        <div>
+          <p
+            style={{ margin: 0, fontWeight: 600, fontSize: 14, color: "var(--color-text-primary)" }}
+          >
+            Today's Activity
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--color-text-secondary)" }}>
+            Full term reports are restricted to Admin roles. Showing today's data only.
+          </p>
+        </div>
       </div>
-      <span style={{ fontSize: 12, fontWeight: 600, color: col, minWidth: 36 }}>{pct}%</span>
-    </div>
-  );
-}
-
-// ─── Small SVG donut (inline only — not Chart.js) ─────────────────────────
-function Donut({ pct, size = 56, stroke = 7 }) {
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
-  const col = pct >= 80 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#ef4444";
-  return (
-    <div style={{ position: "relative", width: size, height: size }}>
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        style={{ transform: "rotate(-90deg)" }}
-      >
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill='none'
-          stroke='#e5e7eb'
-          strokeWidth={stroke}
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill='none'
-          stroke={col}
-          strokeWidth={stroke}
-          strokeDasharray={`${(pct / 100) * circ} ${circ}`}
-          strokeLinecap='round'
-          style={{ transition: "stroke-dasharray 0.8s ease" }}
-        />
-      </svg>
-      <span
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 10,
-          fontWeight: 700,
-          color: col,
-        }}
-      >
-        {pct}%
-      </span>
+      {loading ? (
+        <div className='db-metric-grid'>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className='db-metric-card'>
+              <Bone key={i} h={60} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className='db-metric-grid'>
+          <MetricCard
+            label='Collected Today'
+            value={fmt(todayData.total)}
+            sub={`${todayData.count} payment${todayData.count !== 1 ? "s" : ""}`}
+            icon={<HiCheckCircle />}
+            iconBg='#dcfce7'
+            iconColor='#166534'
+          />
+          <MetricCard
+            label='Students Paid Today'
+            value={todayData.studentsPaid}
+            sub='unique students'
+            icon={<HiAcademicCap />}
+            iconBg='#e0f2fe'
+            iconColor='#0369a1'
+          />
+          <MetricCard
+            label='Methods Used'
+            value={todayData.methodsUsed}
+            sub='payment channels'
+            icon={<HiChartBar />}
+            iconBg='#f3f4f6'
+            iconColor='#374151'
+          />
+        </div>
+      )}
+      {!loading && todayData.recentPayments?.length > 0 && (
+        <div>
+          <p
+            style={{
+              margin: "0 0 0.5rem",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--color-text-primary)",
+            }}
+          >
+            Today's Transactions
+          </p>
+          <div style={{ overflowX: "auto" }}>
+            <table className='data-table'>
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Method</th>
+                  <th className='text-right'>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {todayData.recentPayments.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <strong>{p.studentName || "—"}</strong>
+                    </td>
+                    <td>{p.method || "—"}</td>
+                    <td className='text-right'>{fmt(p.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {!loading && todayData.recentPayments?.length === 0 && (
+        <p
+          style={{
+            margin: 0,
+            fontSize: 13,
+            color: "var(--color-text-secondary)",
+            textAlign: "center",
+            padding: "1rem",
+          }}
+        >
+          No payments recorded today yet.
+        </p>
+      )}
     </div>
   );
 }
@@ -143,7 +189,6 @@ const COLORS = [
   "#14b8a6",
 ];
 
-// Chart 1: Grouped bar — Expected / Collected / Outstanding
 function ChartGrouped({ data }) {
   return (
     <div style={{ height: 320 }}>
@@ -203,7 +248,6 @@ function ChartGrouped({ data }) {
   );
 }
 
-// Chart 2: Horizontal bar — collection rate ranked
 function ChartRates({ data }) {
   const sorted = [...data].sort((a, b) => b.collectionRate - a.collectionRate);
   const rates = sorted.map((d) => d.collectionRate);
@@ -256,7 +300,6 @@ function ChartRates({ data }) {
   );
 }
 
-// Chart 3: Doughnut — overall revenue split
 function ChartRevenueDoughnut({ grandPaid, grandOutstanding }) {
   return (
     <div style={{ height: 280, display: "flex", justifyContent: "center" }}>
@@ -293,7 +336,6 @@ function ChartRevenueDoughnut({ grandPaid, grandOutstanding }) {
   );
 }
 
-// Chart 4: Pie — student payment status
 function ChartStudentPie({ data }) {
   const fullyPaid = data.reduce((s, r) => s + r.fullyPaid, 0);
   const owing = data.reduce((s, r) => s + r.withBalance, 0);
@@ -331,7 +373,6 @@ function ChartStudentPie({ data }) {
   );
 }
 
-// Chart 5: Stacked bar — paid vs owing students
 function ChartStudentStack({ data }) {
   return (
     <div style={{ height: 300 }}>
@@ -387,7 +428,6 @@ function ChartStudentStack({ data }) {
   );
 }
 
-// Chart 6: Radar — multi-metric per class
 function ChartRadar({ data }) {
   const classes = data.slice(0, 8);
   const maxStudents = Math.max(...data.map((d) => d.studentCount), 1);
@@ -495,54 +535,52 @@ function generateInsights({
       type: "success",
       icon: "🏆",
       title: `Best Performing Class: ${topClass.className}`,
-      body: `${topClass.className} leads with a ${topClass.collectionRate}% collection rate — NGN ${topClass.totalPaid.toLocaleString()} of NGN ${topClass.totalFees.toLocaleString()} collected. Identify and replicate the practices that drove this result (early reminders, parent engagement, payment plans) across all classes.`,
+      body: `${topClass.className} leads with a ${topClass.collectionRate}% collection rate — NGN ${topClass.totalPaid.toLocaleString()} of NGN ${topClass.totalFees.toLocaleString()} collected.`,
     });
   if (bottomClass && bottomClass.collectionRate < 70)
     insights.push({
       type: "danger",
       icon: "📉",
       title: `Urgent Attention: ${bottomClass.className}`,
-      body: `${bottomClass.className} has the lowest rate at ${bottomClass.collectionRate}% — NGN ${bottomClass.outstanding.toLocaleString()} outstanding from ${bottomClass.withBalance} student(s). The class teacher should brief management immediately, contact families personally, and arrange flexible installment plans where needed.`,
+      body: `${bottomClass.className} has the lowest rate at ${bottomClass.collectionRate}% — NGN ${bottomClass.outstanding.toLocaleString()} outstanding from ${bottomClass.withBalance} student(s).`,
     });
   if (criticalClasses.length > 0)
     insights.push({
       type: "danger",
       icon: "🔴",
       title: `${criticalClasses.length} Class(es) Below 50% Collection`,
-      body: `Classes below 50%: ${criticalClasses.map((c) => c.className).join(", ")}. These classes hold a disproportionate share of outstanding balance. Prioritise outreach immediately — written notices home, phone calls, and escalation of unresponsive cases to management.`,
+      body: `Classes below 50%: ${criticalClasses.map((c) => c.className).join(", ")}. Prioritise outreach immediately.`,
     });
   if (excellentClasses.length > 0)
     insights.push({
       type: "success",
       icon: "✅",
       title: `${excellentClasses.length} Class(es) at 80%+ Collection`,
-      body: `${excellentClasses.map((c) => c.className).join(", ")} ${excellentClasses.length === 1 ? "has" : "have"} achieved 80%+ collection. Light follow-up only is needed. Consider recognising these classes publicly to build a school-wide culture of timely payment.`,
+      body: `${excellentClasses.map((c) => c.className).join(", ")} ${excellentClasses.length === 1 ? "has" : "have"} achieved 80%+ collection.`,
     });
   insights.push({
     type: "info",
     icon: "👥",
     title: `${totalOwing} of ${totalStudents} Students Still Have Outstanding Balances (${owingPct}%)`,
-    body: `${owingPct}% of enrolled students owe fees this term. If this figure remains high near term-end, the school should consider restricting end-of-term reports for unpaid students (where policy allows), engaging the PTA, and sending formal demand notices.`,
+    body: `${owingPct}% of enrolled students owe fees this term. Intensify follow-up before term end.`,
   });
-  if (grandOutstanding > 0 && grandPaid > 0) {
+  if (grandOutstanding > 0 && grandPaid > 0)
     insights.push({
       type: "info",
       icon: "📅",
       title: "Recovery Pace Advisory",
-      body: `To recover the outstanding NGN ${grandOutstanding.toLocaleString()} before term closes, the school must collect approximately NGN ${Math.round(grandOutstanding / 4).toLocaleString()} per week over the next four weeks. Intensify payment follow-up immediately to meet this target.`,
+      body: `To recover the outstanding NGN ${grandOutstanding.toLocaleString()} before term closes, the school must collect approximately NGN ${Math.round(grandOutstanding / 4).toLocaleString()} per week over the next four weeks.`,
     });
-  }
   insights.push({
     type: "info",
     icon: "📋",
     title: "Recommended Next Steps for Management",
-    body: `1. Send personalised payment reminders to all ${totalOwing} families with outstanding balances this week.\n2. Set a school-wide target of 90% collection before end of ${selectedTerm}.\n3. Arrange payment plan meetings for families flagging financial difficulty.\n4. Publicly recognise high-performing classes to reinforce timely payment culture.\n5. Review fee structure if a large proportion of families consistently struggle — consider default installment plans for next ${session} session.\n6. Ensure the bursar produces weekly collection status updates for the Head Teacher.`,
+    body: `1. Send personalised payment reminders to all ${totalOwing} families with outstanding balances this week.\n2. Set a school-wide target of 90% collection before end of ${selectedTerm}.\n3. Arrange payment plan meetings for families flagging financial difficulty.\n4. Publicly recognise high-performing classes to reinforce timely payment culture.\n5. Review fee structure if a large proportion of families consistently struggle.\n6. Ensure the bursar produces weekly collection status updates for the Head Teacher.`,
   });
-
   return insights;
 }
 
-// ─── DOCX download (client-side via docx npm package) ─────────────────────
+// ─── DOCX, PDF, XLSX download functions (unchanged from original) ──────────
 async function downloadDOCX({
   reportData,
   grandFees,
@@ -553,7 +591,6 @@ async function downloadDOCX({
   session,
   insights,
 }) {
-  // Dynamically import docx (must be installed: npm install docx)
   const {
     Document,
     Packer,
@@ -567,12 +604,10 @@ async function downloadDOCX({
     WidthType,
     BorderStyle,
     ShadingType,
-    LevelFormat,
     PageNumber,
     Footer,
     PageBreak,
   } = await import("docx");
-
   const now = new Date().toLocaleDateString("en-NG", {
     year: "numeric",
     month: "long",
@@ -587,11 +622,9 @@ async function downloadDOCX({
       : overallRate >= 50
         ? "SATISFACTORY"
         : "CRITICAL — REQUIRES IMMEDIATE ACTION";
-
   const border = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
   const borders = { top: border, bottom: border, left: border, right: border };
   const cellW = (n) => ({ size: n, type: WidthType.DXA });
-
   const headerRow = (labels, colWidths) =>
     new TableRow({
       tableHeader: true,
@@ -611,7 +644,6 @@ async function downloadDOCX({
           }),
       ),
     });
-
   const dataRow = (values, colWidths, shade = false) =>
     new TableRow({
       children: values.map(
@@ -630,16 +662,10 @@ async function downloadDOCX({
           }),
       ),
     });
-
   const h1 = (text) =>
     new Paragraph({
       heading: HeadingLevel.HEADING_1,
       children: [new TextRun({ text, bold: true, size: 32, color: "1E3A8A" })],
-    });
-  const h2 = (text) =>
-    new Paragraph({
-      heading: HeadingLevel.HEADING_2,
-      children: [new TextRun({ text, bold: true, size: 26, color: "1E40AF" })],
     });
   const body = (text, opts = {}) =>
     new Paragraph({
@@ -653,8 +679,6 @@ async function downloadDOCX({
       children: [],
       spacing: { after: 200 },
     });
-
-  // Summary table
   const colW5 = [1600, 1600, 1600, 1600, 1560];
   const summaryTable = new Table({
     width: { size: 7960, type: WidthType.DXA },
@@ -687,8 +711,6 @@ async function downloadDOCX({
       ),
     ],
   });
-
-  // Class breakdown table
   const colW8 = [1200, 900, 1100, 1100, 1200, 700, 700, 1060];
   const classRows = reportData.map((row, idx) =>
     dataRow(
@@ -717,8 +739,6 @@ async function downloadDOCX({
       ...classRows,
     ],
   });
-
-  // Advisory paragraphs
   const advisoryBlocks = insights.flatMap((ins, i) => [
     new Paragraph({
       children: [
@@ -728,7 +748,6 @@ async function downloadDOCX({
     }),
     ...(ins.body || "").split("\n").map((line) => body(line.trim())),
   ]);
-
   const doc = new Document({
     numbering: { config: [] },
     styles: {
@@ -782,7 +801,6 @@ async function downloadDOCX({
           }),
         },
         children: [
-          // Cover
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { before: 720, after: 240 },
@@ -820,8 +838,6 @@ async function downloadDOCX({
             ],
           }),
           divider(),
-
-          // Executive Summary
           h1("Executive Summary"),
           summaryTable,
           spacer(),
@@ -829,49 +845,39 @@ async function downloadDOCX({
             `Overall collection rate stands at ${overallRate}%. The school has collected NGN ${grandPaid.toLocaleString()} of the NGN ${grandFees.toLocaleString()} expected for ${selectedTerm}. ${totalOwing} of ${totalStudents} enrolled students still have outstanding balances totalling NGN ${grandOutstanding.toLocaleString()}.`,
           ),
           spacer(),
-
-          // Class Breakdown
           new Paragraph({ children: [new PageBreak()] }),
           h1("Class-by-Class Breakdown"),
           classTable,
           spacer(),
-
-          // Advisory
           new Paragraph({ children: [new PageBreak()] }),
           h1("Management Advisory & Recommendations"),
           body(
-            "The following observations and recommendations are based on current collection data. They are intended for school management and should be actioned promptly.",
+            "The following observations and recommendations are based on current collection data.",
             { color: "4B5563" },
           ),
           spacer(),
           ...advisoryBlocks,
           spacer(),
           divider(),
-          body(
-            "This report was automatically generated by the School Management System. For queries, contact the school bursary or accounts office.",
-            { color: "9CA3AF", italics: true },
-          ),
+          body("This report was automatically generated by the School Management System.", {
+            color: "9CA3AF",
+            italics: true,
+          }),
         ],
       },
     ],
   });
-
   const blob = await Packer.toBlob(doc);
-
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-
   a.href = url;
   a.download = `fees_report_${session}_${selectedTerm}.docx`.replace(/[\s/]/g, "_");
-
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-
   URL.revokeObjectURL(url);
 }
 
-// ─── PDF download (client-side via jsPDF + autoTable) ─────────────────────
 async function downloadPDF({
   reportData,
   grandFees,
@@ -884,7 +890,6 @@ async function downloadPDF({
 }) {
   const { default: jsPDF } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
-
   const now = new Date().toLocaleDateString("en-NG", {
     year: "numeric",
     month: "long",
@@ -897,12 +902,10 @@ async function downloadPDF({
     overallRate >= 80 ? "EXCELLENT" : overallRate >= 50 ? "SATISFACTORY" : "CRITICAL";
   const statusColor =
     overallRate >= 80 ? [5, 150, 105] : overallRate >= 50 ? [217, 119, 6] : [220, 38, 38];
-
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
   let y = 0;
-
   const addPage = () => {
     doc.addPage();
     y = 20;
@@ -910,7 +913,6 @@ async function downloadPDF({
   const checkY = (needed = 20) => {
     if (y + needed > ph - 20) addPage();
   };
-
   const addFooter = () => {
     const pages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pages; i++) {
@@ -925,8 +927,6 @@ async function downloadPDF({
       );
     }
   };
-
-  // ── Cover page ──
   doc.setFillColor(30, 58, 138);
   doc.rect(0, 0, pw, 60, "F");
   doc.setTextColor(255, 255, 255);
@@ -938,24 +938,18 @@ async function downloadPDF({
   doc.text(`${session}  —  ${selectedTerm}`, pw / 2, 37, { align: "center" });
   doc.setFontSize(10);
   doc.text(`Generated: ${now}`, pw / 2, 47, { align: "center" });
-
-  // Status badge
   doc.setFillColor(...statusColor);
   doc.roundedRect(pw / 2 - 45, 55, 90, 12, 3, 3, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(10);
   doc.setFont(undefined, "bold");
   doc.text(`Collection Status: ${statusLabel}`, pw / 2, 63, { align: "center" });
-
   y = 80;
-
-  // ── Summary section ──
   doc.setTextColor(30, 58, 138);
   doc.setFontSize(14);
   doc.setFont(undefined, "bold");
   doc.text("Executive Summary", 14, y);
   y += 8;
-
   autoTable(doc, {
     startY: y,
     head: [["Metric", "Value"]],
@@ -978,15 +972,12 @@ async function downloadPDF({
     theme: "grid",
   });
   y = doc.lastAutoTable.finalY + 10;
-
-  // ── Class breakdown ──
   checkY(40);
   doc.setTextColor(30, 58, 138);
   doc.setFontSize(14);
   doc.setFont(undefined, "bold");
   doc.text("Class-by-Class Breakdown", 14, y);
   y += 6;
-
   autoTable(doc, {
     startY: y,
     head: [
@@ -1041,7 +1032,6 @@ async function downloadPDF({
       7: { halign: "center" },
     },
     didDrawCell: (data) => {
-      // Color-code the rate column
       if (data.column.index === 5 && data.section === "body") {
         const rate = reportData[data.row.index]?.collectionRate ?? 0;
         const col = rate >= 80 ? [209, 250, 229] : rate >= 50 ? [254, 243, 199] : [254, 226, 226];
@@ -1061,15 +1051,12 @@ async function downloadPDF({
     theme: "grid",
   });
   y = doc.lastAutoTable.finalY + 10;
-
-  // ── Advisory ──
   addPage();
   doc.setTextColor(30, 58, 138);
   doc.setFontSize(14);
   doc.setFont(undefined, "bold");
   doc.text("Management Advisory & Recommendations", 14, y);
   y += 8;
-
   doc.setFontSize(9);
   doc.setTextColor(75, 85, 99);
   doc.setFont(undefined, "normal");
@@ -1079,7 +1066,6 @@ async function downloadPDF({
     y,
   );
   y += 8;
-
   for (const [i, ins] of insights.entries()) {
     checkY(30);
     const bgCol =
@@ -1098,28 +1084,22 @@ async function downloadPDF({
           : ins.type === "danger"
             ? [254, 205, 211]
             : [191, 219, 254];
-
     const lines = doc.splitTextToSize(`${ins.body}`, pw - 40);
     const blockH = 6 + lines.length * 4.5 + 6;
     checkY(blockH);
-
     doc.setFillColor(...bgCol);
     doc.setDrawColor(...bdCol);
     doc.roundedRect(14, y, pw - 28, blockH, 2, 2, "FD");
-
     doc.setTextColor(30, 58, 138);
     doc.setFontSize(10);
     doc.setFont(undefined, "bold");
     doc.text(`${i + 1}. ${ins.title}`, 20, y + 6);
-
     doc.setTextColor(55, 65, 81);
     doc.setFontSize(8.5);
     doc.setFont(undefined, "normal");
     doc.text(lines, 20, y + 12);
     y += blockH + 4;
   }
-
-  // Footer on all pages
   addFooter();
   doc.save(`fees_report_${session}_${selectedTerm}.pdf`.replace(/[\s/]/g, "_"));
 }
@@ -1134,29 +1114,11 @@ async function downloadXLSX({
   session,
 }) {
   const workbook = new ExcelJS.Workbook();
-
-  /* ─────────────────────────────────────
-     REUSABLE STYLES
-  ───────────────────────────────────── */
   const applyHeaderStyle = (row) => {
     row.eachCell((cell) => {
-      cell.font = {
-        bold: true,
-        size: 12,
-        color: { argb: "FFFFFFFF" },
-      };
-
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "1F4E78" },
-      };
-
-      cell.alignment = {
-        horizontal: "center",
-        vertical: "middle",
-      };
-
+      cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E78" } };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
       cell.border = {
         top: { style: "thin" },
         left: { style: "thin" },
@@ -1165,34 +1127,15 @@ async function downloadXLSX({
       };
     });
   };
-
   const applySectionTitle = (cell) => {
-    cell.font = {
-      bold: true,
-      size: 13,
-    };
-
-    cell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "D9EAD3" },
-    };
-
-    cell.alignment = {
-      horizontal: "left",
-      vertical: "middle",
-    };
+    cell.font = { bold: true, size: 13 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "D9EAD3" } };
+    cell.alignment = { horizontal: "left", vertical: "middle" };
   };
-
   const applyCurrencyStyle = (cell) => {
     cell.numFmt = "#,##0.00";
   };
-
-  /* ─────────────────────────────────────
-     SHEET 1: SUMMARY
-  ───────────────────────────────────── */
   const summarySheet = workbook.addWorksheet("All Classes");
-
   const summaryRows = [
     [`SCHOOL FEES COLLECTION REPORT — ${session} — ${selectedTerm}`],
     [],
@@ -1238,11 +1181,9 @@ async function downloadXLSX({
       reportData.reduce((s, r) => s + r.withBalance, 0),
     ],
   ];
-
   summaryRows.forEach((row) => {
     summarySheet.addRow(row);
   });
-
   summarySheet.columns = [
     { width: 35 },
     { width: 15 },
@@ -1253,55 +1194,25 @@ async function downloadXLSX({
     { width: 14 },
     { width: 14 },
   ];
-
-  /* Title */
   summarySheet.mergeCells("A1:H1");
   const titleCell = summarySheet.getCell("A1");
-
-  titleCell.font = {
-    bold: true,
-    size: 16,
-    color: { argb: "000000" },
-  };
-
-  titleCell.alignment = {
-    horizontal: "center",
-    vertical: "middle",
-  };
-
-  titleCell.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "E2F0D9" },
-  };
-
-  /* Section Titles */
+  titleCell.font = { bold: true, size: 16, color: { argb: "000000" } };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "E2F0D9" } };
   applySectionTitle(summarySheet.getCell("A3"));
   applySectionTitle(summarySheet.getCell("A12"));
-
-  /* Table Header */
   applyHeaderStyle(summarySheet.getRow(13));
-
-  /* Totals Row */
   const totalsRowNumber = 14 + reportData.length + 1;
   applyHeaderStyle(summarySheet.getRow(totalsRowNumber));
-
-  /* Currency formatting */
   for (let i = 4; i <= totalsRowNumber; i++) {
     applyCurrencyStyle(summarySheet.getCell(`B${i}`));
     applyCurrencyStyle(summarySheet.getCell(`C${i}`));
     applyCurrencyStyle(summarySheet.getCell(`D${i}`));
     applyCurrencyStyle(summarySheet.getCell(`E${i}`));
   }
-
-  /* ─────────────────────────────────────
-     CLASS SHEETS
-  ───────────────────────────────────── */
   for (const row of reportData) {
     const safeName = row.className.replace(/[:/\\?*[\]]/g, "").slice(0, 31);
-
     const classSheet = workbook.addWorksheet(safeName);
-
     const sheetRows = [
       [`CLASS REPORT: ${row.className}`],
       [`Session: ${session}   |   Term: ${selectedTerm}`],
@@ -1330,183 +1241,78 @@ async function downloadXLSX({
           : "No — all students have paid",
       ],
     ];
-
     sheetRows.forEach((sheetRow) => {
       classSheet.addRow(sheetRow);
     });
-
     classSheet.columns = [{ width: 30 }, { width: 40 }];
-
-    /* Title */
     classSheet.mergeCells("A1:B1");
     const classTitle = classSheet.getCell("A1");
-
-    classTitle.font = {
-      bold: true,
-      size: 15,
-    };
-
-    classTitle.alignment = {
-      horizontal: "center",
-      vertical: "middle",
-    };
-
-    classTitle.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "D9EAD3" },
-    };
-
-    /* Metric Header */
+    classTitle.font = { bold: true, size: 15 };
+    classTitle.alignment = { horizontal: "center", vertical: "middle" };
+    classTitle.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "D9EAD3" } };
     applyHeaderStyle(classSheet.getRow(4));
-
-    /* Currency rows */
     [8, 9, 10].forEach((rowNum) => {
       applyCurrencyStyle(classSheet.getCell(`B${rowNum}`));
     });
   }
-
-  /* ─────────────────────────────────────
-     DOWNLOAD
-  ───────────────────────────────────── */
   const buffer = await workbook.xlsx.writeBuffer();
-
-  const fileName = `fees_data_${session}_${selectedTerm}.xlsx`.replace(/[\s/]/g, "_");
-
-  saveAs(new Blob([buffer]), fileName);
+  saveAs(new Blob([buffer]), `fees_data_${session}_${selectedTerm}.xlsx`.replace(/[\s/]/g, "_"));
 }
 
-// ─── Milestone tracker ────────────────────────────────────────────────────
-function MilestoneTracker({ rate }) {
-  const milestones = [
-    { pct: 25, label: "Quarter", icon: "🌱" },
-    { pct: 50, label: "Halfway", icon: "⚡" },
-    { pct: 75, label: "¾ Way", icon: "🔥" },
-    { pct: 90, label: "Near Full", icon: "🎯" },
-    { pct: 100, label: "Complete", icon: "🏆" },
-  ];
-  const col = rate >= 80 ? "#10b981" : rate >= 50 ? "#f59e0b" : "#ef4444";
-  return (
-    <div style={{ padding: "0.75rem 0 1.25rem" }}>
-      <div
-        style={{
-          height: 4,
-          background: "#e5e7eb",
-          borderRadius: 2,
-          position: "relative",
-          marginBottom: "1.75rem",
-        }}
-      >
-        <div
-          style={{
-            height: "100%",
-            width: `${Math.min(rate, 100)}%`,
-            background: col,
-            borderRadius: 2,
-            transition: "width 1s ease",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            left: `${Math.min(rate, 100)}%`,
-            top: "50%",
-            transform: "translate(-50%,-50%)",
-            width: 14,
-            height: 14,
-            borderRadius: "50%",
-            background: col,
-            border: "2px solid white",
-            boxShadow: `0 0 0 3px ${col}44`,
-          }}
-        />
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        {milestones.map((m) => {
-          const reached = rate >= m.pct;
-          return (
-            <div
-              key={m.pct}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 3,
-                opacity: reached ? 1 : 0.38,
-              }}
-            >
-              <span style={{ fontSize: 18 }}>{m.icon}</span>
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: reached ? "#111827" : "#9ca3af",
-                  textAlign: "center",
-                }}
-              >
-                {m.label}
-              </span>
-              <span style={{ fontSize: 10, color: "#6b7280" }}>{m.pct}%</span>
-              {reached && <span style={{ fontSize: 9, color: "#10b981", fontWeight: 700 }}>✓</span>}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+// ─── Today's payments fetcher ─────────────────────────────────────────────
+async function fetchTodayPayments(academicYear, currentTerm) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
 
-// ─── Insight card ─────────────────────────────────────────────────────────
-function InsightCard({ insight }) {
-  const colors = {
-    success: { bg: "#f0fdf4", border: "#bbf7d0", title: "#15803d" },
-    warning: { bg: "#fffbeb", border: "#fde68a", title: "#b45309" },
-    danger: { bg: "#fff1f2", border: "#fecdd3", title: "#be123c" },
-    info: { bg: "#eff6ff", border: "#bfdbfe", title: "#1d4ed8" },
-  };
-  const c = colors[insight.type] || colors.info;
-  return (
-    <div
-      style={{
-        background: c.bg,
-        border: `1px solid ${c.border}`,
-        borderRadius: 12,
-        padding: "1rem 1.25rem",
-        marginBottom: "0.75rem",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
-        <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{insight.icon}</span>
-        <div>
-          <p style={{ margin: "0 0 0.4rem", fontWeight: 700, fontSize: 14, color: c.title }}>
-            {insight.title}
-          </p>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 13,
-              color: "#374151",
-              lineHeight: 1.7,
-              whiteSpace: "pre-line",
-            }}
-          >
-            {insight.body}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, "payments"),
+        where("academicYear", "==", academicYear),
+        where("term", "==", currentTerm),
+        where("date", ">=", Timestamp.fromDate(today)),
+        where("date", "<", Timestamp.fromDate(tomorrow)),
+      ),
+    );
+    const payments = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const total = payments.reduce((s, p) => s + (p.amount || 0), 0);
+    const uniqueStudents = new Set(payments.map((p) => p.studentId)).size;
+    const uniqueMethods = new Set(payments.map((p) => p.method).filter(Boolean)).size;
+    return {
+      total,
+      count: payments.length,
+      studentsPaid: uniqueStudents,
+      methodsUsed: uniqueMethods,
+      recentPayments: payments.slice(0, 20),
+    };
+  } catch {
+    return { total: 0, count: 0, studentsPaid: 0, methodsUsed: 0, recentPayments: [] };
+  }
 }
 
 // ─── Main component ───────────────────────────────────────────────────────
 export default function Reports() {
+  const { role, can } = useRole();
   const { settings, loading: settingsLoading } = useSettings();
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [todayData, setTodayData] = useState({
+    total: 0,
+    count: 0,
+    studentsPaid: 0,
+    methodsUsed: 0,
+    recentPayments: [],
+  });
+  const [todayLoading, setTodayLoading] = useState(false);
   const [selectedTerm, setSelectedTerm] = useState("");
   const [viewMode, setViewMode] = useState("table");
   const [activeTab, setActiveTab] = useState("overview");
-  const [downloading, setDownloading] = useState(null); // "docx" | "pdf" | "xlsx" | null
+  const [downloading, setDownloading] = useState(null);
+
+  // Only super_admin and admin see full term-level finance data
+  const isFinanceAdmin = role === ROLES.super_admin || role === ROLES.admin;
 
   useEffect(() => {
     if (settings.currentTerm && !selectedTerm) setSelectedTerm(settings.currentTerm);
@@ -1514,8 +1320,23 @@ export default function Reports() {
 
   useEffect(() => {
     if (!settings.academicYear || !selectedTerm) return;
-    generateReport();
-  }, [settings.academicYear, selectedTerm]);
+    if (isFinanceAdmin) {
+      generateReport();
+    } else {
+      loadTodayData();
+    }
+  }, [settings.academicYear, selectedTerm, isFinanceAdmin]);
+
+  const loadTodayData = async () => {
+    if (!settings.academicYear || !selectedTerm) return;
+    setTodayLoading(true);
+    try {
+      const data = await fetchTodayPayments(settings.academicYear, selectedTerm);
+      setTodayData(data);
+    } finally {
+      setTodayLoading(false);
+    }
+  };
 
   const generateReport = async () => {
     setLoading(true);
@@ -1577,7 +1398,6 @@ export default function Reports() {
           session: settings.academicYear,
         })
       : [];
-
   const downloadArgs = {
     reportData,
     grandFees,
@@ -1598,20 +1418,22 @@ export default function Reports() {
     } catch (err) {
       console.error(`${type} export failed:`, err);
       alert(
-        `Failed to generate ${type.toUpperCase()} — ensure the required npm packages are installed:\n• docx\n• jspdf\n• jspdf-autotable\n• xlsx`,
+        `Failed to generate ${type.toUpperCase()} — ensure the required npm packages are installed.`,
       );
     } finally {
       setDownloading(null);
     }
   };
 
-  const tabs = [
-    { id: "overview", label: "Overview", icon: <HiChartBar /> },
-    { id: "charts", label: "Charts", icon: <HiPresentationChartLine /> },
-    { id: "class", label: "By Class", icon: <HiAcademicCap /> },
-    { id: "insights", label: "Advisory", icon: <HiLightBulb /> },
-    { id: "download", label: "Download", icon: <HiDocumentText /> },
+  // Tabs: non-finance-admin roles only see overview (today) and no download
+  const allTabs = [
+    { id: "overview", label: "Overview", icon: <HiChartBar />, adminOnly: false },
+    { id: "charts", label: "Charts", icon: <HiPresentationChartLine />, adminOnly: true },
+    { id: "class", label: "By Class", icon: <HiAcademicCap />, adminOnly: true },
+    { id: "insights", label: "Advisory", icon: <HiLightBulb />, adminOnly: true },
+    { id: "download", label: "Download", icon: <HiDocumentText />, adminOnly: true },
   ];
+  const tabs = allTabs.filter((t) => !t.adminOnly || isFinanceAdmin);
 
   if (settingsLoading)
     return (
@@ -1648,10 +1470,14 @@ export default function Reports() {
           </div>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-          <button className='filter-btn' onClick={generateReport} disabled={loading}>
+          <button
+            className='filter-btn'
+            onClick={isFinanceAdmin ? generateReport : loadTodayData}
+            disabled={loading || todayLoading}
+          >
             <HiRefresh /> Refresh
           </button>
-          {reportData.length > 0 && (
+          {isFinanceAdmin && reportData.length > 0 && can(PERMISSIONS.EXPORT_REPORTS) && (
             <>
               <button
                 className='filter-btn'
@@ -1697,625 +1523,677 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Term tabs */}
-      <div className='term-selector-tabs' style={{ marginBottom: "1.5rem" }}>
-        {["1st Term", "2nd Term", "3rd Term"].map((t) => (
-          <button
-            key={t}
-            className={`term-tab ${selectedTerm === t ? "active" : ""}`}
-            onClick={() => setSelectedTerm(t)}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      {/* Summary cards */}
-      <div className='finance-grid' style={{ marginBottom: "1.5rem" }}>
-        {[
-          {
-            label: "Expected Revenue",
-            val: `NGN ${grandFees.toLocaleString()}`,
-            sub: "Total fees billed",
-            cls: "",
-          },
-          {
-            label: "Collected",
-            val: `NGN ${grandPaid.toLocaleString()}`,
-            sub: `${totalFullyPaid} students fully paid`,
-            cls: "cleared",
-          },
-          {
-            label: "Outstanding",
-            val: `NGN ${grandOutstanding.toLocaleString()}`,
-            sub: `${totalOwing} students owing`,
-            cls: grandOutstanding > 0 ? "debt" : "cleared",
-          },
-          {
-            label: "Collection Rate",
-            val: `${overallRate}%`,
-            sub:
-              overallRate >= 80
-                ? "Excellent"
-                : overallRate >= 50
-                  ? "Needs improvement"
-                  : "Critical — act now",
-            cls: overallRate >= 80 ? "cleared" : overallRate >= 50 ? "" : "debt",
-          },
-        ].map(({ label, val, sub, cls }) => (
-          <div key={label} className='finance-card'>
-            <div className='f-data'>
-              <label>{label}</label>
-              <h3 className={cls}>{val}</h3>
-              <small style={{ color: "var(--color-text-secondary)", fontSize: 11 }}>{sub}</small>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Milestone */}
-      <div className='table-card' style={{ marginBottom: "1.25rem", padding: "1.25rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "0.25rem" }}>
-          <HiStar style={{ color: "#f59e0b" }} />
-          <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Collection Milestones — {selectedTerm}</h3>
-        </div>
-        <p style={{ margin: "0 0 0.5rem", fontSize: 12, color: "var(--color-text-secondary)" }}>
-          Track progress toward full fee collection for this term.
-        </p>
-        {loading ? <Bone h={60} /> : <MilestoneTracker rate={overallRate} />}
-      </div>
-
-      {/* Nav tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: "0.25rem",
-          marginBottom: "1rem",
-          borderBottom: "2px solid var(--color-border-tertiary)",
-          flexWrap: "wrap",
-        }}
-      >
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 16px",
-              borderRadius: "8px 8px 0 0",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              border: "none",
-              borderBottom: activeTab === tab.id ? "2px solid #4f46e5" : "2px solid transparent",
-              marginBottom: -2,
-              background: activeTab === tab.id ? "#eef2ff" : "transparent",
-              color: activeTab === tab.id ? "#4f46e5" : "var(--color-text-secondary)",
-            }}
-          >
-            {tab.icon} {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Overview tab ── */}
-      {activeTab === "overview" && (
-        <div className='table-card' style={{ padding: "1.25rem", marginBottom: "1.25rem" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "1rem",
-              flexWrap: "wrap",
-              gap: "0.5rem",
-            }}
-          >
-            <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Collection by Class</h3>
-            <div style={{ display: "flex", gap: "0.375rem" }}>
-              {["table", "cards"].map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setViewMode(m)}
-                  style={{
-                    padding: "5px 12px",
-                    borderRadius: 6,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    border: "1px solid var(--color-border-secondary)",
-                    background: viewMode === m ? "#4f46e5" : "transparent",
-                    color: viewMode === m ? "#fff" : "var(--color-text-secondary)",
-                  }}
-                >
-                  {m.charAt(0).toUpperCase() + m.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-          {loading ? (
-            <Bone h={200} />
-          ) : reportData.length === 0 ? (
-            <p className='empty-row'>No data for {selectedTerm}.</p>
-          ) : viewMode === "cards" ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
-                gap: "1rem",
-              }}
+      {/* Term tabs — only finance admins can switch terms meaningfully */}
+      {isFinanceAdmin && (
+        <div className='term-selector-tabs' style={{ marginBottom: "1.5rem" }}>
+          {["1st Term", "2nd Term", "3rd Term"].map((t) => (
+            <button
+              key={t}
+              className={`term-tab ${selectedTerm === t ? "active" : ""}`}
+              onClick={() => setSelectedTerm(t)}
             >
-              {reportData.map((row) => (
-                <div
-                  key={row.classId}
-                  style={{
-                    background: "var(--color-background-secondary)",
-                    borderRadius: 12,
-                    padding: "1rem",
-                    border: "1px solid var(--color-border-tertiary)",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      marginBottom: "0.75rem",
-                    }}
-                  >
-                    <p style={{ fontWeight: 700, margin: 0, fontSize: 14 }}>{row.className}</p>
-                    <Donut pct={row.collectionRate} />
-                  </div>
-                  <InlineBar pct={row.collectionRate} />
-                  <div
-                    style={{
-                      marginTop: "0.75rem",
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: "0.4rem",
-                    }}
-                  >
-                    {[
-                      ["Students", row.studentCount],
-                      ["Paid ✓", row.fullyPaid],
-                      ["Owing ⚠", row.withBalance],
-                      ["Balance", `NGN ${row.outstanding.toLocaleString()}`],
-                    ].map(([k, v]) => (
-                      <div key={k} style={{ fontSize: 11 }}>
-                        <span style={{ color: "var(--color-text-secondary)" }}>{k}: </span>
-                        <span style={{ fontWeight: 600 }}>{v}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table className='data-table'>
-                <thead>
-                  <tr>
-                    <th>Class</th>
-                    <th className='text-center'>Students</th>
-                    <th className='text-right'>Expected</th>
-                    <th className='text-right'>Collected</th>
-                    <th className='text-right'>Outstanding</th>
-                    <th>Rate</th>
-                    <th className='text-center'>✓ Paid</th>
-                    <th className='text-center'>⚠ Owing</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.map((row) => (
-                    <tr key={row.classId}>
-                      <td>
-                        <strong>{row.className}</strong>
-                      </td>
-                      <td className='text-center'>{row.studentCount}</td>
-                      <td className='text-right'>NGN {row.totalFees.toLocaleString()}</td>
-                      <td className='text-right text-success'>
-                        NGN {row.totalPaid.toLocaleString()}
-                      </td>
-                      <td className={`text-right ${row.outstanding > 0 ? "text-danger" : ""}`}>
-                        NGN {row.outstanding.toLocaleString()}
-                      </td>
-                      <td style={{ minWidth: 130 }}>
-                        <InlineBar pct={row.collectionRate} />
-                      </td>
-                      <td className='text-center'>
-                        <span
-                          style={{
-                            color: "var(--color-text-success)",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 4,
-                            justifyContent: "center",
-                          }}
-                        >
-                          <HiCheckCircle />
-                          {row.fullyPaid}
-                        </span>
-                      </td>
-                      <td className='text-center'>
-                        {row.withBalance > 0 ? (
-                          <span
-                            style={{
-                              color: "var(--color-text-danger)",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 4,
-                              justifyContent: "center",
-                            }}
-                          >
-                            <HiExclamationCircle />
-                            {row.withBalance}
-                          </span>
-                        ) : (
-                          <span style={{ color: "var(--color-text-success)" }}>—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr
-                    style={{
-                      fontWeight: 600,
-                      borderTop: "2px solid var(--color-border-secondary)",
-                    }}
-                  >
-                    <td>
-                      <strong>Totals</strong>
-                    </td>
-                    <td className='text-center'>{totalStudents}</td>
-                    <td className='text-right'>NGN {grandFees.toLocaleString()}</td>
-                    <td className='text-right text-success'>NGN {grandPaid.toLocaleString()}</td>
-                    <td className={`text-right ${grandOutstanding > 0 ? "text-danger" : ""}`}>
-                      NGN {grandOutstanding.toLocaleString()}
-                    </td>
-                    <td>
-                      <InlineBar pct={overallRate} />
-                    </td>
-                    <td className='text-center'>{totalFullyPaid}</td>
-                    <td className='text-center'>{totalOwing}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
+              {t}
+            </button>
+          ))}
         </div>
       )}
 
-      {/* ── Charts tab ── */}
-      {activeTab === "charts" && (
-        <div style={{ marginBottom: "1.25rem" }}>
-          {loading ? (
-            <div className='table-card' style={{ padding: "1.25rem" }}>
-              <Bone h={320} />
-            </div>
-          ) : reportData.length === 0 ? (
-            <div className='table-card' style={{ padding: "1.25rem" }}>
-              <p className='empty-row'>No data to chart.</p>
-            </div>
-          ) : (
-            <>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))",
-                  gap: "1rem",
-                  marginBottom: "1rem",
-                }}
-              >
-                <div className='table-card' style={{ padding: "1.25rem" }}>
-                  <ChartGrouped data={reportData} />
-                </div>
-                <div className='table-card' style={{ padding: "1.25rem" }}>
-                  <ChartRates data={reportData} />
-                </div>
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
-                  gap: "1rem",
-                  marginBottom: "1rem",
-                }}
-              >
-                <div className='table-card' style={{ padding: "1.25rem" }}>
-                  <ChartRevenueDoughnut grandPaid={grandPaid} grandOutstanding={grandOutstanding} />
-                </div>
-                <div className='table-card' style={{ padding: "1.25rem" }}>
-                  <ChartStudentPie data={reportData} />
-                </div>
-              </div>
-              <div className='table-card' style={{ padding: "1.25rem", marginBottom: "1rem" }}>
-                <ChartStudentStack data={reportData} />
-              </div>
-              {reportData.length >= 3 && (
-                <div className='table-card' style={{ padding: "1.25rem", marginBottom: "1rem" }}>
-                  <p
-                    style={{
-                      margin: "0 0 0.5rem",
-                      fontSize: 12,
-                      color: "var(--color-text-secondary)",
-                    }}
-                  >
-                    The radar compares each class across 5 performance dimensions. Larger polygon =
-                    stronger overall performance.
-                  </p>
-                  <ChartRadar data={reportData} />
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      {/* ── Non-finance-admin: show today only ── */}
+      {!isFinanceAdmin && <RestrictedBanner todayData={todayData} loading={todayLoading} />}
 
-      {/* ── By Class tab ── */}
-      {activeTab === "class" && (
-        <div style={{ marginBottom: "1.25rem" }}>
-          {loading ? (
-            <div className='table-card' style={{ padding: "1.25rem" }}>
-              <Bone h={200} />
-            </div>
-          ) : reportData.length === 0 ? (
-            <div className='table-card' style={{ padding: "1.25rem" }}>
-              <p className='empty-row'>No class data available.</p>
-            </div>
-          ) : (
-            reportData.map((row) => {
-              const col =
-                row.collectionRate >= 80
-                  ? "#10b981"
-                  : row.collectionRate >= 50
-                    ? "#f59e0b"
-                    : "#ef4444";
-              const statusLabel =
-                row.collectionRate >= 80
-                  ? "On Track"
-                  : row.collectionRate >= 50
-                    ? "Needs Attention"
-                    : "Critical";
-              return (
-                <div
-                  key={row.classId}
-                  className='table-card'
-                  style={{ padding: "1.25rem", marginBottom: "1rem" }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: "0.75rem",
-                      flexWrap: "wrap",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <Donut pct={row.collectionRate} size={60} stroke={8} />
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>{row.className}</p>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: col,
-                            background: col + "22",
-                            padding: "2px 8px",
-                            borderRadius: 99,
-                          }}
-                        >
-                          {statusLabel}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: col }}>
-                        {row.collectionRate}%
-                      </p>
-                      <p style={{ margin: 0, fontSize: 11, color: "var(--color-text-secondary)" }}>
-                        Collection Rate
-                      </p>
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: "0.75rem" }}>
-                    <InlineBar pct={row.collectionRate} />
-                  </div>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))",
-                      gap: "0.75rem",
-                      marginBottom: "0.75rem",
-                    }}
-                  >
-                    {[
-                      ["👥 Students", row.studentCount],
-                      ["✅ Fully Paid", row.fullyPaid],
-                      ["⚠️ Owing", row.withBalance],
-                      ["📋 Expected", `NGN ${row.totalFees.toLocaleString()}`],
-                      ["💰 Collected", `NGN ${row.totalPaid.toLocaleString()}`],
-                      ["🔴 Outstanding", `NGN ${row.outstanding.toLocaleString()}`],
-                    ].map(([label, val]) => (
-                      <div
-                        key={label}
-                        style={{
-                          background: "var(--color-background-secondary)",
-                          borderRadius: 8,
-                          padding: "0.6rem 0.75rem",
-                          border: "1px solid var(--color-border-tertiary)",
-                        }}
-                      >
-                        <p
-                          style={{
-                            margin: "0 0 2px",
-                            fontSize: 11,
-                            color: "var(--color-text-secondary)",
-                          }}
-                        >
-                          {label}
-                        </p>
-                        <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>{val}</p>
-                      </div>
-                    ))}
-                  </div>
-                  {row.withBalance > 0 && (
-                    <div
-                      style={{
-                        background: "#fff7ed",
-                        border: "1px solid #fed7aa",
-                        borderRadius: 8,
-                        padding: "0.75rem 1rem",
-                      }}
-                    >
-                      <p style={{ margin: 0, fontSize: 12, color: "#92400e" }}>
-                        <strong>Action needed:</strong> {row.withBalance} student(s) in{" "}
-                        {row.className} owe NGN {row.outstanding.toLocaleString()} in total. The
-                        class teacher should contact these families immediately and escalate
-                        unresponsive cases.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {/* ── Advisory tab ── */}
-      {activeTab === "insights" && (
-        <div className='table-card' style={{ padding: "1.25rem", marginBottom: "1.25rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1rem" }}>
-            <HiLightBulb style={{ color: "#f59e0b", fontSize: 20 }} />
-            <h3 style={{ margin: 0, fontSize: "0.95rem" }}>
-              Management Advisory Report — {selectedTerm}
-            </h3>
+      {/* ── Finance admin: summary cards + milestone + full tabs ── */}
+      {isFinanceAdmin && (
+        <>
+          <div className='db-metric-grid' style={{ marginBottom: "1.5rem" }}>
+            <MetricCard
+              label='Expected Revenue'
+              value={`NGN ${grandFees.toLocaleString()}`}
+              sub='Total fees billed'
+              icon={<HiTrendingUp />}
+              iconBg='#e0f2fe'
+              iconColor='#0369a1'
+            />
+            <MetricCard
+              label='Collected'
+              value={`NGN ${grandPaid.toLocaleString()}`}
+              sub={`${totalFullyPaid} students fully paid`}
+              pill={overallRate >= 80 ? "Cleared" : ""}
+              pillClass='pill-success'
+              icon={<HiCheckCircle />}
+              iconBg='#dcfce7'
+              iconColor='#166534'
+            />
+            <MetricCard
+              label='Outstanding'
+              value={`NGN ${grandOutstanding.toLocaleString()}`}
+              sub={`${totalOwing} students owing`}
+              pill={grandOutstanding > 0 ? "Debt" : "Cleared"}
+              pillClass={grandOutstanding > 0 ? "pill-danger" : "pill-success"}
+              icon={<HiExclamationCircle />}
+              iconBg='#fef2f2'
+              iconColor='#dc2626'
+            />
+            <MetricCard
+              label='Collection Rate'
+              value={`${overallRate}%`}
+              sub={
+                overallRate >= 80
+                  ? "Excellent"
+                  : overallRate >= 50
+                    ? "Needs improvement"
+                    : "Critical — act now"
+              }
+              pill={overallRate >= 80 ? "Excellent" : overallRate >= 50 ? "Good" : "Critical"}
+              pillClass={
+                overallRate >= 80
+                  ? "pill-success"
+                  : overallRate >= 50
+                    ? "pill-warning"
+                    : "pill-danger"
+              }
+              icon={<HiChartBar />}
+              iconBg='#f3f4f6'
+              iconColor='#374151'
+            />
           </div>
-          <p style={{ margin: "0 0 1rem", fontSize: 12, color: "var(--color-text-secondary)" }}>
-            Auto-generated observations and recommendations based on current collection data.
-          </p>
-          {loading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <Bone key={i} h={80} r={12} style={{ marginBottom: 12 }} />
-            ))
-          ) : insights.length === 0 ? (
-            <p className='empty-row'>Generate a report first to see advisory notes.</p>
-          ) : (
-            insights.map((ins, i) => <InsightCard key={i} insight={ins} />)
-          )}
-        </div>
-      )}
 
-      {/* ── Download tab ── */}
-      {activeTab === "download" && (
-        <div className='table-card' style={{ padding: "1.5rem", marginBottom: "1.25rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1rem" }}>
-            <HiDocumentText style={{ color: "#4f46e5", fontSize: 20 }} />
-            <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Download Reports</h3>
+          <div className='table-card' style={{ marginBottom: "1.25rem", padding: "1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "0.25rem" }}>
+              <HiStar style={{ color: "#f59e0b" }} />
+              <h3 style={{ margin: 0, fontSize: "0.95rem" }}>
+                Collection Milestones — {selectedTerm}
+              </h3>
+            </div>
+            <p style={{ margin: "0 0 0.5rem", fontSize: 12, color: "var(--color-text-secondary)" }}>
+              Track progress toward full fee collection for this term.
+            </p>
+            {loading ? <Bone h={60} /> : <MilestoneTracker rate={overallRate} />}
           </div>
-          <p style={{ margin: "0 0 1.5rem", fontSize: 13, color: "var(--color-text-secondary)" }}>
-            Choose your preferred format. All downloads include the full executive summary, class
-            breakdown, and management advisory.
-          </p>
 
+          {/* Nav tabs */}
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))",
-              gap: "1rem",
+              display: "flex",
+              gap: "0.25rem",
+              marginBottom: "1rem",
+              borderBottom: "2px solid var(--color-border-tertiary)",
+              flexWrap: "wrap",
             }}
           >
-            {[
-              {
-                type: "pdf",
-                icon: "📄",
-                title: "PDF Report",
-                sub: ".pdf — printable, universal",
-                desc: "Fully formatted A4 report with tables, colour-coded rates, and advisory sections. Best for printing or emailing to management.",
-              },
-              {
-                type: "docx",
-                icon: "📝",
-                title: "Word Document",
-                sub: ".docx — editable",
-                desc: "Styled Word document with headings, tables, and the full advisory. Editable by the school bursar or secretary before sharing.",
-              },
-              {
-                type: "xlsx",
-                icon: "📊",
-                title: "Excel Workbook",
-                sub: ".xlsx — multi-sheet",
-                desc: "One sheet per class plus an 'All Classes' summary sheet. Ideal for further analysis or filing in Google Sheets / Excel.",
-              },
-            ].map(({ type, icon, title, sub, desc }) => (
-              <div
-                key={type}
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                disabled={tab.id === "download" && !can(PERMISSIONS.EXPORT_REPORTS)}
                 style={{
-                  border: "1px solid var(--color-border-secondary)",
-                  borderRadius: 12,
-                  padding: "1.25rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 16px",
+                  borderRadius: "8px 8px 0 0",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor:
+                    tab.id === "download" && !can(PERMISSIONS.EXPORT_REPORTS)
+                      ? "not-allowed"
+                      : "pointer",
+                  border: "none",
+                  borderBottom:
+                    activeTab === tab.id ? "2px solid #4f46e5" : "2px solid transparent",
+                  marginBottom: -2,
+                  background: activeTab === tab.id ? "#eef2ff" : "transparent",
+                  color:
+                    tab.id === "download" && !can(PERMISSIONS.EXPORT_REPORTS)
+                      ? "var(--color-text-disabled)"
+                      : activeTab === tab.id
+                        ? "#4f46e5"
+                        : "var(--color-text-secondary)",
+                  opacity: tab.id === "download" && !can(PERMISSIONS.EXPORT_REPORTS) ? 0.5 : 1,
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  <span style={{ fontSize: 28 }}>{icon}</span>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>{title}</p>
-                    <p style={{ margin: 0, fontSize: 11, color: "var(--color-text-secondary)" }}>
-                      {sub}
-                    </p>
-                  </div>
-                </div>
-                <p
-                  style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "0 0 1rem" }}
-                >
-                  {desc}
-                </p>
-                <button
-                  className='filter-btn'
-                  style={{ width: "100%", justifyContent: "center" }}
-                  disabled={reportData.length === 0 || !!downloading}
-                  onClick={() => handleDownload(type)}
-                >
-                  {downloading === type ? (
-                    "Generating…"
-                  ) : (
-                    <>
-                      <HiDownload /> Download {title}
-                    </>
-                  )}
-                </button>
-              </div>
+                {tab.icon} {tab.label}
+              </button>
             ))}
           </div>
 
-          <div
-            style={{
-              marginTop: "1.25rem",
-              background: "#eff6ff",
-              border: "1px solid #bfdbfe",
-              borderRadius: 8,
-              padding: "0.75rem 1rem",
-            }}
-          >
-            <p style={{ margin: 0, fontSize: 12, color: "#1d4ed8" }}>
-              <strong>Note:</strong> Downloads require these npm packages to be installed in your
-              project: <code>docx</code>, <code>jspdf</code>, <code>jspdf-autotable</code>,{" "}
-              <code>xlsx</code>. Run: <code>npm install docx jspdf jspdf-autotable xlsx</code>
-            </p>
-          </div>
-        </div>
+          {/* ── Overview tab ── */}
+          {activeTab === "overview" && (
+            <div className='table-card' style={{ padding: "1.25rem", marginBottom: "1.25rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "1rem",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Collection by Class</h3>
+                <div style={{ display: "flex", gap: "0.375rem" }}>
+                  {["table", "cards"].map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setViewMode(m)}
+                      style={{
+                        padding: "5px 12px",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        border: "1px solid var(--color-border-secondary)",
+                        background: viewMode === m ? "#4f46e5" : "transparent",
+                        color: viewMode === m ? "#fff" : "var(--color-text-secondary)",
+                      }}
+                    >
+                      {m.charAt(0).toUpperCase() + m.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {loading ? (
+                <Bone h={200} />
+              ) : reportData.length === 0 ? (
+                <p className='empty-row'>No data for {selectedTerm}.</p>
+              ) : viewMode === "cards" ? (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
+                    gap: "1rem",
+                  }}
+                >
+                  {reportData.map((row) => (
+                    <div
+                      key={row.classId}
+                      style={{
+                        background: "var(--color-background-secondary)",
+                        borderRadius: 12,
+                        padding: "1rem",
+                        border: "1px solid var(--color-border-tertiary)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          marginBottom: "0.75rem",
+                        }}
+                      >
+                        <p style={{ fontWeight: 700, margin: 0, fontSize: 14 }}>{row.className}</p>
+                        <Donut pct={row.collectionRate} />
+                      </div>
+                      <InlineBar pct={row.collectionRate} />
+                      <div
+                        style={{
+                          marginTop: "0.75rem",
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: "0.4rem",
+                        }}
+                      >
+                        {[
+                          ["Students", row.studentCount],
+                          ["Paid ✓", row.fullyPaid],
+                          ["Owing ⚠", row.withBalance],
+                          ["Balance", `NGN ${row.outstanding.toLocaleString()}`],
+                        ].map(([k, v]) => (
+                          <div key={k} style={{ fontSize: 11 }}>
+                            <span style={{ color: "var(--color-text-secondary)" }}>{k}: </span>
+                            <span style={{ fontWeight: 600 }}>{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table className='data-table'>
+                    <thead>
+                      <tr>
+                        <th>Class</th>
+                        <th className='text-center'>Students</th>
+                        <th className='text-right'>Expected</th>
+                        <th className='text-right'>Collected</th>
+                        <th className='text-right'>Outstanding</th>
+                        <th>Rate</th>
+                        <th className='text-center'>✓ Paid</th>
+                        <th className='text-center'>⚠ Owing</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.map((row) => (
+                        <tr key={row.classId}>
+                          <td>
+                            <strong>{row.className}</strong>
+                          </td>
+                          <td className='text-center'>{row.studentCount}</td>
+                          <td className='text-right'>NGN {row.totalFees.toLocaleString()}</td>
+                          <td className='text-right text-success'>
+                            NGN {row.totalPaid.toLocaleString()}
+                          </td>
+                          <td className={`text-right ${row.outstanding > 0 ? "text-danger" : ""}`}>
+                            NGN {row.outstanding.toLocaleString()}
+                          </td>
+                          <td style={{ minWidth: 130 }}>
+                            <InlineBar pct={row.collectionRate} />
+                          </td>
+                          <td className='text-center'>
+                            <span
+                              style={{
+                                color: "var(--color-text-success)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4,
+                                justifyContent: "center",
+                              }}
+                            >
+                              <HiCheckCircle />
+                              {row.fullyPaid}
+                            </span>
+                          </td>
+                          <td className='text-center'>
+                            {row.withBalance > 0 ? (
+                              <span
+                                style={{
+                                  color: "var(--color-text-danger)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <HiExclamationCircle />
+                                {row.withBalance}
+                              </span>
+                            ) : (
+                              <span style={{ color: "var(--color-text-success)" }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr
+                        style={{
+                          fontWeight: 600,
+                          borderTop: "2px solid var(--color-border-secondary)",
+                        }}
+                      >
+                        <td>
+                          <strong>Totals</strong>
+                        </td>
+                        <td className='text-center'>{totalStudents}</td>
+                        <td className='text-right'>NGN {grandFees.toLocaleString()}</td>
+                        <td className='text-right text-success'>
+                          NGN {grandPaid.toLocaleString()}
+                        </td>
+                        <td className={`text-right ${grandOutstanding > 0 ? "text-danger" : ""}`}>
+                          NGN {grandOutstanding.toLocaleString()}
+                        </td>
+                        <td>
+                          <InlineBar pct={overallRate} />
+                        </td>
+                        <td className='text-center'>{totalFullyPaid}</td>
+                        <td className='text-center'>{totalOwing}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Charts tab ── */}
+          {activeTab === "charts" && (
+            <div style={{ marginBottom: "1.25rem" }}>
+              {loading ? (
+                <div className='table-card' style={{ padding: "1.25rem" }}>
+                  <Bone h={320} />
+                </div>
+              ) : reportData.length === 0 ? (
+                <div className='table-card' style={{ padding: "1.25rem" }}>
+                  <p className='empty-row'>No data to chart.</p>
+                </div>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))",
+                      gap: "1rem",
+                      marginBottom: "1rem",
+                    }}
+                  >
+                    <div className='table-card' style={{ padding: "1.25rem" }}>
+                      <ChartGrouped data={reportData} />
+                    </div>
+                    <div className='table-card' style={{ padding: "1.25rem" }}>
+                      <ChartRates data={reportData} />
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
+                      gap: "1rem",
+                      marginBottom: "1rem",
+                    }}
+                  >
+                    <div className='table-card' style={{ padding: "1.25rem" }}>
+                      <ChartRevenueDoughnut
+                        grandPaid={grandPaid}
+                        grandOutstanding={grandOutstanding}
+                      />
+                    </div>
+                    <div className='table-card' style={{ padding: "1.25rem" }}>
+                      <ChartStudentPie data={reportData} />
+                    </div>
+                  </div>
+                  <div className='table-card' style={{ padding: "1.25rem", marginBottom: "1rem" }}>
+                    <ChartStudentStack data={reportData} />
+                  </div>
+                  {reportData.length >= 3 && (
+                    <div
+                      className='table-card'
+                      style={{ padding: "1.25rem", marginBottom: "1rem" }}
+                    >
+                      <p
+                        style={{
+                          margin: "0 0 0.5rem",
+                          fontSize: 12,
+                          color: "var(--color-text-secondary)",
+                        }}
+                      >
+                        The radar compares each class across 5 performance dimensions. Larger
+                        polygon = stronger overall performance.
+                      </p>
+                      <ChartRadar data={reportData} />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── By Class tab ── */}
+          {activeTab === "class" && (
+            <div style={{ marginBottom: "1.25rem" }}>
+              {loading ? (
+                <div className='table-card' style={{ padding: "1.25rem" }}>
+                  <Bone h={200} />
+                </div>
+              ) : reportData.length === 0 ? (
+                <div className='table-card' style={{ padding: "1.25rem" }}>
+                  <p className='empty-row'>No class data available.</p>
+                </div>
+              ) : (
+                reportData.map((row) => {
+                  const col =
+                    row.collectionRate >= 80
+                      ? "#10b981"
+                      : row.collectionRate >= 50
+                        ? "#f59e0b"
+                        : "#ef4444";
+                  const statusLabel =
+                    row.collectionRate >= 80
+                      ? "On Track"
+                      : row.collectionRate >= 50
+                        ? "Needs Attention"
+                        : "Critical";
+                  return (
+                    <div
+                      key={row.classId}
+                      className='table-card'
+                      style={{ padding: "1.25rem", marginBottom: "1rem" }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: "0.75rem",
+                          flexWrap: "wrap",
+                          gap: "0.5rem",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <Donut pct={row.collectionRate} size={60} stroke={8} />
+                          <div>
+                            <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>
+                              {row.className}
+                            </p>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: col,
+                                background: col + "22",
+                                padding: "2px 8px",
+                                borderRadius: 99,
+                              }}
+                            >
+                              {statusLabel}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: col }}>
+                            {row.collectionRate}%
+                          </p>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: 11,
+                              color: "var(--color-text-secondary)",
+                            }}
+                          >
+                            Collection Rate
+                          </p>
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: "0.75rem" }}>
+                        <InlineBar pct={row.collectionRate} />
+                      </div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))",
+                          gap: "0.75rem",
+                          marginBottom: "0.75rem",
+                        }}
+                      >
+                        {[
+                          ["👥 Students", row.studentCount],
+                          ["✅ Fully Paid", row.fullyPaid],
+                          ["⚠️ Owing", row.withBalance],
+                          ["📋 Expected", `NGN ${row.totalFees.toLocaleString()}`],
+                          ["💰 Collected", `NGN ${row.totalPaid.toLocaleString()}`],
+                          ["🔴 Outstanding", `NGN ${row.outstanding.toLocaleString()}`],
+                        ].map(([label, val]) => (
+                          <div
+                            key={label}
+                            style={{
+                              background: "var(--color-background-secondary)",
+                              borderRadius: 8,
+                              padding: "0.6rem 0.75rem",
+                              border: "1px solid var(--color-border-tertiary)",
+                            }}
+                          >
+                            <p
+                              style={{
+                                margin: "0 0 2px",
+                                fontSize: 11,
+                                color: "var(--color-text-secondary)",
+                              }}
+                            >
+                              {label}
+                            </p>
+                            <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>{val}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {row.withBalance > 0 && (
+                        <div
+                          style={{
+                            background: "#fff7ed",
+                            border: "1px solid #fed7aa",
+                            borderRadius: 8,
+                            padding: "0.75rem 1rem",
+                          }}
+                        >
+                          <p style={{ margin: 0, fontSize: 12, color: "#92400e" }}>
+                            <strong>Action needed:</strong> {row.withBalance} student(s) in{" "}
+                            {row.className} owe NGN {row.outstanding.toLocaleString()} in total.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* ── Advisory tab ── */}
+          {activeTab === "insights" && (
+            <div className='table-card' style={{ padding: "1.25rem", marginBottom: "1.25rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1rem" }}>
+                <HiLightBulb style={{ color: "#f59e0b", fontSize: 20 }} />
+                <h3 style={{ margin: 0, fontSize: "0.95rem" }}>
+                  Management Advisory Report — {selectedTerm}
+                </h3>
+              </div>
+              <p style={{ margin: "0 0 1rem", fontSize: 12, color: "var(--color-text-secondary)" }}>
+                Auto-generated observations and recommendations based on current collection data.
+              </p>
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <Bone key={i} h={80} r={12} style={{ marginBottom: 12 }} />
+                ))
+              ) : insights.length === 0 ? (
+                <p className='empty-row'>Generate a report first to see advisory notes.</p>
+              ) : (
+                insights.map((ins, i) => <InsightCard key={i} insight={ins} />)
+              )}
+            </div>
+          )}
+
+          {/* ── Download tab ── */}
+          {activeTab === "download" && can(PERMISSIONS.EXPORT_REPORTS) && (
+            <div className='table-card' style={{ padding: "1.5rem", marginBottom: "1.25rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1rem" }}>
+                <HiDocumentText style={{ color: "#4f46e5", fontSize: 20 }} />
+                <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Download Reports</h3>
+              </div>
+              <p
+                style={{ margin: "0 0 1.5rem", fontSize: 13, color: "var(--color-text-secondary)" }}
+              >
+                Choose your preferred format. All downloads include the full executive summary,
+                class breakdown, and management advisory.
+              </p>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))",
+                  gap: "1rem",
+                }}
+              >
+                {[
+                  {
+                    type: "pdf",
+                    icon: "📄",
+                    title: "PDF Report",
+                    sub: ".pdf — printable, universal",
+                    desc: "Fully formatted A4 report with tables, colour-coded rates, and advisory sections. Best for printing or emailing to management.",
+                  },
+                  {
+                    type: "docx",
+                    icon: "📝",
+                    title: "Word Document",
+                    sub: ".docx — editable",
+                    desc: "Styled Word document with headings, tables, and the full advisory. Editable by the school bursar or secretary before sharing.",
+                  },
+                  {
+                    type: "xlsx",
+                    icon: "📊",
+                    title: "Excel Workbook",
+                    sub: ".xlsx — multi-sheet",
+                    desc: "One sheet per class plus an 'All Classes' summary sheet. Ideal for further analysis or filing in Google Sheets / Excel.",
+                  },
+                ].map(({ type, icon, title, sub, desc }) => (
+                  <div
+                    key={type}
+                    style={{
+                      border: "1px solid var(--color-border-secondary)",
+                      borderRadius: 12,
+                      padding: "1.25rem",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        marginBottom: "0.75rem",
+                      }}
+                    >
+                      <span style={{ fontSize: 28 }}>{icon}</span>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>{title}</p>
+                        <p
+                          style={{ margin: 0, fontSize: 11, color: "var(--color-text-secondary)" }}
+                        >
+                          {sub}
+                        </p>
+                      </div>
+                    </div>
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "var(--color-text-secondary)",
+                        margin: "0 0 1rem",
+                      }}
+                    >
+                      {desc}
+                    </p>
+                    <button
+                      className='filter-btn'
+                      style={{ width: "100%", justifyContent: "center" }}
+                      disabled={reportData.length === 0 || !!downloading}
+                      onClick={() => handleDownload(type)}
+                    >
+                      {downloading === type ? (
+                        "Generating…"
+                      ) : (
+                        <>
+                          <HiDownload /> Download {title}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div
+                style={{
+                  marginTop: "1.25rem",
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  borderRadius: 8,
+                  padding: "0.75rem 1rem",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: 12, color: "#1d4ed8" }}>
+                  <strong>Note:</strong> Downloads require: <code>docx</code>, <code>jspdf</code>,{" "}
+                  <code>jspdf-autotable</code>, <code>xlsx</code>. Run:{" "}
+                  <code>npm install docx jspdf jspdf-autotable xlsx</code>
+                </p>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

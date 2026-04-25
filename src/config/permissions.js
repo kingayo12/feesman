@@ -68,6 +68,7 @@ export const PERMISSIONS = {
 
   // Reports
   VIEW_REPORTS: "view_reports",
+  EXPORT_REPORTS: "export_reports",
   MANAGE_LETERS: "manage_letters",
   VIEW_LETTERS: "view_letters",
 
@@ -153,6 +154,7 @@ export const PERMISSION_GROUPS = [
     label: "Reports & Letters",
     permissions: [
       { key: PERMISSIONS.VIEW_REPORTS, label: "View reports" },
+      { key: PERMISSIONS.EXPORT_REPORTS, label: "Export reports" },
       { key: PERMISSIONS.MANAGE_LETERS, label: "Manage letters" },
       { key: PERMISSIONS.VIEW_LETTERS, label: "View letters" },
     ],
@@ -208,6 +210,7 @@ const ACCOUNTANT_SET = [
   PERMISSIONS.VIEW_PAYMENTS,
   PERMISSIONS.RECORD_PAYMENT,
   PERMISSIONS.VIEW_REPORTS,
+  PERMISSIONS.EXPORT_REPORTS,
   PERMISSIONS.VIEW_LETTERS,
   PERMISSIONS.MANAGE_LETERS,
   PERMISSIONS.VIEW_BALANCES,

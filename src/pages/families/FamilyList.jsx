@@ -1,24 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { getFamilies, deleteFamily } from "./familyService";
-import { getStudentsByFamily } from "../students/studentService";
-import { getPaymentsByFamily } from "../fees/paymentService";
-import { getFeesByClass } from "../fees/feesService";
-import { getStudentFeeOverrides } from "../students/studentFeeOverrideService";
-import { getPreviousBalanceAmount } from "../previous_balance/Previousbalanceservice";
 import CustomButton from "../../components/common/CustomButton";
 import { filterData } from "../../utils/helpers";
 import CustomSelect from "../../components/common/SelectInput";
-import {
-  getActiveDiscounts,
-  getAssignmentsForFamily,
-  getAssignmentsForStudent,
-  computeStudentDiscount,
-} from "../discount/Discountservice";
+import { computeStudentDiscount } from "../discount/Discountservice";
 import { getSettings } from "../settings/settingService";
 import FamilyForm from "../../components/forms/FamilyForm";
 import { FamilyListSkeleton } from "../../components/common/Skeleton";
 import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS } from "../../config/permissions";
+import {
+  preCacheFamilyData,
+  getCachedStudentsByFamily,
+  getCachedPaymentsByFamily,
+  getCachedFeesByClass,
+  getCachedDiscounts,
+  getCachedStudentFeeOverrides,
+  getCachedPreviousBalanceAmount,
+  getCachedAssignmentsForFamily,
+  getCachedAssignmentsForStudent,
+  clearMemoryCache,
+} from "../../utils/offlineDataManager";
 import {
   HiOutlineUsers,
   HiChevronRight,
@@ -57,48 +59,56 @@ export default function FamilyList() {
   const calculateFamilyFinancials = async (familyId, settings, activeDiscounts) => {
     const { academicYear, currentTerm } = settings;
 
-    const [students, payments] = await Promise.all([
-      getStudentsByFamily(familyId, academicYear),
-      getPaymentsByFamily(familyId, academicYear, currentTerm),
-    ]);
+    try {
+      const students = await getCachedStudentsByFamily(familyId, academicYear);
+      const payments = await getCachedPaymentsByFamily(familyId, academicYear, currentTerm);
+      const famAssignments = await getCachedAssignmentsForFamily(familyId, academicYear);
+      let totalAssessed = 0;
 
-    const famAssignments = await getAssignmentsForFamily(familyId, academicYear);
-    let totalAssessed = 0;
+      for (const student of students) {
+        try {
+          const [classFees, overrides, prevBal, stuAssignments] = await Promise.all([
+            student.classId
+              ? getCachedFeesByClass(student.classId, academicYear, currentTerm)
+              : Promise.resolve([]),
+            getCachedStudentFeeOverrides(student.id),
+            getCachedPreviousBalanceAmount(student.id, academicYear),
+            getCachedAssignmentsForStudent(student.id, academicYear),
+          ]);
 
-    for (const student of students) {
-      const [classFees, overrides, prevBal, stuAssignments] = await Promise.all([
-        getFeesByClass(student.classId, academicYear, currentTerm),
-        getStudentFeeOverrides(student.id),
-        getPreviousBalanceAmount(student.id, academicYear),
-        getAssignmentsForStudent(student.id, academicYear),
-      ]);
+          const disabledFeeIds = new Set(overrides?.map((o) => o.feeId) || []);
+          const effectiveFees = classFees.filter((f) => !disabledFeeIds.has(f.id));
+          const termFees = effectiveFees.reduce((s, f) => s + Number(f.amount || 0), 0);
 
-      const disabledFeeIds = new Set(overrides.map((o) => o.feeId));
-      const effectiveFees = classFees.filter((f) => !disabledFeeIds.has(f.id));
-      const termFees = effectiveFees.reduce((s, f) => s + Number(f.amount || 0), 0);
+          const { totalDiscount } = computeStudentDiscount({
+            studentId: student.id,
+            familyId,
+            session: academicYear,
+            fees: effectiveFees,
+            siblingCount: students.length,
+            activeDiscounts,
+            familyAssignments: famAssignments,
+            studentAssignments: stuAssignments,
+          });
 
-      const { totalDiscount } = computeStudentDiscount({
-        studentId: student.id,
-        familyId,
-        session: academicYear,
-        fees: effectiveFees,
-        siblingCount: students.length,
-        activeDiscounts,
-        familyAssignments: famAssignments,
-        studentAssignments: stuAssignments,
-      });
+          totalAssessed += Math.max(termFees + (prevBal || 0) - (totalDiscount || 0), 0);
+        } catch (studentErr) {
+          console.warn(`Student calculation error for ${student.id}:`, studentErr);
+        }
+      }
 
-      totalAssessed += Math.max(termFees + prevBal - totalDiscount, 0);
+      const totalPaid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+      const outstanding = Math.max(totalAssessed - totalPaid, 0);
+
+      let status = "Unpaid";
+      if (totalPaid > 0 && outstanding === 0) status = "Paid";
+      else if (totalPaid > 0) status = "Partial";
+
+      return { totalAmount: totalAssessed, totalPaid, outstanding, status };
+    } catch (err) {
+      console.error(`Financials calculation failed for ${familyId}:`, err);
+      return { totalAmount: 0, totalPaid: 0, outstanding: 0, status: "Unpaid" };
     }
-
-    const totalPaid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-    const outstanding = Math.max(totalAssessed - totalPaid, 0);
-
-    let status = "Unpaid";
-    if (totalPaid > 0 && outstanding === 0) status = "Paid";
-    else if (totalPaid > 0) status = "Partial";
-
-    return { totalAmount: totalAssessed, totalPaid, outstanding, status };
   };
 
   const loadFamilies = async () => {
@@ -120,7 +130,16 @@ export default function FamilyList() {
       }
 
       setCurrentTerm(settings.currentTerm);
-      const activeDiscounts = await getActiveDiscounts(settings.academicYear);
+
+      const preCachePromises = basicFamilyData.map((f) =>
+        preCacheFamilyData(f.id, settings.academicYear, settings.currentTerm).catch((e) => {
+          console.warn(`Pre-cache failed for family ${f.id}:`, e);
+          return { success: false };
+        }),
+      );
+      await Promise.allSettled(preCachePromises);
+
+      const activeDiscounts = await getCachedDiscounts(settings.academicYear);
 
       const fullData = await Promise.all(
         basicFamilyData.map(async (family) => {
@@ -131,7 +150,7 @@ export default function FamilyList() {
             };
           } catch (err) {
             console.error(`Financials failed for ${family.id}:`, err);
-            return { ...family, totalAmount: 0, totalPaid: 0, outstanding: 0, status: "Error" };
+            return { ...family, totalAmount: 0, totalPaid: 0, outstanding: 0, status: "Unpaid" };
           }
         }),
       );
@@ -146,15 +165,32 @@ export default function FamilyList() {
 
   useEffect(() => {
     loadFamilies();
+    return () => {
+      clearMemoryCache();
+    };
   }, []);
 
+  /**
+   * Unmount all React roots that were mounted into DataTables action cells.
+   *
+   * IMPORTANT: root.unmount() must NEVER be called synchronously during a React
+   * render cycle — doing so triggers the "Attempted to synchronously unmount a
+   * root while React was already rendering" warning.  We defer every unmount to
+   * the next macrotask via setTimeout so React has always finished its current
+   * render before we tear anything down.
+   */
   const cleanupActionRoots = () => {
-    actionRootsRef.current.forEach((root) => {
-      try {
-        root.unmount();
-      } catch (_) {}
-    });
+    const roots = actionRootsRef.current;
     actionRootsRef.current = [];
+    if (roots.length === 0) return;
+
+    setTimeout(() => {
+      roots.forEach((root) => {
+        try {
+          root.unmount();
+        } catch (_) {}
+      });
+    }, 0);
   };
 
   useEffect(() => {
@@ -170,28 +206,22 @@ export default function FamilyList() {
       return family.status?.toLowerCase() === statusFilter.toLowerCase();
     });
 
-    // Tear down previous DataTables instance completely
-    cleanupActionRoots();
+    // Destroy any existing DataTable instance before rebuilding
     if ($.fn.DataTable.isDataTable(tableRef.current)) {
+      // Unmount React roots first, deferred so we never clash with an active render
+      cleanupActionRoots();
       $(tableRef.current).DataTable().destroy();
       $(tableRef.current).find("tbody").empty();
     }
 
-    // Build rows as plain HTML strings — DataTables owns the DOM entirely
     const rows = filteredFamilies.map((family) => [
-      `<div class="family-cell">
-        <strong>${family.familyName ?? ""}</strong>
-      </div>`,
-      `<div class="contact-cell">
-        <span>${family.phone ?? ""}</span><br/>
-        <small>${family.email ?? ""}</small>
-      </div>`,
+      `<div class="family-cell"><strong>${family.familyName ?? ""}</strong></div>`,
+      `<div class="contact-cell"><span>${family.phone ?? ""}</span><br/><small>${family.email ?? ""}</small></div>`,
       `₦${(family.totalAmount || 0).toLocaleString()}`,
       `₦${(family.totalPaid || 0).toLocaleString()}`,
       `₦${(family.outstanding || 0).toLocaleString()}`,
       `<span class="status-pill align-center ${(family.status ?? "").toLowerCase()}">${family.status ?? ""}</span>`,
       formatDate(family.createdAt),
-      // Empty div — React will mount buttons here after draw
       `<div class="action-btn" data-family-id="${family.id}"></div>`,
     ]);
 
@@ -217,7 +247,12 @@ export default function FamilyList() {
 
     dataTableRef.current = dt;
 
-    // Mount React action buttons into each row's placeholder div
+    /**
+     * Mount React action buttons into each row's placeholder div.
+     * Called after every DataTables draw (pagination, sort, etc.).
+     * Previous roots are cleaned up with a deferred unmount before new ones
+     * are created so React never tries to unmount inside an active render.
+     */
     const mountActionButtons = () => {
       cleanupActionRoots();
 
@@ -261,15 +296,14 @@ export default function FamilyList() {
     mountActionButtons();
 
     return () => {
-      cleanupActionRoots();
       dt.off("draw", mountActionButtons);
+      cleanupActionRoots();
       try {
         if ($.fn.DataTable.isDataTable(tableRef.current)) dt.destroy();
       } catch (_) {}
     };
   }, [families, searchQuery, statusFilter, loading]);
 
-  // Used only for the stat pill and export — does NOT drive table rows
   const filteredFamilies = filterData(families, searchQuery, [
     "familyName",
     "phone",

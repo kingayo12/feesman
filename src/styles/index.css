@@ -3,6 +3,7 @@
   --primary-color: #00009f;
   --primary-color-light: #4a4aff1a;
   /* --secondary-color: red; */
+  --color-text-primary: rgb(43, 43, 43);
   --primary-gradient: linear-gradient(to bottom, #2424ff 0%, rgb(0, 29, 87) 100%) !important;
   --bg-primary: color-mix(in srgb, #fff 80%, #5900ff09 20%);
   --bg-secondary: #f8fafc;
@@ -104,6 +105,7 @@
   --accent-light: #1a1aa127;
   --overlay: rgba(0, 0, 0, 0.75);
   --modal-bg: #1e293b;
+  --color-text-primary: rgb(231, 231, 231);
 }
 
 * {
@@ -879,6 +881,7 @@ main {
 
 .input-wrapper input,
 .input-wrapper select,
+.input-wrapper .rselect__control,
 .input-wrapper textarea {
   width: 100%;
   padding: var(--input-padding) var(--input-padding-right) var(--input-padding)
@@ -890,8 +893,13 @@ main {
   background-color: var(--input-bg);
   transition: all 0.3s ease;
 }
+.input-wrapper .rselect__control {
+  padding: 0;
+}
 
 /* Focus States */
+.input-wrapper .rselect__control:focus,
+.input-wrapper .rselect__control:hover,
 .input-wrapper input:focus {
   outline: none;
   border-color: var(--accent);
@@ -4273,9 +4281,11 @@ a {
   border-radius: var(--border-radius-lg);
   /* padding: 2rem; */
   min-height: 500px;
+  max-width: 680px;
+  margin: auto;
 }
 .settings-section {
-  max-width: 680px;
+  width: 100%;
   padding: 2rem;
   border: 1px solid #ccc;
   border-radius: var(--border-radius-md);
@@ -11418,4 +11428,63 @@ a {
   right: 50%;
   transform: translate(-50%, -50%);
   z-index: 112;
+}
+
+.rselect__control {
+  width: 100%;
+}
+
+/* The outer box — matches your input-wrapper border/radius */
+.rselect__control {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* Remove the default focus outline react-select adds */
+.rselect__control--is-focused {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Value + icon row */
+.rselect__value-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0; /* let input-wrapper handle padding */
+  flex: 1;
+}
+
+/* The icon inside the value container */
+.rselect__value-container .input-icon {
+  display: flex;
+  align-items: center;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.rselect__placeholder {
+  color: var(--color-text-secondary);
+}
+
+.rselect__menu {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  z-index: 100;
+}
+
+.rselect__option--is-focused {
+  background: var(--color-hover);
+}
+
+.rselect__option--is-selected {
+  background: var(--color-primary);
+  color: white;
+}
+
+.min-w-100 {
+  min-width: 100%;
 }

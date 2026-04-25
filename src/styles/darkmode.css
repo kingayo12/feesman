@@ -944,3 +944,7 @@
   background: #0f172a;
   border-color: #334155;
 }
+
+[data-theme="dark"] .db-metric-card {
+  border-color: #334155;
+}
