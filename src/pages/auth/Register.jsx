@@ -5,9 +5,8 @@ import Logo from "../../assets/logo.svg";
 import { HiMail, HiLockClosed, HiUser, HiEye, HiEyeOff, HiExclamationCircle } from "react-icons/hi";
 
 export default function Register() {
-  const { register } = useAuth();
+  const { register, registerWithGoogle } = useAuth();
   const navigate = useNavigate();
-
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState("");
@@ -55,6 +54,20 @@ export default function Register() {
         map[err?.code] ||
           `Registration failed (${err?.code || "unknown error"}). Please try again.`,
       );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleRegister = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      await registerWithGoogle();
+      navigate("/dashboard");
+    } catch (err) {
+      setError("Google registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -189,6 +202,14 @@ export default function Register() {
               {loading ? "Creating account…" : "Create account"}
             </button>
           </form>
+          <button
+            type='button'
+            className='auth-google-btn'
+            onClick={handleGoogleRegister}
+            disabled={loading}
+          >
+            Continue with Google
+          </button>
 
           <p className='auth-footer-text'>
             Already have an account?{" "}

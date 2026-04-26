@@ -82,7 +82,7 @@ const NAV_CONFIG = [
   },
 ];
 
-const ALWAYS_VISIBLE = 7; // how many items show before the More button
+const ALWAYS_VISIBLE = 8; // how many items show before the More button
 
 export default function SideNav() {
   const location = useLocation();

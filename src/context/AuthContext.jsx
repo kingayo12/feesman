@@ -1,8 +1,3 @@
-/**
- * AuthContext.jsx
- * Place in: src/context/AuthContext.jsx
- */
-
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   onAuthStateChanged,
@@ -10,6 +5,8 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
   signOut,
+  signInWithPopup,
+  GoogleAuthProvider,
 } from "firebase/auth";
 
 import { doc, getDoc, getFirestore, setDoc, serverTimestamp } from "firebase/firestore";
@@ -19,12 +16,14 @@ import { db } from "../firebase/firestore";
 
 const AuthContext = createContext(null);
 
+const googleProvider = new GoogleAuthProvider();
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const firestore = db ?? getFirestore();
 
-  // 🔥 Listen to auth state + merge Firestore data
+  // 🔥 Auth listener
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -32,25 +31,15 @@ export function AuthProvider({ children }) {
           const userRef = doc(firestore, "users", firebaseUser.uid);
           const userSnap = await getDoc(userRef);
 
-          let firestoreData = {};
-
-          if (userSnap.exists()) {
-            firestoreData = userSnap.data();
-          } else {
-            console.warn("No Firestore user document found");
-          }
-
-          // ✅ Merge Auth + Firestore
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
-
-            ...firestoreData, // 🔥 role comes from here
+            ...(userSnap.exists() ? userSnap.data() : {}),
           });
-        } catch (error) {
-          console.error("Error fetching user data:", error);
+        } catch (err) {
+          console.error("Error fetching user:", err);
         }
       } else {
         setUser(null);
@@ -62,36 +51,88 @@ export function AuthProvider({ children }) {
     return () => unsub();
   }, [firestore]);
 
-  // 🔐 Login
+  // 🔐 Email login
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
 
   // 🆕 Register
   const register = async (email, password, displayName = "") => {
-    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-    // Update display name in Firebase Auth
     if (displayName) {
-      await updateProfile(credential.user, { displayName });
+      await updateProfile(cred.user, { displayName });
     }
 
-    // ✅ Create Firestore user profile with role
-    await setDoc(doc(firestore, "users", credential.user.uid), {
-      uid: credential.user.uid,
+    await setDoc(doc(firestore, "users", cred.user.uid), {
+      uid: cred.user.uid,
       email,
       displayName,
-      role: "user", // 🔥 default role
+      role: "user",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
 
-    return credential.user;
+    return cred.user;
   };
 
   // 🚪 Logout
   const logout = () => signOut(auth);
 
+  // 🔵 Google login (FIXED)
+  const loginWithGoogle = async () => {
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = result.user;
+
+    const userRef = doc(firestore, "users", user.uid);
+    const snap = await getDoc(userRef);
+
+    if (!snap.exists()) {
+      await setDoc(userRef, {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        role: "user",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    return user;
+  };
+
+  const registerWithGoogle = async () => {
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = result.user;
+
+    const userRef = doc(firestore, "users", user.uid);
+    const snap = await getDoc(userRef);
+
+    // create Firestore profile if new user
+    if (!snap.exists()) {
+      await setDoc(userRef, {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        role: "user",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    return user;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        loginWithGoogle,
+        registerWithGoogle,
+      }}
+    >
       {!loading && children}
     </AuthContext.Provider>
   );
@@ -100,6 +141,6 @@ export function AuthProvider({ children }) {
 // 🔁 Hook
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
 }

@@ -5,7 +5,8 @@ import Logo from "../../assets/logo.svg";
 import { HiMail, HiLockClosed, HiEye, HiEyeOff, HiExclamationCircle } from "react-icons/hi";
 
 export default function Login() {
-  const { login, user, loading: authLoading } = useAuth();
+  const { login, loginWithGoogle, user, loading: authLoading } = useAuth();
+
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || "/dashboard";
@@ -15,22 +16,25 @@ export default function Login() {
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
+  // 🔁 redirect if already logged in
   useEffect(() => {
     if (!authLoading && user) {
       navigate(from, { replace: true });
     }
   }, [authLoading, user, from, navigate]);
 
+  // 🔐 email login
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
+
     setError("");
     setLoading(true);
 
     try {
       await login(email.trim(), password);
-      // Wait for auth state listener to update user, then redirect in useEffect.
     } catch (err) {
       const map = {
         "auth/user-not-found": "No account found with this email.",
@@ -39,21 +43,40 @@ export default function Login() {
         "auth/too-many-requests": "Too many attempts. Please try again later.",
         "auth/invalid-credential": "Invalid email or password.",
       };
+
       setError(map[err?.code] || "Invalid login credentials.");
     } finally {
       setLoading(false);
     }
   };
 
+  // 🔵 Google login
+  const handleGoogleLogin = async () => {
+    setError("");
+    setGoogleLoading(true);
+
+    try {
+      await loginWithGoogle();
+    } catch (err) {
+      setError("Google sign-in failed. Please try again.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <div className='auth-page'>
+      {/* LEFT PANEL */}
       <div className='auth-brand-panel'>
         <div className='auth-brand-inner'>
           <img src={Logo} alt='Logo' className='auth-brand-logo' />
+
           <h1 className='auth-brand-title'>School Fee Manager</h1>
+
           <p className='auth-brand-desc'>
             Manage tuition, track payments, and generate receipts - all in one place.
           </p>
+
           <div className='auth-brand-bullets'>
             <div className='auth-bullet'>
               <span className='auth-bullet-dot' />
@@ -61,20 +84,21 @@ export default function Login() {
             </div>
             <div className='auth-bullet'>
               <span className='auth-bullet-dot' />
-              Family &amp; student records
+              Family & student records
             </div>
             <div className='auth-bullet'>
               <span className='auth-bullet-dot' />
-              PDF receipts &amp; reports
+              PDF receipts & reports
             </div>
             <div className='auth-bullet'>
               <span className='auth-bullet-dot' />
-              Discount &amp; balance management
+              Discount & balance management
             </div>
           </div>
         </div>
       </div>
 
+      {/* RIGHT PANEL */}
       <div className='auth-form-panel'>
         <div className='auth-card'>
           <div className='auth-logo-wrap'>
@@ -84,6 +108,7 @@ export default function Login() {
           <h2 className='auth-heading'>Welcome back</h2>
           <p className='auth-sub'>Sign in to continue to the application</p>
 
+          {/* ERROR */}
           {error && (
             <div className='auth-error-box'>
               <HiExclamationCircle className='auth-error-icon' />
@@ -91,7 +116,9 @@ export default function Login() {
             </div>
           )}
 
+          {/* FORM */}
           <form onSubmit={handleSubmit} className='auth-form'>
+            {/* EMAIL */}
             <div className='auth-field'>
               <label htmlFor='email'>Email address</label>
               <div className='auth-input-wrap'>
@@ -103,18 +130,13 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  autoComplete='email'
                 />
               </div>
             </div>
 
+            {/* PASSWORD */}
             <div className='auth-field'>
-              <div className='auth-label-row'>
-                <label htmlFor='password'>Password</label>
-                <Link to='/forgot-password' className='auth-forgot-link'>
-                  Forgot password?
-                </Link>
-              </div>
+              <label htmlFor='password'>Password</label>
               <div className='auth-input-wrap'>
                 <HiLockClosed className='auth-input-icon' />
                 <input
@@ -124,25 +146,38 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  autoComplete='current-password'
                 />
-                <button
-                  type='button'
-                  className='auth-eye-btn'
-                  onClick={() => setShowPwd(!showPwd)}
-                  tabIndex={-1}
-                >
+
+                <button type='button' className='auth-eye-btn' onClick={() => setShowPwd(!showPwd)}>
                   {showPwd ? <HiEyeOff /> : <HiEye />}
                 </button>
               </div>
             </div>
 
+            {/* LOGIN BUTTON */}
             <button type='submit' className='auth-submit-btn' disabled={loading}>
-              {loading && <span className='auth-spinner' />}
               {loading ? "Signing in..." : "Sign in"}
             </button>
           </form>
 
+          {/* GOOGLE LOGIN */}
+          <button
+            type='button'
+            className='auth-google-btn'
+            onClick={handleGoogleLogin}
+            disabled={googleLoading}
+          >
+            {googleLoading ? "Signing in..." : "Continue with Google"}
+          </button>
+
+          {/* FORGOT PASSWORD */}
+          <p className='auth-footer-text'>
+            <Link to='/forgot-password' className='auth-footer-link'>
+              Forgot password?
+            </Link>
+          </p>
+
+          {/* REGISTER */}
           <p className='auth-footer-text'>
             Don't have an account?{" "}
             <Link to='/register' className='auth-footer-link'>

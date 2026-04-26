@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../../firebase/auth";
-import Logo from "../../assets/logo.png";
+import Logo from "../../assets/logo.svg";
 import { HiMail, HiExclamationCircle, HiCheckCircle, HiArrowLeft } from "react-icons/hi";
 
 export default function ForgotPassword() {
@@ -32,22 +32,12 @@ export default function ForgotPassword() {
   return (
     <div className='auth-page'>
       {/* Brand panel */}
-      <div className='auth-brand-panel' style={{ background: "var(--primary-color)" }}>
+      <div
+        className='auth-brand-panel bg-gradient'
+        style={{ background: "var(--primary-gradient)" }}
+      >
         <div className='auth-brand-inner'>
-          <svg
-            width='52'
-            height='52'
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='rgba(255,255,255,0.9)'
-            strokeWidth='1.5'
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            style={{ marginBottom: "1.5rem" }}
-          >
-            <rect x='3' y='11' width='18' height='11' rx='2' />
-            <path d='M7 11V7a5 5 0 0 1 10 0v4' />
-          </svg>
+          <img src={Logo} alt='Logo' className='auth-brand-logo' />
           <h1 className='auth-brand-title'>Password reset</h1>
           <p className='auth-brand-desc'>
             Enter the email address linked to your account and we'll send you a secure reset link.
@@ -73,21 +63,7 @@ export default function ForgotPassword() {
       <div className='auth-form-panel'>
         <div className='auth-card'>
           <div className='auth-logo-wrap'>
-            <div className='fp-lock-badge'>
-              <svg
-                width='24'
-                height='24'
-                viewBox='0 0 24 24'
-                fill='none'
-                stroke='#92400e'
-                strokeWidth='2'
-                strokeLinecap='round'
-                strokeLinejoin='round'
-              >
-                <rect x='3' y='11' width='18' height='11' rx='2' />
-                <path d='M7 11V7a5 5 0 0 1 10 0v4' />
-              </svg>
-            </div>
+            <img src={Logo} alt='Logo' className='auth-brand-logo' />
           </div>
 
           <h2 className='auth-heading'>Forgot password?</h2>
@@ -114,7 +90,7 @@ export default function ForgotPassword() {
                 </span>
               </div>
               <button
-                className='auth-submit-btn amber'
+                className='btn-primary'
                 style={{ marginTop: "1rem", width: "100%", border: "none" }}
                 onClick={() => {
                   setSent(false);
@@ -143,7 +119,7 @@ export default function ForgotPassword() {
               </div>
               <button
                 type='submit'
-                className='auth-submit-btn amber'
+                className='btn-primary'
                 disabled={loading}
                 style={{ background: "var(--primary-color)" }}
               >

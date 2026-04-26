@@ -7806,6 +7806,20 @@ a {
   display: flex;
 }
 
+.auth-google-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.auth-google-btn:hover {
+  background: #f5f5f5;
+}
 .auth-brand-panel {
   flex: 1;
   background: var(--primary-gradient);
