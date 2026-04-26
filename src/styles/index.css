@@ -845,10 +845,12 @@ main {
 }
 
 /* The Grid Layout */
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: var(--spacing-xl);
+  z-index: 3;
 }
 
 .full-width {
@@ -875,7 +877,6 @@ main {
   top: 50%;
   left: var(--spacing-md);
   transform: translateY(-50%);
-  z-index: 1;
   color: var(--text-tertiary);
   font-size: var(--font-size-md);
   pointer-events: none;
@@ -884,7 +885,7 @@ main {
 
 .input-wrapper input,
 .input-wrapper select,
-.input-wrapper .rselect__control,
+.input-wrapper .custom-downshift-select,
 .input-wrapper textarea {
   width: 100%;
   padding: var(--input-padding) var(--input-padding-right) var(--input-padding)
@@ -898,12 +899,12 @@ main {
   outline: 4px solid var(--bg-info);
   padding-top: 12px;
 }
-.input-wrapper .rselect__control {
+.input-wrapper .custom-downshift-select {
   padding: 0;
 }
 
 /* Focus States */
-.input-wrapper .rselect__control:focus,
+.input-wrapper .custom-downshift-select:focus,
 .input-wrapper input:focus {
   outline: none;
   border-color: var(--accent);
@@ -1543,6 +1544,39 @@ main {
   background: transparent !important;
   outline: none;
   border: none !important;
+}
+
+/* Class Tabs */
+.class-tabs-container {
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--color-border-tertiary);
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.class-tab {
+  padding: 8px 16px;
+  border-radius: 8px 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  transition: all 0.3s ease;
+}
+
+.class-tab:hover {
+  background: var(--color-background-secondary);
+}
+
+.class-tab.active {
+  border-bottom-color: #4f46e5;
+  background: #eef2ff;
+  color: #4f46e5;
 }
 
 /* Table Card */
@@ -2855,6 +2889,12 @@ button:disabled {
 }
 
 /* ===== INFO GRID ===== */
+.student-filters {
+  width: 100%;
+  max-width: 800px;
+}
+
+.student-filters,
 .details-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -11434,12 +11474,12 @@ a {
   z-index: 112;
 }
 
-.rselect__control {
+.custom-downshift-select {
   width: 100%;
 }
 
 /* The outer box — matches your input-wrapper border/radius */
-.rselect__control {
+.custom-downshift-select {
   display: flex;
   align-items: center;
   width: 100%;
@@ -11447,7 +11487,7 @@ a {
 }
 
 /* Remove the default focus outline react-select adds */
-.rselect__control--is-focused {
+.custom-downshift-select--is-focused {
   outline: none;
   box-shadow: none;
 }
@@ -11497,6 +11537,6 @@ a {
   margin-left: 40px !important;
 }
 
-.rselect__control {
+.custom-downshift-select {
   min-width: 230px !important;
 }

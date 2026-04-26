@@ -28,6 +28,7 @@ import {
   HiTrash,
   HiFilter,
   HiSearch,
+  HiArrowRight,
 } from "react-icons/hi";
 import TableToolbar from "../../components/common/TableToolbar";
 import $ from "jquery";
@@ -268,6 +269,9 @@ export default function FamilyList() {
 
           root.render(
             <>
+              <a href={`/families/${family.id}`} className='view-btn'>
+                <HiArrowRight /> View
+              </a>
               {can(PERMISSIONS.EDIT_FAMILY) && (
                 <button
                   onClick={() => {
@@ -284,9 +288,6 @@ export default function FamilyList() {
                   <HiTrash />
                 </button>
               )}
-              <a href={`/families/${family.id}`} className='view-link'>
-                <HiChevronRight />
-              </a>
             </>,
           );
         });

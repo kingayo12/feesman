@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getAllStudents, deleteStudent } from "./studentService";
 import { getEnrollmentsByFilter } from "./enrollmentService";
-import SetTermButton from "./Settermbutton";
 import {
   HiSearch,
   HiOutlineAcademicCap,
@@ -23,7 +22,7 @@ import { getFamilies } from "../families/familyService";
 import { getSettings } from "../settings/settingService";
 import { StudentListSkeleton } from "../../components/common/Skeleton";
 import CustomButton from "../../components/common/CustomButton";
-import CustomSelect from "../../components/common/SelectInput";
+import CustomInput from "../../components/common/Input";
 import { FormModal, ConfirmModal } from "../../components/common/Modal";
 
 const TERMS = ["1st Term", "2nd Term", "3rd Term"];
@@ -39,23 +38,19 @@ export default function StudentList() {
   const [deleting, setDeleting] = useState(false);
   const [editStudent, setEditStudent] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
   const [selectedTerm, setSelectedTerm] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [allSessions, setAllSessions] = useState([]);
   const { can } = useRole();
 
-  // true = studentEnrollments has data (new model)
-  // false = students still carry session/classId directly (old model)
-  const isNewModel = enrollments.length > 0;
-
+  // ─── Load everything ────────────────────────────────────────────────────
   const loadAllData = async () => {
     try {
       setLoading(true);
+
       const [studentData, classData, familyData, appSettings] = await Promise.all([
         getAllStudents(),
         getClasses(),
@@ -66,6 +61,7 @@ export default function StudentList() {
       const defaultSession = appSettings?.academicYear || null;
       const defaultTerm = appSettings?.currentTerm || null;
 
+      // Load enrollments filtered to current session + term by default
       const enrollmentData = await getEnrollmentsByFilter({
         session: defaultSession || undefined,
         term: defaultTerm || undefined,
@@ -77,11 +73,6 @@ export default function StudentList() {
       setEnrollments(enrollmentData || []);
       setSelectedSession(defaultSession);
       setSelectedTerm(defaultTerm);
-
-      const sessions = [...new Set((studentData || []).map((s) => s.session).filter(Boolean))]
-        .sort()
-        .reverse();
-      setAllSessions(sessions);
     } catch (error) {
       console.error("Error loading Student List data:", error);
     } finally {
@@ -93,24 +84,24 @@ export default function StudentList() {
     loadAllData();
   }, []);
 
+  // ─── Re-fetch enrollments when filters change ───────────────────────────
   const reloadEnrollments = async (session, term, classId) => {
     try {
-      setEnrollmentsLoading(true);
       const enrollmentData = await getEnrollmentsByFilter({
         session: session || undefined,
         term: term || undefined,
         classId: classId || undefined,
       });
       setEnrollments(enrollmentData || []);
-      setCurrentPage(1);
     } catch (error) {
       console.error("Error reloading enrollments:", error);
-    } finally {
-      setEnrollmentsLoading(false);
     }
   };
 
-  const getClassName = (classId) => classes.find((c) => c.id === classId)?.name ?? "Not Assigned";
+  // ─── Helpers ────────────────────────────────────────────────────────────
+  const getClassName = (classId) =>
+    classes.find((c) => c.id === classId)?.name ?? "Not Assigned";
+
   const getFamilyName = (familyId) =>
     families.find((f) => f.id === familyId)?.familyName ?? "No Family";
 
@@ -137,63 +128,58 @@ export default function StudentList() {
       return getClassOrderNumber(a.name) - getClassOrderNumber(b.name);
     });
 
-  // NEW MODEL: join enrollments + students
-  // OLD MODEL: read directly from student docs
-  const displayData = isNewModel
-    ? enrollments
-        .map((enrollment) => {
-          const student = students.find((s) => s.id === enrollment.studentId);
-          if (!student) return null;
-          return {
-            ...student,
-            classId: enrollment.classId,
-            session: enrollment.session,
-            term: enrollment.term,
-            enrollmentId: enrollment.id,
-            resolvedClassName: getClassName(enrollment.classId),
-            resolvedFamilyName: getFamilyName(student.familyId),
-          };
-        })
-        .filter(Boolean)
-    : students.map((s) => ({
-        ...s,
-        resolvedClassName: getClassName(s.classId),
-        resolvedFamilyName: getFamilyName(s.familyId),
-      }));
+  // ─── Extract unique sessions from enrollments ───────────────────────────
+  const uniqueSessions = [
+    ...new Set(enrollments.map((e) => e.session).filter(Boolean)),
+  ]
+    .sort()
+    .reverse();
 
-  // Search
-  let finalFilteredStudents = filterData(displayData, searchQuery, [
+  // ─── Join students with their enrollment data ───────────────────────────
+  // Each student is shown once per enrollment in the current filter set.
+  const displayData = enrollments
+    .map((enrollment) => {
+      const student = students.find((s) => s.id === enrollment.studentId);
+      if (!student) return null;
+
+      return {
+        ...student,
+        // Enrollment-sourced fields (authoritative for filtering)
+        classId: enrollment.classId,
+        session: enrollment.session,
+        term: enrollment.term,
+        enrollmentId: enrollment.id,
+        enrollmentStatus: enrollment.status,
+        // Resolved display fields
+        resolvedClassName: getClassName(enrollment.classId),
+        resolvedFamilyName: getFamilyName(student.familyId),
+      };
+    })
+    .filter(Boolean);
+
+  // ─── Search filter (client-side on joined data) ─────────────────────────
+  const filteredStudents = filterData(displayData, searchQuery, [
     "firstName",
     "lastName",
     "resolvedClassName",
     "resolvedFamilyName",
   ]);
 
-  // Old model: filter client-side (new model filters via Firestore in reloadEnrollments)
-  if (!isNewModel) {
-    if (selectedClassId)
-      finalFilteredStudents = finalFilteredStudents.filter((s) => s.classId === selectedClassId);
-    if (selectedSession)
-      finalFilteredStudents = finalFilteredStudents.filter(
-        (s) => String(s.session || "").trim() === String(selectedSession).trim(),
-      );
-    if (selectedTerm)
-      finalFilteredStudents = finalFilteredStudents.filter((s) => s.term === selectedTerm);
-  }
-
-  const totalPages = Math.max(1, Math.ceil(finalFilteredStudents.length / ITEMS_PER_PAGE));
+  // ─── Pagination ──────────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / ITEMS_PER_PAGE));
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  const paginatedStudents = finalFilteredStudents.slice(
+  const paginatedStudents = filteredStudents.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
   );
 
+  // ─── Export ──────────────────────────────────────────────────────────────
   const exportHeaders = ["Student Name", "Class", "Session", "Term", "Family", "Status"];
-  const exportRows = finalFilteredStudents.map((student) => [
+  const exportRows = filteredStudents.map((student) => [
     `${student.firstName} ${student.lastName}`,
     student.resolvedClassName,
     student.session,
@@ -202,57 +188,29 @@ export default function StudentList() {
     "Active",
   ]);
 
-  const handleClassChange = (e) => {
-    const val = e.target.value || null;
+  // ─── Filter change handlers ──────────────────────────────────────────────
+  const handleClassChange = (option) => {
+    const val = option?.value ?? null;
     setSelectedClassId(val);
-    if (isNewModel) reloadEnrollments(selectedSession, selectedTerm, val);
-    else setCurrentPage(1);
+    setCurrentPage(1);
+    reloadEnrollments(selectedSession, selectedTerm, val);
   };
 
-  const handleSessionChange = (e) => {
-    const val = e.target.value || null;
+  const handleSessionChange = (option) => {
+    const val = option?.value ?? null;
     setSelectedSession(val);
-    if (isNewModel) reloadEnrollments(val, selectedTerm, selectedClassId);
-    else setCurrentPage(1);
+    setCurrentPage(1);
+    reloadEnrollments(val, selectedTerm, selectedClassId);
   };
 
-  const handleTermChange = (e) => {
-    const val = e.target.value || null;
+  const handleTermChange = (option) => {
+    const val = option?.value ?? null;
     setSelectedTerm(val);
-    if (isNewModel) reloadEnrollments(selectedSession, val, selectedClassId);
-    else setCurrentPage(1);
+    setCurrentPage(1);
+    reloadEnrollments(selectedSession, val, selectedClassId);
   };
 
-  const activeFilters = [
-    selectedClassId && {
-      key: "class",
-      label: `Class: ${getClassName(selectedClassId)}`,
-      clear: () => {
-        setSelectedClassId(null);
-        if (isNewModel) reloadEnrollments(selectedSession, selectedTerm, null);
-        else setCurrentPage(1);
-      },
-    },
-    selectedSession && {
-      key: "session",
-      label: `Session: ${selectedSession}`,
-      clear: () => {
-        setSelectedSession(null);
-        if (isNewModel) reloadEnrollments(null, selectedTerm, selectedClassId);
-        else setCurrentPage(1);
-      },
-    },
-    selectedTerm && {
-      key: "term",
-      label: `Term: ${selectedTerm}`,
-      clear: () => {
-        setSelectedTerm(null);
-        if (isNewModel) reloadEnrollments(selectedSession, null, selectedClassId);
-        else setCurrentPage(1);
-      },
-    },
-  ].filter(Boolean);
-
+  // ─── Skeleton ─────────────────────────────────────────────────────────────
   if (loading) return <StudentListSkeleton />;
 
   return (
@@ -267,17 +225,11 @@ export default function StudentList() {
         </div>
         <div className='header-stats'>
           <span className='stat-pill'>Total: {students.length}</span>
-          <span className='stat-pill'>Showing: {finalFilteredStudents.length}</span>
+          <span className='stat-pill'>Showing: {filteredStudents.length}</span>
         </div>
       </div>
 
-      <SetTermButton
-        onDone={(result) => {
-          console.log(result);
-          loadAllData();
-        }}
-      />
-
+      {/* ─── Add Student Button ─── */}
       <div className='add_button'>
         {can(PERMISSIONS.CREATE_STUDENT) && (
           <CustomButton
@@ -300,6 +252,7 @@ export default function StudentList() {
         )}
       </div>
 
+      {/* ─── Form Modal ─── */}
       {modalOpen && (
         <FormModal
           title={editStudent ? "Edit Student" : "Add Student"}
@@ -326,6 +279,7 @@ export default function StudentList() {
         </FormModal>
       )}
 
+      {/* ─── Search ─── */}
       <div className='table-controls'>
         <div className='search-box'>
           <HiSearch className='search-icon' />
@@ -343,101 +297,65 @@ export default function StudentList() {
 
       <TableToolbar fileName='students' headers={exportHeaders} rows={exportRows} />
 
+      {/* ─── Filters ─── */}
       <div className='student-filters'>
-        <CustomSelect
+        <CustomInput
+          isRawSelect
           name='class'
-          value={selectedClassId || ""}
+          value={
+            selectedClassId != null
+              ? { value: selectedClassId, label: getClassName(selectedClassId) }
+              : null
+          }
           placeholder='All Classes'
-          labelName='Class'
           onChange={handleClassChange}
+          labelName='Class'
+          isSelect={true}
+          isSearchable={true}
           options={[
-            { value: "", label: "All Classes" },
-            ...sortClasses(classes).map((cls) => ({ value: cls.id, label: cls.name })),
+            { value: null, label: "All Classes" },
+            ...sortClasses(classes).map((cls) => ({
+              value: cls.id,
+              label: cls.name,
+            })),
           ]}
         />
-        <CustomSelect
+
+        <CustomInput
+          isRawSelect
           name='session'
-          value={selectedSession || ""}
+          value={selectedSession != null ? { value: selectedSession, label: selectedSession } : null}
           placeholder='All Sessions'
-          labelName='Session'
           onChange={handleSessionChange}
+          labelName='Session'
+          isSelect={true}
+          isSearchable={true}
           options={[
-            { value: "", label: "All Sessions" },
-            ...allSessions.map((s) => ({ value: s, label: s })),
+            { value: null, label: "All Sessions" },
+            ...uniqueSessions.map((session) => ({
+              value: session,
+              label: session,
+            })),
           ]}
         />
-        <CustomSelect
+
+        <CustomInput
+          isRawSelect
           name='term'
-          value={selectedTerm || ""}
+          value={selectedTerm != null ? { value: selectedTerm, label: selectedTerm } : null}
           placeholder='All Terms'
-          labelName='Term'
           onChange={handleTermChange}
+          labelName='Term'
+          isSelect={true}
+          isSearchable={false}
           options={[
-            { value: "", label: "All Terms" },
-            ...TERMS.map((t) => ({ value: t, label: t })),
+            { value: null, label: "All Terms" },
+            ...TERMS.map((term) => ({ value: term, label: term })),
           ]}
         />
       </div>
 
-      {activeFilters.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "0.5rem",
-            marginBottom: "0.75rem",
-            alignItems: "center",
-          }}
-        >
-          <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Active filters:</span>
-          {activeFilters.map((filter) => (
-            <button
-              key={filter.key}
-              type='button'
-              onClick={filter.clear}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.35rem",
-                padding: "0.25rem 0.65rem",
-                borderRadius: "999px",
-                border: "1px solid var(--accent)",
-                backgroundColor: "var(--accent-muted)",
-                color: "var(--accent)",
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: "pointer",
-              }}
-            >
-              {filter.label}
-              <span style={{ fontSize: 14, lineHeight: 1 }}>×</span>
-            </button>
-          ))}
-          {activeFilters.length > 1 && (
-            <button
-              type='button'
-              onClick={() => {
-                setSelectedClassId(null);
-                setSelectedSession(null);
-                setSelectedTerm(null);
-                if (isNewModel) reloadEnrollments(null, null, null);
-                else setCurrentPage(1);
-              }}
-              style={{
-                fontSize: 12,
-                color: "var(--text-secondary)",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                textDecoration: "underline",
-              }}
-            >
-              Clear all
-            </button>
-          )}
-        </div>
-      )}
-
+      {/* ─── Table ─── */}
       <div className='table-card'>
         <table className='data-table'>
           <thead>
@@ -452,15 +370,9 @@ export default function StudentList() {
             </tr>
           </thead>
           <tbody>
-            {enrollmentsLoading ? (
-              <tr>
-                <td colSpan='7' className='empty-row'>
-                  Loading...
-                </td>
-              </tr>
-            ) : paginatedStudents.length > 0 ? (
+            {paginatedStudents.length > 0 ? (
               paginatedStudents.map((student) => (
-                <tr key={`${student.id}-${student.enrollmentId || student.id}`}>
+                <tr key={`${student.id}-${student.enrollmentId}`}>
                   <td>
                     <div className='student-profile'>
                       <div className='student-initials'>
@@ -479,7 +391,7 @@ export default function StudentList() {
                     <span className='class-tag'>{student.resolvedClassName}</span>
                   </td>
                   <td>{student.session}</td>
-                  <td>{student.term || "—"}</td>
+                  <td>{student.term}</td>
                   <td className='family-cell'>{student.resolvedFamilyName}</td>
                   <td>
                     <span className='status-badge active'>Active</span>
@@ -527,6 +439,7 @@ export default function StudentList() {
           </tbody>
         </table>
 
+        {/* ─── Pagination ─── */}
         <div
           style={{
             display: "flex",
@@ -539,10 +452,14 @@ export default function StudentList() {
           }}
         >
           <span style={{ color: "var(--color-text-secondary, #6b7280)", fontSize: 14 }}>
-            {finalFilteredStudents.length > 0
-              ? `${(currentPage - 1) * ITEMS_PER_PAGE + 1}–${Math.min(currentPage * ITEMS_PER_PAGE, finalFilteredStudents.length)} of ${finalFilteredStudents.length}`
+            {filteredStudents.length > 0
+              ? `${(currentPage - 1) * ITEMS_PER_PAGE + 1}–${Math.min(
+                  currentPage * ITEMS_PER_PAGE,
+                  filteredStudents.length,
+                )} of ${filteredStudents.length}`
               : "No students to display."}
           </span>
+
           {totalPages > 1 && (
             <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
               <button
@@ -569,6 +486,7 @@ export default function StudentList() {
         </div>
       </div>
 
+      {/* ─── Delete Confirm ─── */}
       {deleteTarget && (
         <ConfirmModal
           entityName={`${deleteTarget.firstName} ${deleteTarget.lastName}`}
@@ -579,7 +497,9 @@ export default function StudentList() {
             try {
               await deleteStudent(deleteTarget.id);
               setStudents((prev) => prev.filter((s) => s.id !== deleteTarget.id));
-              setEnrollments((prev) => prev.filter((e) => e.studentId !== deleteTarget.id));
+              setEnrollments((prev) =>
+                prev.filter((e) => e.studentId !== deleteTarget.id),
+              );
               setDeleteTarget(null);
             } catch (err) {
               console.error(err);

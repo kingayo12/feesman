@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { getClassById, getClasses } from "./classService";
-import { getAllStudents, promoteStudents } from "../students/studentService";
+import { getAllStudents } from "../students/studentService";
+import { promoteStudents } from "../students/enrollmentService";
 import { getSettings } from "../settings/settingService";
 import { ClassDetailsSkeleton } from "../../components/common/Skeleton";
 import {
