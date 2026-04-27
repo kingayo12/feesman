@@ -23,7 +23,6 @@ import {
 } from "../../utils/offlineDataManager";
 import {
   HiOutlineUsers,
-  HiChevronRight,
   HiPencilAlt,
   HiTrash,
   HiFilter,
@@ -57,20 +56,43 @@ export default function FamilyList() {
     return d.toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" });
   };
 
+  // ── Financial calculation per family ──────────────────────────────────────
+  //
+  // getCachedStudentsByFamily(familyId, academicYear) returns students already
+  // enriched with classId/session/term from studentEnrollments — so we never
+  // read student.classId from the identity doc directly.
+  //
+  // We still pass currentTerm when picking classId so we only use the enrollment
+  // that matches the term being displayed.
+  //
   const calculateFamilyFinancials = async (familyId, settings, activeDiscounts) => {
     const { academicYear, currentTerm } = settings;
 
     try {
+      // Returns students enriched with classId/session/term from enrollments
+      // The cache key includes academicYear so data is session-scoped
       const students = await getCachedStudentsByFamily(familyId, academicYear);
-      const payments = await getCachedPaymentsByFamily(familyId, academicYear, currentTerm);
-      const famAssignments = await getCachedAssignmentsForFamily(familyId, academicYear);
+
+      if (!students?.length) {
+        return { totalAmount: 0, totalPaid: 0, outstanding: 0, status: "Unpaid" };
+      }
+
+      const [payments, famAssignments] = await Promise.all([
+        getCachedPaymentsByFamily(familyId, academicYear, currentTerm),
+        getCachedAssignmentsForFamily(familyId, academicYear),
+      ]);
+
       let totalAssessed = 0;
 
       for (const student of students) {
         try {
+          // classId comes from the enrollment doc (already enriched by cache)
+          // Only use it if the enrollment term matches the current term
+          const classId = student.classId && student.term === currentTerm ? student.classId : null;
+
           const [classFees, overrides, prevBal, stuAssignments] = await Promise.all([
-            student.classId
-              ? getCachedFeesByClass(student.classId, academicYear, currentTerm)
+            classId
+              ? getCachedFeesByClass(classId, academicYear, currentTerm)
               : Promise.resolve([]),
             getCachedStudentFeeOverrides(student.id),
             getCachedPreviousBalanceAmount(student.id, academicYear),
@@ -78,7 +100,7 @@ export default function FamilyList() {
           ]);
 
           const disabledFeeIds = new Set(overrides?.map((o) => o.feeId) || []);
-          const effectiveFees = classFees.filter((f) => !disabledFeeIds.has(f.id));
+          const effectiveFees = (classFees || []).filter((f) => !disabledFeeIds.has(f.id));
           const termFees = effectiveFees.reduce((s, f) => s + Number(f.amount || 0), 0);
 
           const { totalDiscount } = computeStudentDiscount({
@@ -98,7 +120,7 @@ export default function FamilyList() {
         }
       }
 
-      const totalPaid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+      const totalPaid = (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
       const outstanding = Math.max(totalAssessed - totalPaid, 0);
 
       let status = "Unpaid";
@@ -112,6 +134,7 @@ export default function FamilyList() {
     }
   };
 
+  // ── Load ──────────────────────────────────────────────────────────────────
   const loadFamilies = async () => {
     setLoading(true);
     try {
@@ -132,16 +155,19 @@ export default function FamilyList() {
 
       setCurrentTerm(settings.currentTerm);
 
-      const preCachePromises = basicFamilyData.map((f) =>
-        preCacheFamilyData(f.id, settings.academicYear, settings.currentTerm).catch((e) => {
-          console.warn(`Pre-cache failed for family ${f.id}:`, e);
-          return { success: false };
-        }),
+      // Pre-cache all family data concurrently
+      await Promise.allSettled(
+        basicFamilyData.map((f) =>
+          preCacheFamilyData(f.id, settings.academicYear, settings.currentTerm).catch((e) => {
+            console.warn(`Pre-cache failed for family ${f.id}:`, e);
+            return { success: false };
+          }),
+        ),
       );
-      await Promise.allSettled(preCachePromises);
 
       const activeDiscounts = await getCachedDiscounts(settings.academicYear);
 
+      // Calculate financials for all families concurrently
       const fullData = await Promise.all(
         basicFamilyData.map(async (family) => {
           try {
@@ -171,20 +197,15 @@ export default function FamilyList() {
     };
   }, []);
 
-  /**
-   * Unmount all React roots that were mounted into DataTables action cells.
-   *
-   * IMPORTANT: root.unmount() must NEVER be called synchronously during a React
-   * render cycle — doing so triggers the "Attempted to synchronously unmount a
-   * root while React was already rendering" warning.  We defer every unmount to
-   * the next macrotask via setTimeout so React has always finished its current
-   * render before we tear anything down.
-   */
+  // ── DataTables action root cleanup ────────────────────────────────────────
+  //
+  // root.unmount() must NEVER be called synchronously during a React render
+  // cycle — defer to next macrotask via setTimeout.
+  //
   const cleanupActionRoots = () => {
     const roots = actionRootsRef.current;
     actionRootsRef.current = [];
     if (roots.length === 0) return;
-
     setTimeout(() => {
       roots.forEach((root) => {
         try {
@@ -194,6 +215,7 @@ export default function FamilyList() {
     }, 0);
   };
 
+  // ── DataTables setup ──────────────────────────────────────────────────────
   useEffect(() => {
     if (loading || !tableRef.current) return;
 
@@ -202,14 +224,12 @@ export default function FamilyList() {
       "phone",
       "email",
       "status",
-    ]).filter((family) => {
-      if (!statusFilter) return true;
-      return family.status?.toLowerCase() === statusFilter.toLowerCase();
-    });
+    ]).filter(
+      (family) => !statusFilter || family.status?.toLowerCase() === statusFilter.toLowerCase(),
+    );
 
-    // Destroy any existing DataTable instance before rebuilding
+    // Destroy existing instance before rebuilding
     if ($.fn.DataTable.isDataTable(tableRef.current)) {
-      // Unmount React roots first, deferred so we never clash with an active render
       cleanupActionRoots();
       $(tableRef.current).DataTable().destroy();
       $(tableRef.current).find("tbody").empty();
@@ -236,7 +256,7 @@ export default function FamilyList() {
       columns: [
         { title: "Family Name" },
         { title: "Contact" },
-        { title: "Term Fees (net)", className: "" },
+        { title: "Term Fees (net)" },
         { title: "Term Paid", className: "text-success" },
         { title: "Outstanding" },
         { title: "Status" },
@@ -248,15 +268,9 @@ export default function FamilyList() {
 
     dataTableRef.current = dt;
 
-    /**
-     * Mount React action buttons into each row's placeholder div.
-     * Called after every DataTables draw (pagination, sort, etc.).
-     * Previous roots are cleaned up with a deferred unmount before new ones
-     * are created so React never tries to unmount inside an active render.
-     */
+    // Mount React action buttons into each row's placeholder div
     const mountActionButtons = () => {
       cleanupActionRoots();
-
       $(tableRef.current)
         .find("tbody [data-family-id]")
         .each(function () {
@@ -305,6 +319,7 @@ export default function FamilyList() {
     };
   }, [families, searchQuery, statusFilter, loading]);
 
+  // ── Export ────────────────────────────────────────────────────────────────
   const filteredFamilies = filterData(families, searchQuery, [
     "familyName",
     "phone",
@@ -331,6 +346,7 @@ export default function FamilyList() {
     formatDate(family.createdAt),
   ]);
 
+  // ── Render ────────────────────────────────────────────────────────────────
   if (loading) return <FamilyListSkeleton />;
 
   return (
@@ -348,6 +364,7 @@ export default function FamilyList() {
         </div>
       </div>
 
+      {/* ── Add Family ── */}
       <div className='add_button'>
         {can(PERMISSIONS.CREATE_FAMILY) && (
           <CustomButton
@@ -364,6 +381,7 @@ export default function FamilyList() {
         )}
       </div>
 
+      {/* ── Family Form Modal ── */}
       {modalOpen && (
         <FormModal
           title={editingFamily ? "Edit Family Profile" : "Register New Family"}
@@ -387,6 +405,7 @@ export default function FamilyList() {
         </FormModal>
       )}
 
+      {/* ── Search + Filter ── */}
       <div className='table-controls'>
         <div className='search-box'>
           <HiSearch className='search-icon' />
@@ -414,6 +433,7 @@ export default function FamilyList() {
         />
       </div>
 
+      {/* ── Table ── */}
       <div className='table-card'>
         {currentTerm && (
           <p
@@ -422,6 +442,7 @@ export default function FamilyList() {
             Showing <strong>{currentTerm}</strong> figures (incl. arrears, discounts applied).
           </p>
         )}
+
         <TableToolbar fileName='families' headers={exportHeaders} rows={exportRows} />
 
         {/*
@@ -445,11 +466,12 @@ export default function FamilyList() {
           <tbody />
         </table>
 
+        {/* ── Delete Confirm ── */}
         {deleteTarget && (
           <ConfirmModal
-            entityName={"family(" + deleteTarget?.familyName + ")"}
+            entityName={`family (${deleteTarget?.familyName})`}
             loading={deleting}
-            onClose={() => setDeleteTarget(null)}
+            onClose={() => !deleting && setDeleteTarget(null)}
             onConfirm={async () => {
               setDeleting(true);
               try {

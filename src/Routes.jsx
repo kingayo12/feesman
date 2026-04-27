@@ -32,6 +32,7 @@ import RoleGuard from "./components/common/RoleGuard.jsx";
 import MasterLayout from "./Layout/MasterLayout.jsx";
 
 import { PERMISSIONS } from "./config/permissions.js";
+import MigrationPage from "./pages/migration/MigrationPage";
 
 // Combines auth check + role check in one wrapper
 function Guard({ permission, children }) {
@@ -70,7 +71,7 @@ export default function AppRoutes() {
                     </ProtectedRoute>
                   }
                 />
-
+                <Route path='/migrate' element={<MigrationPage />} />
                 {/* Families */}
                 <Route
                   path='/families'

@@ -144,32 +144,22 @@ export const updateStudent = async (id, data) => {
 
 /* =========================
    DELETE STUDENT
+   NOTE: only deletes the identity doc.
+   Use deleteStudentWithEnrollments for a full cleanup.
 ========================= */
 export const deleteStudent = async (id) => {
   const ref = doc(db, "students", id);
   await deleteDoc(ref);
-  // NOTE: You may also want to delete their enrollments.
-  // See deleteStudentWithEnrollments below for a full cleanup.
 };
 
 /* =========================
    DELETE STUDENT + ALL ENROLLMENTS
 ========================= */
 export const deleteStudentWithEnrollments = async (id) => {
-  const {
-    collection: col,
-    getDocs: gd,
-    query: q,
-    where: w,
-    deleteDoc: dd,
-    doc: d,
-  } = await import("firebase/firestore");
-
   // Delete all enrollment docs for this student
-  const enrollQ = q(col(db, "studentEnrollments"), w("studentId", "==", id));
-  const enrollSnap = await gd(enrollQ);
-  const deletes = enrollSnap.docs.map((e) => dd(d(db, "studentEnrollments", e.id)));
-  await Promise.all(deletes);
+  const enrollQ = query(collection(db, "studentEnrollments"), where("studentId", "==", id));
+  const enrollSnap = await getDocs(enrollQ);
+  await Promise.all(enrollSnap.docs.map((e) => deleteDoc(doc(db, "studentEnrollments", e.id))));
 
   // Delete the student identity doc
   await deleteDoc(doc(db, "students", id));

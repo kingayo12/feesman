@@ -1,13 +1,13 @@
-import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../firebase/firestore";
 
 /**
  * Offline Data Manager
- * Pre-caches and manages Firestore data for offline support
- * Reduces number of individual queries by batching operations
+ * Pre-caches and manages Firestore data for offline support.
+ * Reduces the number of individual queries by batching operations.
  */
 
-// In-memory cache for frequently accessed data
+// ─── In-memory cache ──────────────────────────────────────────────────────────
 const memoryCache = {
   settings: null,
   settingsExpiry: 0,
@@ -19,7 +19,7 @@ const memoryCache = {
   discountsExpiry: 0,
   discountAssignments: null,
   discountAssignmentsExpiry: 0,
-  students: {},
+  students: {}, // key: `${familyId}:${academicYear}:${term}`
   payments: {},
   fees: {},
   studentFeeOverrides: {},
@@ -31,175 +31,235 @@ const memoryCache = {
 };
 
 const CACHE_TTL = {
-  settings: 5 * 60 * 1000, // 5 minutes
+  settings: 5 * 60 * 1000, //  5 minutes
   lists: 15 * 60 * 1000, // 15 minutes
   data: 10 * 60 * 1000, // 10 minutes
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 /**
- * Get or fetch settings with in-memory caching
+ * Normalize term strings so old data ("Second Term") matches new data ("2nd Term").
+ * Mirrors the same helper in feesService / paymentService.
  */
+function normalizeTerm(term) {
+  if (!term) return "";
+  const map = {
+    "first term": "1st Term",
+    "second term": "2nd Term",
+    "third term": "3rd Term",
+    "1st term": "1st Term",
+    "2nd term": "2nd Term",
+    "3rd term": "3rd Term",
+  };
+  return map[term.toLowerCase()] ?? term;
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
 export const getCachedSettings = async () => {
   const now = Date.now();
   if (memoryCache.settings && memoryCache.settingsExpiry > now) {
     return memoryCache.settings;
   }
-
-  const q = query(collection(db, "settings"));
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocs(query(collection(db, "settings")));
   const data = snapshot.docs[0]?.data() || null;
-
   memoryCache.settings = data;
   memoryCache.settingsExpiry = now + CACHE_TTL.settings;
   return data;
 };
 
+// ─── Students ─────────────────────────────────────────────────────────────────
+
 /**
- * Batch fetch all students for a family (cached)
+ * Fetch all active students for a family, enriched with their current
+ * enrollment (classId / session / term) for the given academicYear + term.
+ *
+ * KEY CHANGE: student docs no longer carry classId / session / term —
+ * those fields live in studentEnrollments. This function fetches both
+ * collections and merges them so callers always get enriched objects.
+ *
+ * Cache key: `${familyId}:${academicYear}:${normalizedTerm}` — scoped to
+ * the specific term so switching terms always gets fresh data.
  */
-export const getCachedStudentsByFamily = async (familyId, academicYear) => {
-  const key = `${familyId}:${academicYear}`;
-  if (memoryCache.students[key]) {
-    return memoryCache.students[key];
+export const getCachedStudentsByFamily = async (familyId, academicYear, currentTerm) => {
+  const normalizedTerm = normalizeTerm(currentTerm || "");
+  const key = `${familyId}:${academicYear}:${normalizedTerm}`;
+
+  if (memoryCache.students[key]) return memoryCache.students[key];
+
+  try {
+    // 1. Identity docs — no enrollment fields on these
+    const studentSnap = await getDocs(
+      query(
+        collection(db, "students"),
+        where("familyId", "==", familyId),
+        where("status", "==", "active"),
+      ),
+    );
+    const students = studentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const studentIds = students.map((s) => s.id);
+
+    if (studentIds.length === 0) {
+      memoryCache.students[key] = [];
+      return [];
+    }
+
+    // 2. Active enrollments for this session + term
+    //    Filter by both session AND normalized term so we get the right classId
+    const enrollSnap = await getDocs(
+      query(
+        collection(db, "studentEnrollments"),
+        where("session", "==", academicYear),
+        where("status", "==", "active"),
+        // Note: we filter term client-side to handle old "Second Term" format
+      ),
+    );
+
+    // Build map: studentId → enrollment (term-filtered client-side)
+    const enrollmentMap = {};
+    for (const d of enrollSnap.docs) {
+      const e = d.data();
+      if (
+        studentIds.includes(e.studentId) &&
+        (!normalizedTerm || normalizeTerm(e.term) === normalizedTerm)
+      ) {
+        enrollmentMap[e.studentId] = { id: d.id, ...e };
+      }
+    }
+
+    // 3. Enrich students with enrollment data
+    const enriched = students.map((s) => ({
+      ...s,
+      classId: enrollmentMap[s.id]?.classId || null,
+      term: enrollmentMap[s.id]?.term || null,
+      session: enrollmentMap[s.id]?.session || null,
+    }));
+
+    memoryCache.students[key] = enriched;
+    return enriched;
+  } catch (err) {
+    console.error(`Error fetching students for family ${familyId}:`, err);
+    memoryCache.students[key] = [];
+    return [];
   }
-
-  const q = query(
-    collection(db, "students"),
-    where("familyId", "==", familyId),
-    where("session", "==", academicYear),
-  );
-  const snapshot = await getDocs(q);
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-  memoryCache.students[key] = data;
-  return data;
 };
 
-/**
- * Batch fetch all payments for a family (cached)
- */
-export const getCachedPaymentsByFamily = async (familyId, academicYear, currentTerm) => {
-  const key = `${familyId}:${academicYear}:${currentTerm}`;
-  if (memoryCache.payments[key]) {
-    return memoryCache.payments[key];
-  }
+// ─── Payments ─────────────────────────────────────────────────────────────────
 
-  const q = query(
-    collection(db, "payments"),
-    where("familyId", "==", familyId),
-    where("session", "==", academicYear),
-    where("term", "==", currentTerm),
+export const getCachedPaymentsByFamily = async (familyId, academicYear, currentTerm) => {
+  const normalizedTerm = normalizeTerm(currentTerm);
+  const key = `${familyId}:${academicYear}:${normalizedTerm}`;
+  if (memoryCache.payments[key]) return memoryCache.payments[key];
+
+  // Query by familyId + session, filter term client-side to handle old formats
+  const snap = await getDocs(
+    query(
+      collection(db, "payments"),
+      where("familyId", "==", familyId),
+      where("session", "==", academicYear),
+    ),
   );
-  const snapshot = await getDocs(q);
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  const data = snap.docs
+    .map((d) => ({ id: d.id, ...d.data(), term: normalizeTerm(d.data().term) }))
+    .filter((p) => !normalizedTerm || p.term === normalizedTerm);
 
   memoryCache.payments[key] = data;
   return data;
 };
 
+// ─── Fees ─────────────────────────────────────────────────────────────────────
+
 /**
- * Batch fetch all fees for a class (cached)
+ * Fetch fees for a class/session/term.
+ *
+ * FIX: previously queried term directly in Firestore, which missed old docs
+ * stored as "Second Term". Now queries by classId + session only, then
+ * filters term client-side after normalizing — mirrors feesService.getFeesByClass.
  */
 export const getCachedFeesByClass = async (classId, academicYear, currentTerm) => {
-  const key = `${classId}:${academicYear}:${currentTerm}`;
-  if (memoryCache.fees[key]) {
-    return memoryCache.fees[key];
-  }
+  if (!classId || !academicYear || !currentTerm) return [];
 
-  const q = query(
-    collection(db, "fees"),
-    where("classId", "==", classId),
-    where("session", "==", academicYear),
-    where("term", "==", currentTerm),
+  const normalizedTerm = normalizeTerm(currentTerm);
+  const key = `${classId}:${academicYear}:${normalizedTerm}`;
+  if (memoryCache.fees[key]) return memoryCache.fees[key];
+
+  const snap = await getDocs(
+    query(
+      collection(db, "fees"),
+      where("classId", "==", classId),
+      where("session", "==", academicYear),
+      // term filtered client-side to handle "Second Term" / "2nd Term" variants
+    ),
   );
-  const snapshot = await getDocs(q);
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  const data = snap.docs
+    .map((d) => ({
+      id: d.id,
+      ...d.data(),
+      term: normalizeTerm(d.data().term),
+      session: d.data().session || d.data().academicYear || "",
+    }))
+    .filter((f) => f.term === normalizedTerm);
 
   memoryCache.fees[key] = data;
   return data;
 };
 
-/**
- * Batch fetch all families (cached)
- */
+// ─── Families ─────────────────────────────────────────────────────────────────
+
 export const getCachedAllFamilies = async () => {
   const now = Date.now();
-  if (memoryCache.families && memoryCache.familiesExpiry > now) {
-    return memoryCache.families;
-  }
-
-  const snapshot = await getDocs(collection(db, "families"));
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
+  if (memoryCache.families && memoryCache.familiesExpiry > now) return memoryCache.families;
+  const snap = await getDocs(collection(db, "families"));
+  const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   memoryCache.families = data;
   memoryCache.familiesExpiry = now + CACHE_TTL.lists;
   return data;
 };
 
-/**
- * Get cached family by ID
- */
 export const getCachedFamilyById = async (familyId) => {
   const families = await getCachedAllFamilies();
   return families.find((f) => f.id === familyId) || null;
 };
 
-/**
- * Batch fetch all classes (cached)
- */
+// ─── Classes ─────────────────────────────────────────────────────────────────
+
 export const getCachedAllClasses = async () => {
   const now = Date.now();
-  if (memoryCache.classes && memoryCache.classesExpiry > now) {
-    return memoryCache.classes;
-  }
-
-  const snapshot = await getDocs(collection(db, "classes"));
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
+  if (memoryCache.classes && memoryCache.classesExpiry > now) return memoryCache.classes;
+  const snap = await getDocs(collection(db, "classes"));
+  const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   memoryCache.classes = data;
   memoryCache.classesExpiry = now + CACHE_TTL.lists;
   return data;
 };
 
-/**
- * Get cached class by ID
- */
 export const getCachedClassById = async (classId) => {
   const classes = await getCachedAllClasses();
   return classes.find((c) => c.id === classId) || null;
 };
 
-/**
- * Batch fetch all discounts (cached)
- */
+// ─── Discounts ────────────────────────────────────────────────────────────────
+
 export const getCachedAllDiscounts = async () => {
   const now = Date.now();
-  if (memoryCache.discounts && memoryCache.discountsExpiry > now) {
-    return memoryCache.discounts;
-  }
-
-  const snapshot = await getDocs(collection(db, "discounts"));
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
+  if (memoryCache.discounts && memoryCache.discountsExpiry > now) return memoryCache.discounts;
+  const snap = await getDocs(collection(db, "discounts"));
+  const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   memoryCache.discounts = data;
   memoryCache.discountsExpiry = now + CACHE_TTL.lists;
   return data;
 };
 
-/**
- * Get active discounts for an academic year (from cached list)
- */
 export const getCachedDiscounts = async (academicYear) => {
-  const allDiscounts = await getCachedAllDiscounts();
-  return allDiscounts.filter(
-    (d) => d.active && (d.session === academicYear || d.session === "all"),
-  );
+  const all = await getCachedAllDiscounts();
+  return all.filter((d) => d.active && (d.session === academicYear || d.session === "all"));
 };
 
-/**
- * Batch fetch all discount assignments (cached)
- * Always initialises memoryCache.discountAssignments as an array, never leaves it null.
- */
+// ─── Discount assignments ─────────────────────────────────────────────────────
+
 export const getCachedAllDiscountAssignments = async () => {
   const now = Date.now();
   if (
@@ -208,26 +268,16 @@ export const getCachedAllDiscountAssignments = async () => {
   ) {
     return memoryCache.discountAssignments;
   }
-
-  const snapshot = await getDocs(collection(db, "discountAssignments"));
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-  // Always store as an array so downstream key-lookups never hit null
+  const snap = await getDocs(collection(db, "discountAssignments"));
+  const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   memoryCache.discountAssignments = data;
   memoryCache.discountAssignmentsExpiry = now + CACHE_TTL.lists;
   return data;
 };
 
-/**
- * Get cached discount assignments for a family.
- * Guards against memoryCache.discountAssignments being null before the
- * bulk fetch has run (race condition on first load).
- */
 export const getCachedAssignmentsForFamily = async (familyId, academicYear) => {
-  // Ensure the bulk cache is populated first — this is the only safe entry point
-  const allAssignments = await getCachedAllDiscountAssignments();
-
-  return allAssignments.filter(
+  const all = await getCachedAllDiscountAssignments();
+  return all.filter(
     (a) =>
       a.targetId === familyId &&
       a.targetType === "family" &&
@@ -235,16 +285,9 @@ export const getCachedAssignmentsForFamily = async (familyId, academicYear) => {
   );
 };
 
-/**
- * Get cached discount assignments for a student.
- * Guards against memoryCache.discountAssignments being null before the
- * bulk fetch has run (race condition on first load).
- */
 export const getCachedAssignmentsForStudent = async (studentId, academicYear) => {
-  // Ensure the bulk cache is populated first — this is the only safe entry point
-  const allAssignments = await getCachedAllDiscountAssignments();
-
-  return allAssignments.filter(
+  const all = await getCachedAllDiscountAssignments();
+  return all.filter(
     (a) =>
       a.targetId === studentId &&
       a.targetType === "student" &&
@@ -252,139 +295,108 @@ export const getCachedAssignmentsForStudent = async (studentId, academicYear) =>
   );
 };
 
-/**
- * Batch fetch all student fee overrides for a student (cached)
- */
+// ─── Fee overrides ────────────────────────────────────────────────────────────
+
 export const getCachedStudentFeeOverrides = async (studentId) => {
-  const key = studentId;
-  if (memoryCache.studentFeeOverrides[key]) {
-    return memoryCache.studentFeeOverrides[key];
+  if (memoryCache.studentFeeOverrides[studentId]) {
+    return memoryCache.studentFeeOverrides[studentId];
   }
-
-  const q = query(collection(db, "studentFeeOverrides"), where("studentId", "==", studentId));
-  const snapshot = await getDocs(q);
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-  memoryCache.studentFeeOverrides[key] = data;
+  const snap = await getDocs(
+    query(collection(db, "studentFeeOverrides"), where("studentId", "==", studentId)),
+  );
+  const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  memoryCache.studentFeeOverrides[studentId] = data;
   return data;
 };
 
-/**
- * Batch fetch previous balance for a student (cached)
- */
+// ─── Previous balances ────────────────────────────────────────────────────────
+
 export const getCachedPreviousBalance = async (studentId, session) => {
   const key = `${studentId}:${session}`;
-  if (memoryCache.previousBalances[key]) {
-    return memoryCache.previousBalances[key];
-  }
-
-  const q = query(
-    collection(db, "previousBalances"),
-    where("studentId", "==", studentId),
-    where("session", "==", session),
+  if (memoryCache.previousBalances[key]) return memoryCache.previousBalances[key];
+  const snap = await getDocs(
+    query(
+      collection(db, "previousBalances"),
+      where("studentId", "==", studentId),
+      where("session", "==", session),
+    ),
   );
-  const snapshot = await getDocs(q);
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
+  const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   memoryCache.previousBalances[key] = data;
   return data;
 };
 
-/**
- * Get previous balance amount for a student
- */
 export const getCachedPreviousBalanceAmount = async (studentId, session) => {
   try {
     const balances = await getCachedPreviousBalance(studentId, session);
-    if (balances.length === 0) return 0;
     return balances.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
-  } catch (error) {
-    console.warn(`Failed to fetch previous balance for ${studentId}:`, error);
+  } catch (err) {
+    console.warn(`Failed to fetch previous balance for ${studentId}:`, err);
     return 0;
   }
 };
 
-/**
- * Batch fetch all users (cached)
- */
+// ─── Users & Roles ────────────────────────────────────────────────────────────
+
 export const getCachedAllUsers = async () => {
   const now = Date.now();
-  if (memoryCache.users && memoryCache.usersExpiry > now) {
-    return memoryCache.users;
-  }
-
-  const snapshot = await getDocs(collection(db, "users"));
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
+  if (memoryCache.users && memoryCache.usersExpiry > now) return memoryCache.users;
+  const snap = await getDocs(collection(db, "users"));
+  const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   memoryCache.users = data;
   memoryCache.usersExpiry = now + CACHE_TTL.lists;
   return data;
 };
 
-/**
- * Batch fetch all roles (cached)
- */
 export const getCachedAllRoles = async () => {
   const now = Date.now();
-  if (memoryCache.roles && memoryCache.rolesExpiry > now) {
-    return memoryCache.roles;
-  }
-
-  const snapshot = await getDocs(collection(db, "roles"));
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
+  if (memoryCache.roles && memoryCache.rolesExpiry > now) return memoryCache.roles;
+  const snap = await getDocs(collection(db, "roles"));
+  const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   memoryCache.roles = data;
   memoryCache.rolesExpiry = now + CACHE_TTL.lists;
   return data;
 };
 
+// ─── Pre-cache ────────────────────────────────────────────────────────────────
+
 /**
- * Pre-cache all required data for a family before calculating financials
+ * Pre-cache all required data for a family before calculating financials.
+ * Must pass currentTerm so getCachedStudentsByFamily uses the right cache key.
  */
 export const preCacheFamilyData = async (familyId, academicYear, currentTerm) => {
   try {
-    const [students, payments, discounts, discountAssignments] = await Promise.all([
-      getCachedStudentsByFamily(familyId, academicYear),
+    const [students, payments, , famAssignments] = await Promise.all([
+      getCachedStudentsByFamily(familyId, academicYear, currentTerm), // ← term required
       getCachedPaymentsByFamily(familyId, academicYear, currentTerm),
       getCachedDiscounts(academicYear),
       getCachedAssignmentsForFamily(familyId, academicYear),
     ]);
 
     if (students?.length) {
-      const studentPromises = students.map((s) =>
-        Promise.all([
-          s.classId
-            ? getCachedFeesByClass(s.classId, academicYear, currentTerm)
-            : Promise.resolve([]),
-          getCachedStudentFeeOverrides(s.id),
-          getCachedPreviousBalanceAmount(s.id, academicYear),
-          getCachedAssignmentsForStudent(s.id, academicYear),
-        ]),
+      await Promise.all(
+        students.map((s) =>
+          Promise.all([
+            s.classId
+              ? getCachedFeesByClass(s.classId, academicYear, currentTerm)
+              : Promise.resolve([]),
+            getCachedStudentFeeOverrides(s.id),
+            getCachedPreviousBalanceAmount(s.id, academicYear),
+            getCachedAssignmentsForStudent(s.id, academicYear),
+          ]),
+        ),
       );
-      await Promise.all(studentPromises);
     }
 
-    return {
-      success: true,
-      students: students || [],
-      payments: payments || [],
-      discounts: discounts || [],
-    };
-  } catch (error) {
-    console.error(`Error pre-caching family data for ${familyId}:`, error);
-    return {
-      success: false,
-      students: [],
-      payments: [],
-      discounts: [],
-      error,
-    };
+    return { success: true, students: students || [], payments: payments || [] };
+  } catch (err) {
+    console.error(`Error pre-caching family data for ${familyId}:`, err);
+    return { success: false, students: [], payments: [], error: err };
   }
 };
 
-/**
- * Clear memory cache (useful on logout or when switching contexts)
- */
+// ─── Clear cache ──────────────────────────────────────────────────────────────
+
 export const clearMemoryCache = () => {
   memoryCache.settings = null;
   memoryCache.settingsExpiry = 0;
@@ -407,9 +419,8 @@ export const clearMemoryCache = () => {
   memoryCache.rolesExpiry = 0;
 };
 
-/**
- * Prefetch all families and their related data for better offline support
- */
+// ─── Prefetch all ─────────────────────────────────────────────────────────────
+
 export const prefetchAllFamiliesData = async (academicYear, currentTerm) => {
   try {
     await Promise.all([
@@ -420,36 +431,28 @@ export const prefetchAllFamiliesData = async (academicYear, currentTerm) => {
     ]);
 
     const families = await getCachedAllFamilies();
-
     const results = await Promise.all(
       families.map((f) => preCacheFamilyData(f.id, academicYear, currentTerm)),
     );
 
-    const successCount = results.filter((r) => r.success).length;
-    // console.log(`Prefetched ${successCount}/${families.length} families`);
-
     return {
       success: true,
       familiesCount: families.length,
-      cachedCount: successCount,
+      cachedCount: results.filter((r) => r.success).length,
     };
-  } catch (error) {
-    console.error("Error prefetching families data:", error);
-    return {
-      success: false,
-      error,
-    };
+  } catch (err) {
+    console.error("Error prefetching families data:", err);
+    return { success: false, error: err };
   }
 };
 
-/**
- * Smart data fetcher that handles offline gracefully
- */
+// ─── Offline fallback ─────────────────────────────────────────────────────────
+
 export const fetchWithOfflineFallback = async (fetchFn, fallbackValue = null) => {
   try {
     return await fetchFn();
-  } catch (error) {
-    console.warn("Fetch failed, using fallback:", error);
+  } catch (err) {
+    console.warn("Fetch failed, using fallback:", err);
     return fallbackValue;
   }
 };

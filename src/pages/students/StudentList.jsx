@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getAllStudents, deleteStudent } from "./studentService";
+import { getAllStudents, deleteStudentWithEnrollments } from "./studentService";
 import { getEnrollmentsByFilter } from "./enrollmentService";
 import SetTermButton from "./Settermbutton";
 import {
@@ -29,9 +29,41 @@ import { FormModal, ConfirmModal } from "../../components/common/Modal";
 const TERMS = ["1st Term", "2nd Term", "3rd Term"];
 const ITEMS_PER_PAGE = 10;
 
+// ─── Sort helpers ─────────────────────────────────────────────────────────────
+function parseClassName(name = "") {
+  const m = name.trim().match(/^(.*?)(\d+)\s*([A-Za-z]?)$/);
+  if (!m) return { prefix: name.trim(), level: Infinity, arm: "" };
+  return { prefix: m[1].trim(), level: parseInt(m[2], 10), arm: m[3].toUpperCase() };
+}
+
+function getGroupOrder(prefix = "") {
+  const p = prefix.toLowerCase();
+  if (p.includes("creche") || p.includes("daycare")) return 0;
+  if (p.includes("kg") || p.includes("kindergarten")) return 1;
+  if (p.includes("nursery")) return 2;
+  if (p.includes("primary")) return 3;
+  if (p.includes("jss") || p.includes("junior")) return 4;
+  if (p.includes("ss") || p.includes("senior") || p.includes("secondary")) return 5;
+  return 6;
+}
+
+function sortClasses(list = []) {
+  return [...list].sort((a, b) => {
+    const pa = parseClassName(a.name);
+    const pb = parseClassName(b.name);
+    const go = getGroupOrder(pa.prefix) - getGroupOrder(pb.prefix);
+    if (go !== 0) return go;
+    if (pa.prefix !== pb.prefix) return pa.prefix.localeCompare(pb.prefix);
+    if (pa.level !== pb.level) return pa.level - pb.level;
+    return pa.arm.localeCompare(pb.arm);
+  });
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function StudentList() {
   const [students, setStudents] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
+  const [hasEnrollments, setHasEnrollments] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [classes, setClasses] = useState([]);
   const [families, setFamilies] = useState([]);
@@ -49,13 +81,11 @@ export default function StudentList() {
   const [allSessions, setAllSessions] = useState([]);
   const { can } = useRole();
 
-  // true = studentEnrollments has data (new model)
-  // false = students still carry session/classId directly (old model)
-  const isNewModel = enrollments.length > 0;
-
+  // ── Load ──────────────────────────────────────────────────────────────────
   const loadAllData = async () => {
     try {
       setLoading(true);
+
       const [studentData, classData, familyData, appSettings] = await Promise.all([
         getAllStudents(),
         getClasses(),
@@ -66,22 +96,31 @@ export default function StudentList() {
       const defaultSession = appSettings?.academicYear || null;
       const defaultTerm = appSettings?.currentTerm || null;
 
+      // Enrollments for current session/term (active only)
       const enrollmentData = await getEnrollmentsByFilter({
         session: defaultSession || undefined,
         term: defaultTerm || undefined,
       });
 
+      // Check if ANY active enrollments exist (unfiltered) to detect model
+      // status: "active" is already applied inside getEnrollmentsByFilter
+      const anyEnrollments = await getEnrollmentsByFilter({});
+      const newModel = (anyEnrollments || []).length > 0;
+
       setStudents(studentData || []);
       setClasses(classData || []);
       setFamilies(familyData || []);
       setEnrollments(enrollmentData || []);
+      setHasEnrollments(newModel);
       setSelectedSession(defaultSession);
       setSelectedTerm(defaultTerm);
 
-      const sessions = [...new Set((studentData || []).map((s) => s.session).filter(Boolean))]
-        .sort()
-        .reverse();
-      setAllSessions(sessions);
+      // Sessions list from enrollment docs (new model) or student docs (old model)
+      const sessionSource = newModel
+        ? anyEnrollments.map((e) => e.session)
+        : (studentData || []).map((s) => s.session);
+
+      setAllSessions([...new Set(sessionSource.filter(Boolean))].sort().reverse());
     } catch (error) {
       console.error("Error loading Student List data:", error);
     } finally {
@@ -93,15 +132,16 @@ export default function StudentList() {
     loadAllData();
   }, []);
 
+  // ── Reload enrollments when filters change ────────────────────────────────
   const reloadEnrollments = async (session, term, classId) => {
     try {
       setEnrollmentsLoading(true);
-      const enrollmentData = await getEnrollmentsByFilter({
+      const data = await getEnrollmentsByFilter({
         session: session || undefined,
         term: term || undefined,
         classId: classId || undefined,
       });
-      setEnrollments(enrollmentData || []);
+      setEnrollments(data || []);
       setCurrentPage(1);
     } catch (error) {
       console.error("Error reloading enrollments:", error);
@@ -110,36 +150,12 @@ export default function StudentList() {
     }
   };
 
-  const getClassName = (classId) => classes.find((c) => c.id === classId)?.name ?? "Not Assigned";
-  const getFamilyName = (familyId) =>
-    families.find((f) => f.id === familyId)?.familyName ?? "No Family";
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const getClassName = (cid) => classes.find((c) => c.id === cid)?.name ?? "Not Assigned";
+  const getFamilyName = (fid) => families.find((f) => f.id === fid)?.familyName ?? "No Family";
 
-  const getClassLevel = (name = "") => {
-    const n = name.toLowerCase();
-    if (n.includes("creche") || n.includes("daycare")) return 0;
-    if (n.includes("kg")) return 1;
-    if (n.includes("nursery")) return 2;
-    if (n.includes("primary")) return 3;
-    if (n.includes("jss")) return 4;
-    if (n.includes("ss")) return 5;
-    return 6;
-  };
-
-  const getClassOrderNumber = (name = "") => {
-    const match = name.match(/\d+/);
-    return match ? Number(match[0]) : 0;
-  };
-
-  const sortClasses = (list = []) =>
-    [...list].sort((a, b) => {
-      const levelDiff = getClassLevel(a.name) - getClassLevel(b.name);
-      if (levelDiff !== 0) return levelDiff;
-      return getClassOrderNumber(a.name) - getClassOrderNumber(b.name);
-    });
-
-  // NEW MODEL: join enrollments + students
-  // OLD MODEL: read directly from student docs
-  const displayData = isNewModel
+  // ── Build display rows ────────────────────────────────────────────────────
+  const displayData = hasEnrollments
     ? enrollments
         .map((enrollment) => {
           const student = students.find((s) => s.id === enrollment.studentId);
@@ -161,7 +177,7 @@ export default function StudentList() {
         resolvedFamilyName: getFamilyName(s.familyId),
       }));
 
-  // Search
+  // ── Search ────────────────────────────────────────────────────────────────
   let finalFilteredStudents = filterData(displayData, searchQuery, [
     "firstName",
     "lastName",
@@ -169,8 +185,8 @@ export default function StudentList() {
     "resolvedFamilyName",
   ]);
 
-  // Old model: filter client-side (new model filters via Firestore in reloadEnrollments)
-  if (!isNewModel) {
+  // Old model: filter client-side
+  if (!hasEnrollments) {
     if (selectedClassId)
       finalFilteredStudents = finalFilteredStudents.filter((s) => s.classId === selectedClassId);
     if (selectedSession)
@@ -181,6 +197,7 @@ export default function StudentList() {
       finalFilteredStudents = finalFilteredStudents.filter((s) => s.term === selectedTerm);
   }
 
+  // ── Pagination ────────────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(finalFilteredStudents.length / ITEMS_PER_PAGE));
 
   useEffect(() => {
@@ -192,34 +209,36 @@ export default function StudentList() {
     currentPage * ITEMS_PER_PAGE,
   );
 
+  // ── Export ────────────────────────────────────────────────────────────────
   const exportHeaders = ["Student Name", "Class", "Session", "Term", "Family", "Status"];
-  const exportRows = finalFilteredStudents.map((student) => [
-    `${student.firstName} ${student.lastName}`,
-    student.resolvedClassName,
-    student.session,
-    student.term,
-    student.resolvedFamilyName,
+  const exportRows = finalFilteredStudents.map((s) => [
+    `${s.firstName} ${s.lastName}`,
+    s.resolvedClassName,
+    s.session,
+    s.term,
+    s.resolvedFamilyName,
     "Active",
   ]);
 
+  // ── Filter handlers ───────────────────────────────────────────────────────
   const handleClassChange = (e) => {
     const val = e.target.value || null;
     setSelectedClassId(val);
-    if (isNewModel) reloadEnrollments(selectedSession, selectedTerm, val);
+    if (hasEnrollments) reloadEnrollments(selectedSession, selectedTerm, val);
     else setCurrentPage(1);
   };
 
   const handleSessionChange = (e) => {
     const val = e.target.value || null;
     setSelectedSession(val);
-    if (isNewModel) reloadEnrollments(val, selectedTerm, selectedClassId);
+    if (hasEnrollments) reloadEnrollments(val, selectedTerm, selectedClassId);
     else setCurrentPage(1);
   };
 
   const handleTermChange = (e) => {
     const val = e.target.value || null;
     setSelectedTerm(val);
-    if (isNewModel) reloadEnrollments(selectedSession, val, selectedClassId);
+    if (hasEnrollments) reloadEnrollments(selectedSession, val, selectedClassId);
     else setCurrentPage(1);
   };
 
@@ -229,7 +248,7 @@ export default function StudentList() {
       label: `Class: ${getClassName(selectedClassId)}`,
       clear: () => {
         setSelectedClassId(null);
-        if (isNewModel) reloadEnrollments(selectedSession, selectedTerm, null);
+        if (hasEnrollments) reloadEnrollments(selectedSession, selectedTerm, null);
         else setCurrentPage(1);
       },
     },
@@ -238,7 +257,7 @@ export default function StudentList() {
       label: `Session: ${selectedSession}`,
       clear: () => {
         setSelectedSession(null);
-        if (isNewModel) reloadEnrollments(null, selectedTerm, selectedClassId);
+        if (hasEnrollments) reloadEnrollments(null, selectedTerm, selectedClassId);
         else setCurrentPage(1);
       },
     },
@@ -247,16 +266,35 @@ export default function StudentList() {
       label: `Term: ${selectedTerm}`,
       clear: () => {
         setSelectedTerm(null);
-        if (isNewModel) reloadEnrollments(selectedSession, null, selectedClassId);
+        if (hasEnrollments) reloadEnrollments(selectedSession, null, selectedClassId);
         else setCurrentPage(1);
       },
     },
   ].filter(Boolean);
 
+  // ── Delete ────────────────────────────────────────────────────────────────
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteStudentWithEnrollments(deleteTarget.id);
+      setStudents((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      setEnrollments((prev) => prev.filter((e) => e.studentId !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error("Delete failed:", err);
+      alert("Failed to delete student. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
   if (loading) return <StudentListSkeleton />;
 
   return (
     <div className='student-list-container'>
+      {/* ── Header ── */}
       <div className='list-page-header'>
         <div className='header-title'>
           <HiOutlineAcademicCap className='main-icon' />
@@ -271,13 +309,9 @@ export default function StudentList() {
         </div>
       </div>
 
-      <SetTermButton
-        onDone={(result) => {
-          console.log(result);
-          loadAllData();
-        }}
-      />
+      <SetTermButton onDone={() => loadAllData()} />
 
+      {/* ── Add Student ── */}
       <div className='add_button'>
         {can(PERMISSIONS.CREATE_STUDENT) && (
           <CustomButton
@@ -300,6 +334,7 @@ export default function StudentList() {
         )}
       </div>
 
+      {/* ── Form Modal ── */}
       {modalOpen && (
         <FormModal
           title={editStudent ? "Edit Student" : "Add Student"}
@@ -326,6 +361,7 @@ export default function StudentList() {
         </FormModal>
       )}
 
+      {/* ── Search ── */}
       <div className='table-controls'>
         <div className='search-box'>
           <HiSearch className='search-icon' />
@@ -343,6 +379,7 @@ export default function StudentList() {
 
       <TableToolbar fileName='students' headers={exportHeaders} rows={exportRows} />
 
+      {/* ── Filters ── */}
       <div className='student-filters'>
         <CustomSelect
           name='class'
@@ -379,6 +416,7 @@ export default function StudentList() {
         />
       </div>
 
+      {/* ── Active filter pills ── */}
       {activeFilters.length > 0 && (
         <div
           style={{
@@ -420,7 +458,7 @@ export default function StudentList() {
                 setSelectedClassId(null);
                 setSelectedSession(null);
                 setSelectedTerm(null);
-                if (isNewModel) reloadEnrollments(null, null, null);
+                if (hasEnrollments) reloadEnrollments(null, null, null);
                 else setCurrentPage(1);
               }}
               style={{
@@ -438,6 +476,7 @@ export default function StudentList() {
         </div>
       )}
 
+      {/* ── Table ── */}
       <div className='table-card'>
         <table className='data-table'>
           <thead>
@@ -527,6 +566,7 @@ export default function StudentList() {
           </tbody>
         </table>
 
+        {/* ── Pagination ── */}
         <div
           style={{
             display: "flex",
@@ -569,24 +609,13 @@ export default function StudentList() {
         </div>
       </div>
 
+      {/* ── Delete Confirm Modal ── */}
       {deleteTarget && (
         <ConfirmModal
           entityName={`${deleteTarget.firstName} ${deleteTarget.lastName}`}
           loading={deleting}
-          onClose={() => setDeleteTarget(null)}
-          onConfirm={async () => {
-            setDeleting(true);
-            try {
-              await deleteStudent(deleteTarget.id);
-              setStudents((prev) => prev.filter((s) => s.id !== deleteTarget.id));
-              setEnrollments((prev) => prev.filter((e) => e.studentId !== deleteTarget.id));
-              setDeleteTarget(null);
-            } catch (err) {
-              console.error(err);
-            } finally {
-              setDeleting(false);
-            }
-          }}
+          onClose={() => !deleting && setDeleteTarget(null)}
+          onConfirm={handleDelete}
         />
       )}
     </div>

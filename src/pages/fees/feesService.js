@@ -13,9 +13,11 @@ import {
 
 const feesRef = collection(db, "fees");
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 /**
  * Normalize term strings so old data ("Second Term") matches new data ("2nd Term").
- * This is the single fix point — all reads go through here.
+ * All reads and writes go through here — single fix point.
  */
 function normalizeTerm(term) {
   if (!term) return "";
@@ -30,12 +32,30 @@ function normalizeTerm(term) {
   return map[term.toLowerCase()] ?? term;
 }
 
+/**
+ * Check if a fee already exists for the same class/session/term/feeType.
+ * Queries by classId + session + feeType, then filters term client-side
+ * to handle old docs that stored "Second Term" vs "2nd Term".
+ */
+const feeExists = async ({ classId, session, term, feeType }) => {
+  const q = query(
+    feesRef,
+    where("classId", "==", classId),
+    where("session", "==", session),
+    where("feeType", "==", feeType),
+  );
+  const snapshot = await getDocs(q);
+  const normalizedTerm = normalizeTerm(term);
+  return snapshot.docs.some((d) => normalizeTerm(d.data().term) === normalizedTerm);
+};
+
+// ─── Exports ──────────────────────────────────────────────────────────────────
+
 export const createFee = async (feeData) => {
   const exists = await feeExists(feeData);
-
   if (exists) {
     console.warn("Duplicate fee skipped:", feeData);
-    return null; // skip duplicate
+    return null;
   }
 
   return await addDoc(feesRef, {
@@ -45,51 +65,40 @@ export const createFee = async (feeData) => {
   });
 };
 
-const feeExists = async ({ classId, session, term, feeType }) => {
-  const q = query(
-    feesRef,
-    where("classId", "==", classId),
-    where("session", "==", session),
-    where("feeType", "==", feeType),
-  );
-
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs.some((doc) => normalizeTerm(doc.data().term) === normalizeTerm(term));
-};
-
+/**
+ * Create multiple fees in parallel.
+ * Duplicate-checks run concurrently; only non-duplicate fees are written.
+ */
 export const createBulkFees = async (feesArray) => {
-  const results = [];
+  // Check all fees for duplicates concurrently
+  const existsFlags = await Promise.all(feesArray.map((fee) => feeExists(fee)));
 
-  for (const fee of feesArray) {
-    const exists = await feeExists(fee);
-
-    if (!exists) {
-      const res = await addDoc(feesRef, {
+  // Write non-duplicate fees concurrently
+  const writePromises = feesArray
+    .filter((_, i) => !existsFlags[i])
+    .map((fee) =>
+      addDoc(feesRef, {
         ...fee,
         term: normalizeTerm(fee.term),
         createdAt: new Date(),
-      });
-      results.push(res);
-    } else {
-      console.warn("Skipped duplicate:", fee);
-    }
-  }
+      }),
+    );
 
-  return results;
+  const skipped = existsFlags.filter(Boolean).length;
+  if (skipped > 0) console.warn(`Skipped ${skipped} duplicate fee(s).`);
+
+  return await Promise.all(writePromises);
 };
 
 export const getFees = async () => {
   const q = query(feesRef, orderBy("createdAt", "desc"));
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data(),
-    // Normalize on read — fixes any docs saved with old "Second Term" format
-    term: normalizeTerm(docSnap.data().term),
-    // Normalize session field name — some docs may use "academicYear" vs "session"
-    session: docSnap.data().session || docSnap.data().academicYear || "",
+  return snapshot.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+    term: normalizeTerm(d.data().term),
+    session: d.data().session || d.data().academicYear || "",
   }));
 };
 
@@ -108,28 +117,29 @@ export const deleteFee = async (id) => {
 };
 
 /**
- * ✅ KEY FIX: getFeesByClass now tries both the normalized term AND a Firestore
- * query. Because Firestore can't query with OR on the same field without a
- * composite index trick, we fetch by session+class and filter term client-side.
- * This guarantees matches even if old fee docs used "Second Term".
+ * Get fees for a specific class, session, and term.
+ *
+ * Queries by classId + session only, then filters term client-side.
+ * This handles old docs where term may be stored as "Second Term".
+ *
+ * Returns [] immediately if classId is null/undefined — a student with
+ * no active enrollment this term has no classId and should show no fees.
  */
 export const getFeesByClass = async (classId, session, term) => {
   if (!classId || !session || !term) return [];
 
   const normalizedTerm = normalizeTerm(term);
 
-  // Query by classId + session only, then filter term client-side
-  // This handles old docs where term may be stored as "Second Term"
   const q = query(feesRef, where("classId", "==", classId), where("session", "==", session));
 
   const snapshot = await getDocs(q);
 
   return snapshot.docs
-    .map((docSnap) => ({
-      id: docSnap.id,
-      ...docSnap.data(),
-      term: normalizeTerm(docSnap.data().term),
-      session: docSnap.data().session || docSnap.data().academicYear || "",
+    .map((d) => ({
+      id: d.id,
+      ...d.data(),
+      term: normalizeTerm(d.data().term),
+      session: d.data().session || d.data().academicYear || "",
     }))
     .filter((fee) => fee.term === normalizedTerm);
 };

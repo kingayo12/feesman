@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { getFamilyById } from "./familyService";
 import { getStudentsByFamily } from "../students/studentService";
+import { getEnrollmentsByFilter } from "../students/enrollmentService";
 import { getPaymentsByFamily } from "../fees/paymentService";
 import { getClasses } from "../classes/classService";
 import StudentForm from "../../components/forms/StudentForm";
@@ -28,6 +29,7 @@ import {
   HiX,
 } from "react-icons/hi";
 
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 function FamilyDetailsSkeleton() {
   return (
     <div className='details-container'>
@@ -49,7 +51,6 @@ function FamilyDetailsSkeleton() {
         </div>
         <Bone w={120} h={42} r={12} />
       </div>
-
       <div className='details-grid'>
         <div className='content-card'>
           <div className='card-header'>
@@ -59,9 +60,9 @@ function FamilyDetailsSkeleton() {
             <Bone w={100} h={36} r={10} />
           </div>
           <div style={{ display: "grid", gap: 16 }}>
-            {Array.from({ length: 4 }).map((_, index) => (
+            {Array.from({ length: 4 }).map((_, i) => (
               <div
-                key={index}
+                key={i}
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr 1fr",
@@ -78,11 +79,10 @@ function FamilyDetailsSkeleton() {
             ))}
           </div>
         </div>
-
         <div className='content-card'>
           <Bone w='60%' h={22} style={{ marginBottom: 16 }} />
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
               <Bone w='40%' h={18} />
               <Bone w='30%' h={18} />
             </div>
@@ -93,25 +93,26 @@ function FamilyDetailsSkeleton() {
   );
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function FamilyDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { can } = useRole();
 
   const [family, setFamily] = useState(null);
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState([]); // enriched with enrollment data
   const [payments, setPayments] = useState([]);
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [classes, setClasses] = useState([]);
   const [settings, setSettings] = useState({});
   const [showReceipt, setShowReceipt] = useState(false);
-  const [feesByStudent, setFeesByStudent] = useState({}); // term fees
-  const [prevByStudent, setPrevByStudent] = useState({}); // previous balances
+  const [feesByStudent, setFeesByStudent] = useState({});
+  const [prevByStudent, setPrevByStudent] = useState({});
   const [loading, setLoading] = useState(true);
 
+  // ── Load ──────────────────────────────────────────────────────────────────
   const loadAll = async () => {
     setLoading(true);
-
     try {
       const appSettings = await getSettings();
       const session = appSettings?.academicYear;
@@ -119,43 +120,73 @@ export default function FamilyDetails() {
 
       if (!session || !term) {
         console.error("Missing session or term in settings:", appSettings);
+        setLoading(false);
         return;
       }
 
       const [fam, studs, pays, cls] = await Promise.all([
         getFamilyById(id),
-        getStudentsByFamily(id, session),
+        getStudentsByFamily(id), // identity only — no session arg
         getPaymentsByFamily(id, session, term),
         getClasses(),
       ]);
 
+      const studentIds = (studs || []).map((s) => s.id);
+
+      // Fetch active enrollments for current session+term,
+      // then filter to only this family's students client-side
+      let enrMap = {};
+      if (studentIds.length > 0) {
+        const allEnrollments = await getEnrollmentsByFilter({ session, term });
+        for (const e of allEnrollments || []) {
+          if (studentIds.includes(e.studentId)) {
+            enrMap[e.studentId] = e;
+          }
+        }
+      }
+
+      // Enrich student identity docs with current enrollment fields
+      const enrichedStudents = (studs || []).map((s) => ({
+        ...s,
+        classId: enrMap[s.id]?.classId || null,
+        session: enrMap[s.id]?.session || null,
+        term: enrMap[s.id]?.term || null,
+      }));
+
+      // Build fee + previous balance maps
       const feeMap = {};
       const prevMap = {};
 
-      for (const student of studs) {
+      for (const student of enrichedStudents) {
+        if (!student.classId) {
+          feeMap[student.id] = 0;
+          prevMap[student.id] = 0;
+          continue;
+        }
+
         const [studentFees, overrides, prevBal] = await Promise.all([
           getFeesByClass(student.classId, session, term),
           getStudentFeeOverrides(student.id),
-          getPreviousBalanceAmount(student.id, session), // ← fetch previous balance
+          getPreviousBalanceAmount(student.id, session),
         ]);
 
         const disabledFeeIds = new Set(overrides.map((o) => o.feeId));
-        const termTotal = studentFees.reduce(
+        const termTotal = (studentFees || []).reduce(
           (sum, fee) => (disabledFeeIds.has(fee.id) ? sum : sum + Number(fee.amount)),
           0,
         );
 
-        feeMap[student.id] = termTotal + prevBal; // term fees + arrears
+        feeMap[student.id] = termTotal + prevBal;
         prevMap[student.id] = prevBal;
       }
 
+      setFamily(fam);
+      setStudents(enrichedStudents);
+      setPayments(pays || []);
+      setClasses(cls || []);
+      setSettings(appSettings);
       setFeesByStudent(feeMap);
       setPrevByStudent(prevMap);
-      setFamily(fam);
-      setStudents(studs);
-      setPayments(pays);
-      setClasses(cls);
-      setSettings(appSettings);
     } catch (error) {
       console.error("Failed to load family details:", error);
     } finally {
@@ -167,20 +198,18 @@ export default function FamilyDetails() {
     loadAll();
   }, [id]);
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const getClassName = (classId) => classes.find((c) => c.id === classId)?.name ?? "Not Assigned";
 
   const getStudentPaid = (studentId) =>
     payments.filter((p) => p.studentId === studentId).reduce((sum, p) => sum + Number(p.amount), 0);
 
-  const getStudentBalance = (studentId) =>
-    (feesByStudent[studentId] || 0) - getStudentPaid(studentId);
-
   const familyTotalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
   const familyTotalFees = students.reduce((sum, s) => sum + (feesByStudent[s.id] || 0), 0);
   const familyBalance = familyTotalFees - familyTotalPaid;
-
   const totalArrears = students.reduce((sum, s) => sum + (prevByStudent[s.id] || 0), 0);
 
+  // ── Render ────────────────────────────────────────────────────────────────
   if (loading || !family) return <FamilyDetailsSkeleton />;
 
   return (
@@ -189,6 +218,7 @@ export default function FamilyDetails() {
         <HiArrowLeft /> Back to List
       </button>
 
+      {/* ── Profile Header ── */}
       <div className='profile-header'>
         <div className='family-badge'>{family.familyName.charAt(0)}</div>
         <div className='header-info'>
@@ -219,7 +249,7 @@ export default function FamilyDetails() {
       </div>
 
       <div className='details-grid'>
-        {/* Students */}
+        {/* ── Students ── */}
         <div className='content-card students-section'>
           <div className='card-header'>
             <div className='title-row'>
@@ -229,7 +259,7 @@ export default function FamilyDetails() {
             {can(PERMISSIONS.CREATE_STUDENT) && (
               <button
                 className={`action-btn ${showAddStudent ? "cancel" : "add"}`}
-                onClick={() => setShowAddStudent(!showAddStudent)}
+                onClick={() => setShowAddStudent((v) => !v)}
               >
                 {showAddStudent ? (
                   "Cancel"
@@ -272,7 +302,9 @@ export default function FamilyDetails() {
                         {student.firstName} {student.lastName}
                       </h4>
                       <p>
-                        {student.session} • {getClassName(student.classId)}
+                        {student.session
+                          ? `${student.session} • ${getClassName(student.classId)}`
+                          : "Not enrolled this term"}
                       </p>
                       {prevBal > 0 && (
                         <span style={{ fontSize: 11, color: "#d97706", fontWeight: 600 }}>
@@ -290,7 +322,7 @@ export default function FamilyDetails() {
           </div>
         </div>
 
-        {/* Family Summary */}
+        {/* ── Financial Summary ── */}
         <div className='content-card summary-section'>
           <h3>{family.familyName} Family Financial Summary</h3>
 

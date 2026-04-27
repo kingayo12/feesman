@@ -38,26 +38,55 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
   };
   if (!selectedSession || !selectedTerm) return empty;
 
-  const [studentsSnap, paymentsSnap, recentSnap, allTermPaymentsSnap] = await Promise.all([
+  const normalizedTerm = normalizeTerm(selectedTerm);
+
+  // 1. Get all active students (identity only - no session/classId)
+  const allStudentsSnap = await getDocs(
+    query(collection(db, "students"), where("status", "==", "active")),
+  );
+  const allStudents = allStudentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  // 2. Get enrollments for selected session+term
+  const enrollmentsSnap = await getDocs(
+    query(
+      collection(db, "studentEnrollments"),
+      where("session", "==", selectedSession),
+      where("term", "==", normalizedTerm),
+      where("status", "==", "active"),
+    ),
+  );
+  const enrollments = enrollmentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const enrollmentMap = {};
+  const enrolledStudentIds = new Set();
+  enrollments.forEach((e) => {
+    enrollmentMap[e.studentId] = e;
+    enrolledStudentIds.add(e.studentId);
+  });
+
+  // 3. Filter students to only those enrolled in this session+term, then enrich with classId
+  const students = allStudents
+    .filter((s) => enrolledStudentIds.has(s.id))
+    .map((s) => ({
+      ...s,
+      classId: enrollmentMap[s.id]?.classId || null,
+      term: enrollmentMap[s.id]?.term || null,
+      session: enrollmentMap[s.id]?.session || null,
+    }));
+
+  // 4. Get payments for this session+term
+  const [paymentsSnap, recentSnap, allTermPaymentsSnap] = await Promise.all([
     getDocs(
       query(
-        collection(db, "students"),
+        collection(db, "payments"),
         where("session", "==", selectedSession),
-        where("status", "==", "active"),
+        where("term", "==", normalizedTerm),
       ),
     ),
     getDocs(
       query(
         collection(db, "payments"),
         where("session", "==", selectedSession),
-        where("term", "==", normalizeTerm(selectedTerm)),
-      ),
-    ),
-    getDocs(
-      query(
-        collection(db, "payments"),
-        where("session", "==", selectedSession),
-        where("term", "==", normalizeTerm(selectedTerm)),
+        where("term", "==", normalizedTerm),
         orderBy("date", "desc"),
         limit(5),
       ),
@@ -65,7 +94,6 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
     getDocs(query(collection(db, "payments"), where("session", "==", selectedSession))),
   ]);
 
-  const students = studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const payments = paymentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const allPayments = allTermPaymentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
@@ -108,7 +136,7 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
           collection(db, "fees"),
           where("classId", "==", student.classId),
           where("session", "==", selectedSession),
-          where("term", "==", normalizeTerm(selectedTerm)),
+          where("term", "==", normalizedTerm),
         )
       : null;
 

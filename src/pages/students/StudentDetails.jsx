@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getStudentById } from "./studentService";
+import { getStudentById, getStudentsByFamily } from "./studentService";
 import { getFeesByClass } from "../fees/feesService";
 import { getPaymentsByStudent } from "../fees/paymentService";
 import { getClasses } from "../classes/classService";
-import { getStudentsByFamily } from "./studentService";
+import { getCurrentEnrollment } from "./enrollmentService";
 import PaymentForm from "../../components/forms/PaymentForm";
 import StudentReceipt from "./StudentReciept";
 import { formatDate } from "../../utils/helpers";
@@ -44,6 +44,7 @@ export default function StudentDetails() {
   const navigate = useNavigate();
 
   const [student, setStudent] = useState(null);
+  const [enrollment, setEnrollment] = useState(null); // current active enrollment
   const [fees, setFees] = useState([]);
   const [payments, setPayments] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -57,28 +58,42 @@ export default function StudentDetails() {
   const [discountData, setDiscountData] = useState({ totalDiscount: 0, breakdown: [] });
   const { can } = useRole();
 
+  // ── Derived from enrollment (not student doc) ─────────────────────────────
+  // classId and session now live in studentEnrollments, not the student doc.
+  const classId = enrollment?.classId || null;
+  const session = enrollment?.session || settings?.academicYear || "";
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const getClassName = (cid) => classes.find((c) => c.id === cid)?.name ?? "Not Assigned";
+
   const loadPayments = async () => {
     try {
       setPayments((await getPaymentsByStudent(id)) || []);
     } catch (e) {
-      console.error(e);
+      console.error("loadPayments error:", e);
     }
   };
+
   const refreshOverrides = async () => {
-    setOverrides(await getStudentFeeOverrides(id));
+    try {
+      setOverrides((await getStudentFeeOverrides(id)) || []);
+    } catch (e) {
+      console.error("refreshOverrides error:", e);
+    }
   };
 
-  const loadFeesForTerm = async (classId, session, term) => {
+  const loadFeesForTerm = async (cid, sess, term) => {
     try {
-      if (!classId || !session || !term) return;
-      setFees((await getFeesByClass(classId, session, term)) || []);
+      if (!cid || !sess || !term) {
+        setFees([]);
+        return;
+      }
+      setFees((await getFeesByClass(cid, sess, term)) || []);
     } catch (e) {
-      console.error(e);
+      console.error("loadFeesForTerm error:", e);
       setFees([]);
     }
   };
-
-  const getClassName = (classId) => classes.find((c) => c.id === classId)?.name ?? "Loading…";
 
   const handleToggleFee = async (feeId) => {
     try {
@@ -92,67 +107,86 @@ export default function StudentDetails() {
     }
   };
 
+  // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     async function init() {
       try {
         setLoading(true);
-        const [appSettings, classData, studentData] = await Promise.all([
+
+        const [appSettings, classData, studentData, enrollmentData] = await Promise.all([
           getSettings(),
           getClasses(),
           getStudentById(id),
+          getCurrentEnrollment(id), // ← fetch active enrollment
         ]);
-        setSettings(appSettings);
-        setClasses(classData);
-        setStudent(studentData);
 
-        const session = appSettings?.academicYear;
+        setSettings(appSettings || {});
+        setClasses(classData || []);
+        setStudent(studentData);
+        setEnrollment(enrollmentData); // may be null if not enrolled this term
+
+        const activeSession = enrollmentData?.session || appSettings?.academicYear;
+        const activeTerm = enrollmentData?.term || appSettings?.currentTerm || "1st Term";
 
         // Previous balance
-        if (session) {
-          const pb = await getPreviousBalance(id, session);
-          setPrevBalance(pb ? Number(pb.amount || 0) : 0);
+        if (activeSession) {
+          try {
+            const pb = await getPreviousBalance(id, activeSession);
+            setPrevBalance(pb ? Number(pb.amount || 0) : 0);
+          } catch {
+            setPrevBalance(0);
+          }
         }
 
-        // Discounts — load sibling count, active discounts, assignments
-        if (session && studentData?.familyId) {
-          const [siblings, activeDiscounts, famAssignments, stuAssignments] = await Promise.all([
-            getStudentsByFamily(studentData.familyId, session),
-            getActiveDiscounts(session),
-            getAssignmentsForFamily(studentData.familyId, session),
-            getAssignmentsForStudent(id, session),
-          ]);
+        // Discounts
+        if (activeSession && studentData?.familyId) {
+          try {
+            // getStudentsByFamily accepts only familyId — no session arg
+            const [siblings, activeDiscounts, famAssignments, stuAssignments] = await Promise.all([
+              getStudentsByFamily(studentData.familyId),
+              getActiveDiscounts(activeSession),
+              getAssignmentsForFamily(studentData.familyId, activeSession),
+              getAssignmentsForStudent(id, activeSession),
+            ]);
 
-          // Discount calculation depends on effectiveFees — computed after fees load,
-          // store raw data now and re-compute in useEffect when fees change
-          setDiscountData({
-            _raw: {
-              activeDiscounts,
-              famAssignments,
-              stuAssignments,
-              siblingCount: siblings.length,
-            },
-            totalDiscount: 0,
-            breakdown: [],
-          });
+            setDiscountData({
+              _raw: {
+                activeDiscounts,
+                famAssignments,
+                stuAssignments,
+                siblingCount: siblings.length,
+              },
+              totalDiscount: 0,
+              breakdown: [],
+            });
+          } catch (e) {
+            console.error("Discount load error:", e);
+          }
         }
 
         await Promise.all([refreshOverrides(), loadPayments()]);
-        setSelectedTerm(appSettings?.currentTerm || "1st Term");
+        setSelectedTerm(activeTerm);
       } catch (e) {
-        console.error(e);
+        console.error("StudentDetails init error:", e);
       } finally {
         setLoading(false);
       }
     }
+
     init();
   }, [id]);
 
+  // ── Reload fees when selected term changes ────────────────────────────────
+  // Uses classId + session from enrollment doc, not student doc.
   useEffect(() => {
-    if (student && selectedTerm)
-      loadFeesForTerm(student.classId, settings.academicYear || student.session, selectedTerm);
-  }, [selectedTerm, student, settings.academicYear]);
+    if (classId && session && selectedTerm) {
+      loadFeesForTerm(classId, session, selectedTerm);
+    } else {
+      setFees([]);
+    }
+  }, [selectedTerm, classId, session]);
 
-  // Re-compute discount whenever fees or overrides change
+  // ── Re-compute discount when fees or overrides change ────────────────────
   useEffect(() => {
     if (!discountData?._raw) return;
     const { activeDiscounts, famAssignments, stuAssignments, siblingCount } = discountData._raw;
@@ -160,7 +194,7 @@ export default function StudentDetails() {
     const result = computeStudentDiscount({
       studentId: id,
       familyId: student?.familyId,
-      session: settings.academicYear,
+      session,
       fees: effectiveFeeList,
       siblingCount,
       activeDiscounts,
@@ -170,12 +204,9 @@ export default function StudentDetails() {
     setDiscountData((prev) => ({ ...prev, ...result }));
   }, [fees, overrides, discountData?._raw]);
 
+  // ── Derived financials ────────────────────────────────────────────────────
   const disabledFeeIds = overrides.map((o) => o.feeId);
   const effectiveFees = fees.filter((f) => !disabledFeeIds.includes(f.id));
-
-  if (loading) return <StudentDetailsSkeleton />;
-  if (!student) return <div className='error-bar'>Student record not found.</div>;
-
   const currentTermFees = effectiveFees.reduce((s, f) => s + Number(f.amount || 0), 0);
   const termTotalFees = currentTermFees + prevBalance;
   const discount = discountData.totalDiscount || 0;
@@ -185,12 +216,17 @@ export default function StudentDetails() {
   const termBalance = netFees - termTotalPaid;
   const totalPaidAllTime = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
 
+  // ── Render ────────────────────────────────────────────────────────────────
+  if (loading) return <StudentDetailsSkeleton />;
+  if (!student) return <div className='error-bar'>Student record not found.</div>;
+
   return (
     <div className='student-details-wrapper'>
       <button className='back-link' onClick={() => navigate(-1)}>
         <HiArrowLeft /> Student Directory
       </button>
 
+      {/* ── Profile Hero ── */}
       <div className='profile-hero'>
         <div className='profile-main'>
           <div className='hero-avatar'>
@@ -201,8 +237,12 @@ export default function StudentDetails() {
               {student.firstName} {student.lastName}
             </h1>
             <p className='sub-info'>
-              <HiCalendar /> {settings.academicYear || student.session} •{" "}
-              <strong>{getClassName(student.classId)}</strong>
+              <HiCalendar /> {session || "No session"} • <strong>{getClassName(classId)}</strong>
+              {!enrollment && (
+                <span style={{ color: "#f59e0b", fontSize: 12, marginLeft: 8 }}>
+                  ⚠ Not enrolled this term
+                </span>
+              )}
               {prevBalance > 0 && (
                 <span className='prev-bal-badge'>
                   <HiExclamationCircle /> ₦{prevBalance.toLocaleString()} arrears
@@ -221,7 +261,7 @@ export default function StudentDetails() {
           {can(PERMISSIONS.EDIT_STUDENT) && (
             <button
               className={`pay-toggle-btn ${showPaymentForm ? "active" : ""}`}
-              onClick={() => setShowPaymentForm(!showPaymentForm)}
+              onClick={() => setShowPaymentForm((v) => !v)}
             >
               {showPaymentForm ? "Cancel" : "+ Record Payment"}
             </button>
@@ -237,7 +277,7 @@ export default function StudentDetails() {
         </div>
       </div>
 
-      {/* Banners */}
+      {/* ── Banners ── */}
       {prevBalance > 0 && (
         <div className='pb-alert-banner'>
           <HiExclamationCircle />
@@ -257,13 +297,34 @@ export default function StudentDetails() {
         </div>
       )}
 
+      {/* ── Not enrolled warning ── */}
+      {!enrollment && !loading && (
+        <div
+          style={{
+            padding: "0.75rem 1rem",
+            marginBottom: "1rem",
+            borderRadius: 8,
+            background: "#fefce8",
+            border: "1px solid #fde68a",
+            color: "#854d0e",
+            fontSize: 13,
+          }}
+        >
+          <HiExclamationCircle style={{ marginRight: 6, verticalAlign: "middle" }} />
+          This student has no active enrollment for the current term. Fees cannot be displayed until
+          they are enrolled. Use the <strong>Edit Student</strong> or <strong>Promote</strong> flow
+          to enroll them.
+        </div>
+      )}
+
+      {/* ── Payment Form ── */}
       {showPaymentForm && (
         <div className='form-card animate-slide'>
           <PaymentForm
             studentId={id}
             familyId={student.familyId}
             term={selectedTerm}
-            session={settings.academicYear}
+            session={session}
             onSuccess={() => {
               loadPayments();
               setShowPaymentForm(false);
@@ -272,6 +333,7 @@ export default function StudentDetails() {
         </div>
       )}
 
+      {/* ── Term Tabs ── */}
       <div className='term-selector-tabs'>
         {["1st Term", "2nd Term", "3rd Term"].map((term) => (
           <button
@@ -284,7 +346,7 @@ export default function StudentDetails() {
         ))}
       </div>
 
-      {/* Finance cards */}
+      {/* ── Finance Cards ── */}
       <div className='finance-grid'>
         <div className='finance-card'>
           <div className='f-icon blue'>
@@ -304,6 +366,7 @@ export default function StudentDetails() {
             )}
           </div>
         </div>
+
         <div className='finance-card'>
           <div className='f-icon green'>
             <HiCreditCard />
@@ -313,6 +376,7 @@ export default function StudentDetails() {
             <h3>₦{totalPaidAllTime.toLocaleString()}</h3>
           </div>
         </div>
+
         <div className='finance-card'>
           <div className={`f-icon ${termBalance > 0 ? "red" : "green-solid"}`}>
             <HiCurrencyDollar />
@@ -328,7 +392,7 @@ export default function StudentDetails() {
 
       <div className='details-layout-grid'>
         <div className='main-content finance_details'>
-          {/* Fee breakdown */}
+          {/* ── Fee Breakdown ── */}
           <div className='billing-card'>
             <div className='card-top'>
               <h4>{selectedTerm} Breakdown</h4>
@@ -348,7 +412,7 @@ export default function StudentDetails() {
                 </tr>
               </thead>
               <tbody>
-                {/* Arrears */}
+                {/* Arrears row */}
                 {prevBalance > 0 && (
                   <tr style={{ background: "#fffbeb" }}>
                     <td>
@@ -360,24 +424,26 @@ export default function StudentDetails() {
                     <td className='text-right font-bold' style={{ color: "#d97706" }}>
                       ₦{prevBalance.toLocaleString()}
                     </td>
-                    <td className='text-center'>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          padding: "2px 8px",
-                          borderRadius: 6,
-                          background: "#fef9c3",
-                          color: "#854d0e",
-                          fontWeight: 600,
-                        }}
-                      >
-                        Arrears
-                      </span>
-                    </td>
+                    {can(PERMISSIONS.MANAGE_DISCOUNTS) && (
+                      <td className='text-center'>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            background: "#fef9c3",
+                            color: "#854d0e",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Arrears
+                        </span>
+                      </td>
+                    )}
                   </tr>
                 )}
 
-                {/* Regular fees */}
+                {/* Fee rows */}
                 {fees.length ? (
                   fees.map((f) => {
                     const dis = disabledFeeIds.includes(f.id);
@@ -418,7 +484,9 @@ export default function StudentDetails() {
                 ) : (
                   <tr>
                     <td colSpan='3' className='empty-ledger'>
-                      No fees defined for this term.
+                      {!enrollment
+                        ? "Student is not enrolled this term."
+                        : "No fees defined for this term."}
                     </td>
                   </tr>
                 )}
@@ -449,23 +517,26 @@ export default function StudentDetails() {
                     <td className='text-right font-bold' style={{ color: "#16a34a" }}>
                       −₦{b.amount.toLocaleString()}
                     </td>
-                    <td className='text-center'>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          padding: "2px 8px",
-                          borderRadius: 6,
-                          background: "#dcfce7",
-                          color: "#15803d",
-                          fontWeight: 600,
-                        }}
-                      >
-                        Discount
-                      </span>
-                    </td>
+                    {can(PERMISSIONS.MANAGE_DISCOUNTS) && (
+                      <td className='text-center'>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            background: "#dcfce7",
+                            color: "#15803d",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Discount
+                        </span>
+                      </td>
+                    )}
                   </tr>
                 ))}
 
+                {/* Net total row */}
                 <tr className='total-row'>
                   <td>
                     <strong>Net Total</strong>
@@ -473,13 +544,13 @@ export default function StudentDetails() {
                   <td className='text-right'>
                     <strong>₦{netFees.toLocaleString()}</strong>
                   </td>
-                  {can(PERMISSIONS.MANAGE_DISCOUNTS) && <td></td>}
+                  {can(PERMISSIONS.MANAGE_DISCOUNTS) && <td />}
                 </tr>
               </tbody>
             </table>
           </div>
 
-          {/* Payments */}
+          {/* ── Payment History ── */}
           <div className='history-card'>
             <div className='card-top'>
               <h4>{selectedTerm} Payments</h4>
@@ -521,6 +592,7 @@ export default function StudentDetails() {
         </div>
       </div>
 
+      {/* ── Receipt Modal ── */}
       {receiptPayment && (
         <StudentReceipt
           payment={receiptPayment}
