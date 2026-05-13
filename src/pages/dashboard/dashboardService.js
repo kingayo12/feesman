@@ -8,8 +8,9 @@ import {
   getCachedAssignmentsForStudent,
   getCachedDiscounts,
 } from "../../utils/offlineDataManager";
+import { getCacheItem, getDashboardCacheKey, setCacheItem } from "../../utils/cache";
 import { computeStudentDiscount } from "../discount/Discountservice";
-
+import { TERMS } from "../../constants";
 function normalizeTerm(term) {
   if (!term) return "";
   const map = {
@@ -39,6 +40,12 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
   if (!selectedSession || !selectedTerm) return empty;
 
   const normalizedTerm = normalizeTerm(selectedTerm);
+  const cacheKey = getDashboardCacheKey(selectedSession, normalizedTerm);
+  const cachedStats = getCacheItem(cacheKey);
+
+  if (cachedStats) {
+    return cachedStats;
+  }
 
   // 1. Get all active students (identity only - no session/classId)
   const allStudentsSnap = await getDocs(
@@ -224,7 +231,6 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
     .slice(0, 8);
 
   // ── Term trend ────────────────────────────────────────────────────────────
-  const TERMS = ["1st Term", "2nd Term", "3rd Term"];
   const termTrend = TERMS.map((term) => ({
     term,
     paid: allPayments.filter((p) => p.term === term).reduce((s, p) => s + Number(p.amount || 0), 0),
@@ -254,7 +260,7 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
     };
   });
 
-  return {
+  const result = {
     totalStudents: students.length,
     totalFees: totalExpectedRevenue,
     totalPayments: totalPaymentsReceived,
@@ -266,6 +272,9 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
     termTrend,
     collectionByMethod,
   };
+
+  setCacheItem(cacheKey, result);
+  return result;
 };
 
 export async function getTodayPayments(academicYear, currentTerm) {
@@ -273,6 +282,12 @@ export async function getTodayPayments(academicYear, currentTerm) {
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
+  const todayCacheKey = getDashboardCacheKey(academicYear, `${normalizeTerm(currentTerm)}_today`);
+  const cachedToday = getCacheItem(todayCacheKey);
+
+  if (cachedToday) {
+    return cachedToday;
+  }
 
   try {
     const snap = await getDocs(
@@ -309,7 +324,9 @@ export async function getTodayPayments(academicYear, currentTerm) {
       amount: p.amount,
     }));
 
-    return { total, count: payments.length, studentsPaid, methodsUsed, recentPayments };
+    const result = { total, count: payments.length, studentsPaid, methodsUsed, recentPayments };
+    setCacheItem(getDashboardCacheKey(academicYear, `${normalizedTerm}_today`), result);
+    return result;
   } catch (err) {
     console.warn("[dashboardService] Failed to load today payments:", err);
     return { total: 0, count: 0, studentsPaid: 0, methodsUsed: 0, recentPayments: [] };

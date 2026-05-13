@@ -25,8 +25,7 @@ import { StudentListSkeleton } from "../../components/common/Skeleton";
 import CustomButton from "../../components/common/CustomButton";
 import CustomSelect from "../../components/common/SelectInput";
 import { FormModal, ConfirmModal } from "../../components/common/Modal";
-
-const TERMS = ["1st Term", "2nd Term", "3rd Term"];
+import { TERMS } from "../../constants";
 const ITEMS_PER_PAGE = 10;
 
 // ─── Sort helpers ─────────────────────────────────────────────────────────────

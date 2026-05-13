@@ -17,7 +17,7 @@ import ClassDetails from "./pages/classes/ClassDetails.jsx";
 
 import FeeSetup from "./pages/fees/FeeSetup.jsx";
 import PaymentHistory from "./pages/fees/PaymentHistory.jsx";
-import LetterTemplates from "./pages/letters/LetterTemplatesNew.jsx";
+import LetterTemplates from "./pages/letters/LetterTemplates.jsx";
 
 import SettingsPage from "./pages/settings/Setting.jsx";
 import MigrateTerms from "./pages/settings/MigrateTerms.jsx";
@@ -33,6 +33,7 @@ import MasterLayout from "./Layout/MasterLayout.jsx";
 
 import { PERMISSIONS } from "./config/permissions.js";
 import MigrationPage from "./pages/migration/MigrationPage";
+import Homepage from "./pages/landingPage/homepage.jsx";
 
 // Combines auth check + role check in one wrapper
 function Guard({ permission, children }) {
@@ -50,179 +51,172 @@ export default function AppRoutes() {
         {/* Public website */}
 
         {/* Auth routes */}
-        <Route path='/' element={<Login />} />
+        <Route path='/' element={<Homepage />} />
         <Route path='/login' element={<Login />} />
         <Route path='/register' element={<Register />} />
         <Route path='/forgot-password' element={<ForgotPassword />} />
 
         {/* All app pages inside MasterLayout */}
-        <Route
-          path='/*'
-          element={
-            <MasterLayout>
-              <Routes>
-                {/* Dashboard — every logged-in user can see this,
+        <Route path='/' element={<MasterLayout />}>
+          {/* Dashboard — every logged-in user can see this,
                     but Dashboard.jsx itself branches on role (user vs full) */}
-                <Route
-                  path='/dashboard'
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path='/migrate' element={<MigrationPage />} />
-                {/* Families */}
-                <Route
-                  path='/families'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_FAMILIES}>
-                      <FamilyList />
-                    </Guard>
-                  }
-                />
-                <Route
-                  path='/families/:id'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_FAMILIES}>
-                      <FamilyDetails />
-                    </Guard>
-                  }
-                />
+          <Route
+            path='/dashboard'
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route path='/migrate' element={<MigrationPage />} />
+          {/* Families */}
+          <Route
+            path='/families'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_FAMILIES}>
+                <FamilyList />
+              </Guard>
+            }
+          />
+          <Route
+            path='/families/:id'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_FAMILIES}>
+                <FamilyDetails />
+              </Guard>
+            }
+          />
 
-                {/* Students */}
-                <Route
-                  path='/students'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_STUDENTS}>
-                      <StudentList />
-                    </Guard>
-                  }
-                />
-                <Route
-                  path='/students/:id'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_STUDENTS}>
-                      <StudentDetails />
-                    </Guard>
-                  }
-                />
+          {/* Students */}
+          <Route
+            path='/students'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_STUDENTS}>
+                <StudentList />
+              </Guard>
+            }
+          />
+          <Route
+            path='/students/:id'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_STUDENTS}>
+                <StudentDetails />
+              </Guard>
+            }
+          />
 
-                {/* Classes */}
-                <Route
-                  path='/classes'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_CLASSES}>
-                      <ClassList />
-                    </Guard>
-                  }
-                />
-                <Route
-                  path='/classes/:id'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_CLASSES}>
-                      <ClassDetails />
-                    </Guard>
-                  }
-                />
+          {/* Classes */}
+          <Route
+            path='/classes'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_CLASSES}>
+                <ClassList />
+              </Guard>
+            }
+          />
+          <Route
+            path='/classes/:id'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_CLASSES}>
+                <ClassDetails />
+              </Guard>
+            }
+          />
 
-                {/* Fees */}
-                <Route
-                  path='/fees'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_FEES}>
-                      <FeeSetup />
-                    </Guard>
-                  }
-                />
-                <Route
-                  path='/payment-history'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_PAYMENTS}>
-                      <PaymentHistory />
-                    </Guard>
-                  }
-                />
+          {/* Fees */}
+          <Route
+            path='/fees'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_FEES}>
+                <FeeSetup />
+              </Guard>
+            }
+          />
+          <Route
+            path='/payment-history'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_PAYMENTS}>
+                <PaymentHistory />
+              </Guard>
+            }
+          />
 
-                {/* Reports */}
-                <Route
-                  path='/reports'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_REPORTS}>
-                      <Reports />
-                    </Guard>
-                  }
-                />
+          {/* Reports */}
+          <Route
+            path='/reports'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_REPORTS}>
+                <Reports />
+              </Guard>
+            }
+          />
 
-                <Route
-                  path='/letters'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_LETTERS}>
-                      <LetterTemplates />
-                    </Guard>
-                  }
-                />
+          <Route
+            path='/letters'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_LETTERS}>
+                <LetterTemplates />
+              </Guard>
+            }
+          />
 
-                {/* Finance tools */}
-                <Route
-                  path='/balance'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_BALANCES}>
-                      <PreviousBalances />
-                    </Guard>
-                  }
-                />
-                <Route
-                  path='/discount'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_DISCOUNTS}>
-                      <Discounts />
-                    </Guard>
-                  }
-                />
+          {/* Finance tools */}
+          <Route
+            path='/balance'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_BALANCES}>
+                <PreviousBalances />
+              </Guard>
+            }
+          />
+          <Route
+            path='/discount'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_DISCOUNTS}>
+                <Discounts />
+              </Guard>
+            }
+          />
 
-                {/* Role management */}
-                <Route
-                  path='/roles'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_ROLES}>
-                      <RoleManagement />
-                    </Guard>
-                  }
-                />
+          {/* Role management */}
+          <Route
+            path='/roles'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_ROLES}>
+                <RoleManagement />
+              </Guard>
+            }
+          />
 
-                {/* Settings */}
-                <Route
-                  path='/settings'
-                  element={
-                    <Guard permission={PERMISSIONS.VIEW_SETTINGS}>
-                      <SettingsPage />
-                    </Guard>
-                  }
-                />
-                <Route
-                  path='/profile'
-                  element={
-                    <ProtectedRoute>
-                      <UserProfile />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path='/migrate'
-                  element={
-                    <Guard permission={PERMISSIONS.DANGER_ZONE}>
-                      <MigrateTerms />
-                    </Guard>
-                  }
-                />
+          {/* Settings */}
+          <Route
+            path='/settings'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_SETTINGS}>
+                <SettingsPage />
+              </Guard>
+            }
+          />
+          <Route
+            path='/profile'
+            element={
+              <ProtectedRoute>
+                <UserProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path='/migrate'
+            element={
+              <Guard permission={PERMISSIONS.DANGER_ZONE}>
+                <MigrateTerms />
+              </Guard>
+            }
+          />
 
-                {/* Catch-all → dashboard */}
-                <Route path='*' element={<Navigate to='/dashboard' replace />} />
-              </Routes>
-            </MasterLayout>
-          }
-        />
+          {/* Catch-all → dashboard */}
+          <Route path='*' element={<Navigate to='/dashboard' replace />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );

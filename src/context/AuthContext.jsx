@@ -13,10 +13,24 @@ import { doc, getDoc, getFirestore, setDoc, serverTimestamp } from "firebase/fir
 
 import { auth } from "../firebase/auth";
 import { db } from "../firebase/firestore";
+import {
+  clearDashboardCache,
+  clearSessionExpiry,
+  getSessionExpiry,
+  isSessionExpired,
+  setSessionExpiry,
+} from "../utils/cache";
 
 const AuthContext = createContext(null);
 
 const googleProvider = new GoogleAuthProvider();
+
+const clearAuthStorage = () => {
+  clearSessionExpiry();
+  clearDashboardCache();
+};
+
+const setAuthSessionExpiry = () => setSessionExpiry();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -27,6 +41,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        if (isSessionExpired()) {
+          clearAuthStorage();
+          await signOut(auth);
+          setLoading(false);
+          return;
+        }
+
         try {
           const userRef = doc(firestore, "users", firebaseUser.uid);
           const userSnap = await getDoc(userRef);
@@ -38,6 +59,10 @@ export function AuthProvider({ children }) {
             photoURL: firebaseUser.photoURL,
             ...(userSnap.exists() ? userSnap.data() : {}),
           });
+
+          if (!getSessionExpiry()) {
+            setAuthSessionExpiry();
+          }
         } catch (err) {
           console.error("Error fetching user:", err);
         }
@@ -51,8 +76,31 @@ export function AuthProvider({ children }) {
     return () => unsub();
   }, [firestore]);
 
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const expiry = getSessionExpiry();
+    if (!expiry) return undefined;
+
+    const remainingMs = expiry - Date.now();
+    if (remainingMs <= 0) {
+      logout();
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      logout();
+    }, remainingMs);
+
+    return () => window.clearTimeout(timer);
+  }, [user]);
+
   // 🔐 Email login
-  const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
+  const login = async (email, password) => {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    setAuthSessionExpiry();
+    return cred;
+  };
 
   // 🆕 Register
   const register = async (email, password, displayName = "") => {
@@ -71,11 +119,18 @@ export function AuthProvider({ children }) {
       updatedAt: serverTimestamp(),
     });
 
+    setAuthSessionExpiry();
     return cred.user;
   };
 
   // 🚪 Logout
-  const logout = () => signOut(auth);
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } finally {
+      clearAuthStorage();
+    }
+  };
 
   // 🔵 Google login (FIXED)
   const loginWithGoogle = async () => {
@@ -96,6 +151,7 @@ export function AuthProvider({ children }) {
       });
     }
 
+    setAuthSessionExpiry();
     return user;
   };
 
@@ -118,6 +174,7 @@ export function AuthProvider({ children }) {
       });
     }
 
+    setAuthSessionExpiry();
     return user;
   };
 

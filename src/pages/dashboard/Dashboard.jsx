@@ -1,6 +1,12 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getDashboardFinanceStats, getTodayPayments } from "./dashboardService";
 import { getSettings } from "../settings/settingService";
+import {
+  getCacheItem,
+  getDashboardCacheKey,
+  setCacheItem,
+  SETTINGS_CACHE_KEY,
+} from "../../utils/cache";
 import {
   HiRefresh,
   HiArrowRight,
@@ -21,7 +27,6 @@ import {
   HiLockClosed,
   HiPresentationChartLine,
 } from "react-icons/hi";
-import { formatDate } from "../../utils/helpers";
 import { useNavigate } from "react-router-dom";
 import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS, ROLE_META, ROLES } from "../../config/permissions";
@@ -678,7 +683,6 @@ function AdminOfficerView({
 function GenericPermissionView({
   stats,
   todayStats,
-  collectionRate,
   academicYear,
   currentTerm,
   quickLinks,
@@ -861,49 +865,108 @@ export default function Dashboard() {
   const canViewFinance = can(PERMISSIONS.VIEW_PAYMENTS) || can(PERMISSIONS.VIEW_FEES);
   const canViewStudents = can(PERMISSIONS.VIEW_STUDENTS) || can(PERMISSIONS.VIEW_FAMILIES);
   const canViewSystem = can(PERMISSIONS.VIEW_ROLES) || can(PERMISSIONS.VIEW_SETTINGS);
+  const [loadedFromCache, setLoadedFromCache] = useState(false);
 
-  const loadSettings = useCallback(async () => {
-    try {
-      const s = await getSettings();
-      if (!s?.academicYear || !s?.currentTerm) throw new Error("not configured");
-      setAcademicYear(s.academicYear);
-      setCurrentTerm(s.currentTerm);
-    } catch {
-      setError("School settings are not properly configured. Please visit Settings.");
-      setLoading(false);
-    }
-  }, []);
+  const loadSettings = useCallback(
+    async ({ showLoading = true } = {}) => {
+      if (showLoading) setLoading(true);
 
-  const loadStats = useCallback(async () => {
-    if (!academicYear || !currentTerm) return;
-    try {
-      setLoading(true);
-      setError(null);
-
-      // All roles get the general stats (class breakdown, student counts, etc.)
-      const data = await getDashboardFinanceStats(academicYear, currentTerm);
-      setStats({ ...EMPTY_STATS, ...data });
-
-      // Non-finance-admin roles get today's collections instead of full term totals
-      if (!isFinanceAdmin) {
-        const today = await getTodayPayments(academicYear, currentTerm);
-        setTodayStats(today);
+      try {
+        const s = await getSettings();
+        if (!s?.academicYear || !s?.currentTerm) throw new Error("not configured");
+        setAcademicYear(s.academicYear);
+        setCurrentTerm(s.currentTerm);
+        setCacheItem(SETTINGS_CACHE_KEY, {
+          academicYear: s.academicYear,
+          currentTerm: s.currentTerm,
+        });
+        setError(null);
+      } catch {
+        if (!academicYear || !currentTerm) {
+          setError("School settings are not properly configured. Please visit Settings.");
+          setLoading(false);
+        }
+      } finally {
+        if (showLoading) setLoading(false);
       }
-    } catch {
-      setError("Failed to load dashboard statistics.");
-      setStats(EMPTY_STATS);
-    } finally {
-      setLoading(false);
-    }
-  }, [academicYear, currentTerm, isFinanceAdmin]);
+    },
+    [academicYear, currentTerm],
+  );
+
+  const loadStats = useCallback(
+    async (showLoading = true) => {
+      if (!academicYear || !currentTerm) return;
+      if (showLoading) {
+        setLoading(true);
+        setError(null);
+      }
+
+      try {
+        // All roles get the general stats (class breakdown, student counts, etc.)
+        const data = await getDashboardFinanceStats(academicYear, currentTerm);
+        setStats({ ...EMPTY_STATS, ...data });
+
+        // Non-finance-admin roles get today's collections instead of full term totals
+        if (!isFinanceAdmin) {
+          const today = await getTodayPayments(academicYear, currentTerm);
+          setTodayStats(today);
+        }
+      } catch {
+        if (!loadedFromCache) {
+          setError("Failed to load dashboard statistics.");
+        }
+        setStats(EMPTY_STATS);
+      } finally {
+        if (showLoading) setLoading(false);
+      }
+    },
+    [academicYear, currentTerm, isFinanceAdmin, loadedFromCache],
+  );
 
   useEffect(() => {
-    loadSettings();
+    const cachedSettings = getCacheItem(SETTINGS_CACHE_KEY);
+    const hasCachedSettings = cachedSettings?.academicYear && cachedSettings?.currentTerm;
+    let hasCachedDashboard = false;
+
+    if (hasCachedSettings) {
+      setAcademicYear(cachedSettings.academicYear);
+      setCurrentTerm(cachedSettings.currentTerm);
+
+      const cachedStats = getCacheItem(
+        getDashboardCacheKey(cachedSettings.academicYear, cachedSettings.currentTerm),
+      );
+
+      if (cachedStats) {
+        setStats(cachedStats);
+        setLoadedFromCache(true);
+        hasCachedDashboard = true;
+      }
+
+      const cachedToday = getCacheItem(
+        getDashboardCacheKey(cachedSettings.academicYear, `${cachedSettings.currentTerm}_today`),
+      );
+
+      if (cachedToday) {
+        setTodayStats(cachedToday);
+      }
+    }
+
+    if (hasCachedDashboard) {
+      setLoading(false);
+    }
+
+    loadSettings({ showLoading: !hasCachedSettings });
   }, [loadSettings]);
 
   useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+    if (!academicYear || !currentTerm) return;
+    loadStats(!loadedFromCache);
+  }, [academicYear, currentTerm, isFinanceAdmin, loadStats, loadedFromCache]);
+
+  const collectionRate = useMemo(
+    () => (stats.totalFees > 0 ? Math.round((stats.totalPayments / stats.totalFees) * 100) : 0),
+    [stats.totalFees, stats.totalPayments],
+  );
 
   useEffect(() => {
     const timer = setInterval(() => setActiveSlide((prev) => (prev + 1) % APP_SLIDES.length), 6000);
@@ -926,9 +989,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const collectionRate =
-    stats.totalFees > 0 ? Math.round((stats.totalPayments / stats.totalFees) * 100) : 0;
 
   const roleHeadings = {
     [ROLES.super_admin]: {

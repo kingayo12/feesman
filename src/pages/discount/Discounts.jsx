@@ -587,7 +587,7 @@ export default function Discounts() {
               </p>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+            <div className='discard-card-wrapper'>
               {discounts.map((d) => {
                 const assignCount = assignments.filter((a) => a.discountId === d.id).length;
                 return (

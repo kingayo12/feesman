@@ -24,8 +24,7 @@ import { StudentListSkeleton } from "../../components/common/Skeleton";
 import CustomButton from "../../components/common/CustomButton";
 import CustomInput from "../../components/common/Input";
 import { FormModal, ConfirmModal } from "../../components/common/Modal";
-
-const TERMS = ["1st Term", "2nd Term", "3rd Term"];
+import { TERMS } from "../../constants";
 const ITEMS_PER_PAGE = 10;
 
 export default function StudentList() {
@@ -99,8 +98,7 @@ export default function StudentList() {
   };
 
   // ─── Helpers ────────────────────────────────────────────────────────────
-  const getClassName = (classId) =>
-    classes.find((c) => c.id === classId)?.name ?? "Not Assigned";
+  const getClassName = (classId) => classes.find((c) => c.id === classId)?.name ?? "Not Assigned";
 
   const getFamilyName = (familyId) =>
     families.find((f) => f.id === familyId)?.familyName ?? "No Family";
@@ -129,9 +127,7 @@ export default function StudentList() {
     });
 
   // ─── Extract unique sessions from enrollments ───────────────────────────
-  const uniqueSessions = [
-    ...new Set(enrollments.map((e) => e.session).filter(Boolean)),
-  ]
+  const uniqueSessions = [...new Set(enrollments.map((e) => e.session).filter(Boolean))]
     .sort()
     .reverse();
 
@@ -324,7 +320,9 @@ export default function StudentList() {
         <CustomInput
           isRawSelect
           name='session'
-          value={selectedSession != null ? { value: selectedSession, label: selectedSession } : null}
+          value={
+            selectedSession != null ? { value: selectedSession, label: selectedSession } : null
+          }
           placeholder='All Sessions'
           onChange={handleSessionChange}
           labelName='Session'
@@ -497,9 +495,7 @@ export default function StudentList() {
             try {
               await deleteStudent(deleteTarget.id);
               setStudents((prev) => prev.filter((s) => s.id !== deleteTarget.id));
-              setEnrollments((prev) =>
-                prev.filter((e) => e.studentId !== deleteTarget.id),
-              );
+              setEnrollments((prev) => prev.filter((e) => e.studentId !== deleteTarget.id));
               setDeleteTarget(null);
             } catch (err) {
               console.error(err);

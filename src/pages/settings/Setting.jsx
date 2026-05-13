@@ -41,6 +41,8 @@ import {
   HiCurrencyDollar,
   HiDocumentText,
 } from "react-icons/hi";
+import { TERMS } from "../../constants";
+import { CURRENCIES } from "../../constants";
 
 /* ─────────────────────────────────────────────────────────────
    CONSTANTS
@@ -54,8 +56,6 @@ const TABS = [
   { id: "data", label: "Data & Export", icon: HiDatabase },
 ];
 
-const TERMS = ["1st Term", "2nd Term", "3rd Term"];
-const CURRENCIES = ["NGN (₦)", "USD ($)", "GBP (£)", "GHS (₵)", "KES (Ksh)"];
 const TIMEZONES = [
   "Africa/Lagos",
   "Africa/Accra",

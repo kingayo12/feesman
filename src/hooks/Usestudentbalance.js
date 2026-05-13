@@ -1,39 +1,82 @@
 import { getFeesByClass } from "../pages/fees/feesService";
 import { getStudentFeeOverrides } from "../pages/students/studentFeeOverrideService";
 import { getPaymentsByStudent } from "../pages/fees/paymentService";
+import { computeStudentDiscount } from "../pages/discount/Discountservice";
+import {
+  getCachedDiscounts,
+  getCachedPreviousBalanceAmount,
+  getCachedAssignmentsForFamily,
+  getCachedAssignmentsForStudent,
+} from "../utils/offlineDataManager";
 
 /**
  * Calculate the net balance for a single student for a given session + term.
  *
- * This is the single source of truth for the formula:
- *   effectiveFees = classFees - overriddenFees
- *   balance = effectiveFees - paymentsForTerm
- *
- * Previously this logic was duplicated in:
- *   - FamilyList.jsx (calculateFamilyFinancials)
- *   - FamilyDetails.jsx (feeMap loop)
- *   - getDashboardFinanceStats (student loop)
- *   - StudentDetails.jsx (inline)
+ * Formula:
+ *   effectiveFees  = classFees - overriddenFees
+ *   netFees        = effectiveFees + previousBalance - discounts
+ *   balance        = netFees - paymentsForTerm
  *
  * @param {string} studentId
  * @param {string} classId
- * @param {string} session  e.g. "2024/2025"
- * @param {string} term     e.g. "1st Term"
- * @returns {{ totalFees, totalPaid, balance, effectiveFees }}
+ * @param {string} session      e.g. "2024/2025"
+ * @param {string} term         e.g. "1st Term"
+ * @param {object} [opts]
+ * @param {string} [opts.familyId]        - pass in for discount calculation
+ * @param {number} [opts.siblingCount]    - pass in for sibling discounts
+ * @param {object[]} [opts.activeDiscounts]     - pre-loaded to avoid repeat fetches
+ * @param {object[]} [opts.familyAssignments]   - pre-loaded to avoid repeat fetches
+ * @returns {{ totalFees, totalPaid, balance, effectiveFees, totalDiscount, previousBalance }}
  */
-export async function calculateStudentBalance(studentId, classId, session, term) {
-  const [classFees, overrides, allPayments] = await Promise.all([
+export async function calculateStudentBalance(studentId, classId, session, term, opts = {}) {
+  const {
+    familyId = null,
+    siblingCount = 1,
+    activeDiscounts: preloadedDiscounts = null,
+    familyAssignments: preloadedFamilyAssignments = null,
+  } = opts;
+
+  const [classFees, overrides, allPayments, previousBalance, stuAssignments] = await Promise.all([
     getFeesByClass(classId, session, term),
     getStudentFeeOverrides(studentId),
     getPaymentsByStudent(studentId, session, term),
+    getCachedPreviousBalanceAmount(studentId, session).catch(() => 0),
+    getCachedAssignmentsForStudent(studentId, session).catch(() => []),
   ]);
 
+  // ── Effective fees (minus overrides) ──────────────────────────────────
   const disabledFeeIds = new Set(overrides.map((o) => o.feeId));
-
   const effectiveFees = classFees.filter((f) => !disabledFeeIds.has(f.id));
+  const termFees = effectiveFees.reduce((sum, f) => sum + Number(f.amount || 0), 0);
 
-  const totalFees = effectiveFees.reduce((sum, f) => sum + Number(f.amount || 0), 0);
+  // ── Discounts ─────────────────────────────────────────────────────────
+  let totalDiscount = 0;
+  try {
+    const activeDiscounts =
+      preloadedDiscounts ?? (await getCachedDiscounts(session).catch(() => []));
 
+    const famAssignments =
+      preloadedFamilyAssignments ??
+      (familyId ? await getCachedAssignmentsForFamily(familyId, session).catch(() => []) : []);
+
+    const result = computeStudentDiscount({
+      studentId,
+      familyId,
+      session,
+      fees: effectiveFees,
+      siblingCount,
+      activeDiscounts,
+      familyAssignments: famAssignments,
+      studentAssignments: stuAssignments,
+    });
+
+    totalDiscount = result.totalDiscount ?? 0;
+  } catch (err) {
+    console.warn("[calculateStudentBalance] Discount calculation failed:", err);
+  }
+
+  // ── Net fees = term fees + arrears - discounts ────────────────────────
+  const totalFees = Math.max(termFees + Number(previousBalance || 0) - totalDiscount, 0);
   const totalPaid = allPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
   return {
@@ -42,5 +85,7 @@ export async function calculateStudentBalance(studentId, classId, session, term)
     balance: totalFees - totalPaid,
     effectiveFees,
     termPayments: allPayments,
+    totalDiscount,
+    previousBalance: Number(previousBalance || 0),
   };
 }

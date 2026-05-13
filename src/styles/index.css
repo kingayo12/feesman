@@ -1,13 +1,15 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap");
 /* ── Dark mode variables ───────────────────────────────── */
 :root {
   --primary-color: #00009f;
   --primary-color-light: #4a4aff1a;
+  --color-border-secondary: #2424ff;
   /* --secondary-color: red; */
   --color-text-primary: rgb(43, 43, 43);
   --primary-gradient: linear-gradient(to bottom, #2424ff 0%, rgb(0, 29, 87) 100%) !important;
   --bg-primary: color-mix(in srgb, #fff 80%, #5900ff09 20%);
   --bg-secondary: #f8fafc;
-  --color-background-secondary: #f8fafc;
+  --color-background-secondary: #b8dbfeb0;
   --bg-tertiary: #f1f5f9;
   --text-primary: #1e293b;
   --text-secondary: #64748b;
@@ -34,8 +36,8 @@
   --text-warning: #d97706;
   --bg-danger: #fee2e2;
   --text-danger: #ef4444;
-  --font-family: Arial, sans-serif;
-  --font-family-serif: Georgia, "Times New Roman", serif;
+  --font-family: "Montserrat", sans-serif;
+  --font-family-Nunito: "Nunito", sans-serif;
   --font-size-xxs: 0.75rem;
   --font-size-xs: 0.8rem;
   --font-size-sm: 0.875rem;
@@ -286,7 +288,7 @@ aside.side-nav .nav-link {
   width: 100%;
   cursor: pointer;
   background: none;
-  font-family: inherit;
+  font-family: var(--font-family);
 }
 
 aside.side-nav .nav-link:hover {
@@ -301,7 +303,7 @@ aside.side-nav .nav-link:hover {
 
 /* ── Active state ─────────────────────────────────────────────────────── */
 aside.side-nav .nav-link.active {
-  background-color: var(--bg-secondary, #f1f5f9);
+  background-color: var(--color-background-secondary, #f1f5f9);
   border-color: rgba(255, 255, 255, 0.8);
   color: var(--accent, #4f46e5);
   font-weight: 600;
@@ -556,7 +558,7 @@ aside.side-nav .toggle-icon {
 
 main {
   padding: var(--spacing-lg);
-  max-height: calc(100vh - 75px);
+  max-height: calc(100vh - 65px);
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) transparent;
@@ -939,6 +941,7 @@ main {
   gap: 0.5rem;
   transition: all 0.3s ease;
   width: 250px;
+  background: var(--accent);
 }
 
 .submit-btn:hover {
@@ -1438,6 +1441,7 @@ main {
 .student-list-container {
   max-width: 1200px;
   margin: 0 auto;
+  min-height: 100vh;
 }
 
 /* Header Section */
@@ -1886,7 +1890,7 @@ main {
   font-weight: 600;
 }
 .ref-cell {
-  font-family: monospace;
+  font-family: var(--font-family);
   color: #94a3b8;
 }
 .font-bold {
@@ -3143,6 +3147,7 @@ a {
 /* Receipt Styling */
 .printable-receipt {
   /* font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; */
+  font-family: var(--font-family-Nunito);
   color: #333;
 }
 
@@ -3511,7 +3516,7 @@ a {
   box-shadow: var(--shadow-lg);
   max-width: 780px;
   margin: 0 auto;
-  font-family: var(--font-family-serif);
+  font-family: var(--font-family-Nunito);
 }
 
 .lp-head {
@@ -3763,7 +3768,7 @@ a {
 .lp-edit-form .lp-field textarea {
   min-height: 260px;
   resize: vertical;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-family);
   font-size: 0.85rem;
 }
 
@@ -4052,6 +4057,7 @@ a {
 .db-metric-card {
   background: linear-gradient(to top, var(--modal-bg), var(--bg-secondary));
   backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
   border-radius: var(--border-radius-md);
   padding: 14px 16px;
   display: flex;
@@ -4192,8 +4198,8 @@ a {
   font-size: 11px;
   padding: 3px 10px;
   border-radius: 999px;
-  border: 0.5px solid var(--color-border-secondary);
-  background: transparent;
+  border: 0.5px solid transparent;
+  background: var(--bg-primary);
   cursor: pointer;
   color: var(--color-text-secondary);
   transition: all 0.15s ease;
@@ -4201,11 +4207,12 @@ a {
 
 .db-tab-btn:hover {
   background: var(--color-background-secondary);
+  border-color: var(--color-border-secondary);
 }
 
 .db-tab-btn.active {
-  background: var(--color-background-info);
-  border-color: var(--color-border-info);
+  background: var(--color-background-secondary);
+  border-color: var(--primary-color-light);
   color: var(--color-text-info);
 }
 
@@ -4324,6 +4331,8 @@ a {
   border: 1px solid var(--color-border-tertiary);
   border-radius: var(--border-radius-lg);
   /* padding: 2rem; */
+  width: 100%;
+  height: 100%;
   min-height: 500px;
   max-width: 680px;
   margin: auto;
@@ -5504,7 +5513,7 @@ a {
   max-width: 1300px;
   margin: 0 auto;
   padding-bottom: 3rem;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-family);
 }
 
 /* Header */
@@ -5910,7 +5919,7 @@ a {
   box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
   max-width: 760px;
   margin: 0 auto;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-family-Nunito);
   position: relative;
 }
 
@@ -5951,7 +5960,7 @@ a {
   font-size: var(--font-size-lg);
   font-weight: 900;
   color: #1a3799;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-family);
   letter-spacing: 0.02em;
   text-transform: uppercase;
   line-height: 1.2;
@@ -5960,14 +5969,14 @@ a {
   margin-top: 5px;
   font-size: var(--font-size-xxs);
   color: #111;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-family-Nunito);
   text-transform: uppercase;
 }
 .lp-school-contacts {
   margin: 0 0 0.15rem;
   font-size: 0.74rem;
   color: #111;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-family);
 }
 .lp-sep {
   margin: 0 0.05rem;
@@ -5977,7 +5986,7 @@ a {
   margin-top: 5px;
   font-size: 0.7rem;
   color: #111;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-family-Nunito);
 }
 
 /* Rule */
@@ -5996,13 +6005,13 @@ a {
   display: inline-block;
   font-size: 0.8rem;
   color: #374151;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-family-Nunito);
 }
 
 /* Addressing */
 .lp-addr-block {
   margin-bottom: 1.25rem;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-family-Nunito);
 }
 .lp-to-line,
 .lp-re-line {
@@ -6035,6 +6044,7 @@ a {
   object-fit: contain;
   opacity: 0.1;
   user-select: none;
+  -webkit-user-select: none;
 }
 .lp-body {
   position: relative;
@@ -6050,7 +6060,7 @@ a {
 /* Signature */
 .lp-sig-block {
   margin-top: 1.5rem;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-family);
   position: relative;
   z-index: 1;
 }
@@ -6058,7 +6068,7 @@ a {
   margin: 0 0 1.25rem;
   font-size: 0.95rem;
   color: #1f2937;
-  font-family: Georgia, serif;
+  font-family: var(--font-family-Nunito);
 }
 .lp-sig-line {
   width: 200px;
@@ -6089,6 +6099,7 @@ a {
   border-radius: 10px;
   font-size: 0.82rem;
   line-height: 1.5;
+  font-family: var(--font-family);
 }
 .lp-hint svg {
   flex-shrink: 0;
@@ -6106,6 +6117,7 @@ a {
   z-index: 2000;
   padding: 1rem;
   backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 .lp-modal {
   background: #fff;
@@ -7496,8 +7508,7 @@ a {
 }
 .sp-mock-logo,
 .sp-mock-logo-ph {
-  width: 52px;
-  height: 52px;
+  width: 100px;
   border-radius: 6px;
 }
 .sp-mock-logo-ph {
@@ -7507,6 +7518,28 @@ a {
   align-items: center;
   justify-content: center;
   color: #9ca3af;
+}
+.sp-mock-logo-ph img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.sp-mock-info {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+}
+
+.sp-mock-info strong {
+  font-size: var(--font-size-md);
+  font-family: var(--font-family);
+}
+
+.sp-mock-info span {
+  font-size: var(--font-size-xs);
+  text-align: center;
+  font-family: var(--font-family-Nunito);
 }
 .sp-export-icon {
   width: 38px;
@@ -8191,7 +8224,7 @@ a {
      ReceiptToolbar (.rtb-*)
      =========================================================== */
 .rtb-root {
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-family);
 }
 
 .rtb-bar {
@@ -8775,12 +8808,19 @@ a {
 /* ===========================================================
      Discounts (.discount-card, .dc-pill)
      =========================================================== */
+.discard-card-wrapper {
+  display: grid;
+  /* grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); */
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
 .discount-card {
-  background: var(--color-background-primary, #fff);
+  background: var(--bg-primary);
   border: 1px solid var(--color-border-tertiary, #f1f5f9);
   border-radius: 12px;
   padding: 1rem 1.25rem;
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
@@ -9133,7 +9173,7 @@ a {
   position: relative;
   background: #fff;
   color: #1e293b;
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-family-Nunito);
   font-size: 13px;
   line-height: 1.55;
   padding: 36px 40px;
@@ -9432,7 +9472,7 @@ a {
   position: relative;
   background: #fff;
   color: #1e293b;
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-family-Nunito);
   font-size: 13px;
   line-height: 1.55;
   padding: 40px;
@@ -10746,8 +10786,13 @@ a {
   background: #fef9c3;
   padding: 1px 5px;
   border-radius: 4px;
-  font-family: monospace;
+  font-family: var(--font-family-Nunito);
   font-size: 0.75rem;
+}
+
+p,
+a {
+  font-family: var(--font-family-Nunito);
 }
 [data-theme="dark"] .cd-warning-box {
   background: #422006;
@@ -11539,7 +11584,7 @@ a {
 }
 
 .rselect__option--is-selected {
-  background: var(--color-primary);
+  background: var(--primary-color-light);
   color: white;
 }
 
@@ -11553,4 +11598,14 @@ a {
 
 .custom-downshift-select {
   min-width: 230px !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-family);
+  font-weight: 800;
 }

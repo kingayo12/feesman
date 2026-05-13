@@ -8,6 +8,7 @@ import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS, ROLES } from "../../config/permissions";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
+import { getCachedDiscounts, getCachedAssignmentsForFamily } from "../../utils/offlineDataManager";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import {
@@ -1313,7 +1314,7 @@ export default function Reports() {
   const [downloading, setDownloading] = useState(null);
 
   // Only super_admin and admin see full term-level finance data
-  const isFinanceAdmin = role === ROLES.super_admin || role === ROLES.admin;
+  const isFinanceAdmin = role === ROLES.super_admin || ROLES === ROLES.admin;
 
   useEffect(() => {
     if (settings.currentTerm && !selectedTerm) setSelectedTerm(settings.currentTerm);
@@ -1333,7 +1334,14 @@ export default function Reports() {
     setTodayLoading(true);
     try {
       const data = await getTodayPayments(settings.academicYear, selectedTerm);
-      setTodayData(data);
+      const payments = data.payments || [];
+      setTodayData({
+        total: data.total,
+        count: data.count,
+        studentsPaid: new Set(payments.map((p) => p.studentId)).size,
+        methodsUsed: new Set(payments.map((p) => p.method).filter(Boolean)).size,
+        recentPayments: payments.slice(0, 20),
+      });
     } finally {
       setTodayLoading(false);
     }
@@ -1342,22 +1350,76 @@ export default function Reports() {
   const generateReport = async () => {
     setLoading(true);
     try {
-      const [classData, allStudents] = await Promise.all([getClasses(), getAllStudents()]);
+      const [classData, students] = await Promise.all([getClasses(), getAllStudents()]);
+
+      const enrollments = await getEnrollmentsByFilter({
+        session: settings.academicYear,
+        term: selectedTerm,
+      });
+
+      // ── Pre-load discounts and family assignments once ──────────────────
+      const activeDiscounts = await getCachedDiscounts(settings.academicYear).catch(() => []);
+
+      // Build a flat list of all enrolled students across all classes
+      const studentMap = Object.fromEntries(students.map((s) => [s.id, s]));
+      const allEnrolledStudents = enrollments
+        .map((e) => {
+          const student = studentMap[e.studentId];
+          if (!student) return null;
+          return { ...student, classId: e.classId };
+        })
+        .filter(Boolean);
+
+      // Group all enrolled students by familyId for sibling counts
+      const familyGroups = {};
+      allEnrolledStudents.forEach((s) => {
+        if (s.familyId) {
+          familyGroups[s.familyId] = (familyGroups[s.familyId] || []).concat(s);
+        }
+      });
+
+      // Pre-load family discount assignments in bulk
+      const familyAssignmentCache = {};
+      for (const familyId of Object.keys(familyGroups)) {
+        familyAssignmentCache[familyId] = await getCachedAssignmentsForFamily(
+          familyId,
+          settings.academicYear,
+        ).catch(() => []);
+      }
+
+      // ── Per-class report ────────────────────────────────────────────────
       const classReports = await Promise.all(
         classData.map(async (cls) => {
-          const classStudents = allStudents.filter((s) => s.classId === cls.id);
-          if (!classStudents.length) return null;
+          const classEnrollments = enrollments.filter((e) => e.classId === cls.id);
+          if (!classEnrollments.length) return null;
+
+          const classStudents = classEnrollments
+            .map((e) => {
+              const student = studentMap[e.studentId];
+              if (!student) return null;
+              return { ...student, classId: e.classId };
+            })
+            .filter(Boolean);
+
+          // Pass pre-loaded discounts and family data into calculateStudentBalance
           const balances = await Promise.all(
             classStudents.map((s) =>
-              calculateStudentBalance(s.id, s.classId, settings.academicYear, selectedTerm),
+              calculateStudentBalance(s.id, s.classId, settings.academicYear, selectedTerm, {
+                familyId: s.familyId,
+                siblingCount: (familyGroups[s.familyId] || [s]).length,
+                activeDiscounts,
+                familyAssignments: familyAssignmentCache[s.familyId] || [],
+              }),
             ),
           );
-          const totalFees = balances.reduce((s, b) => s + b.totalFees, 0);
-          const totalPaid = balances.reduce((s, b) => s + b.totalPaid, 0);
-          const outstanding = totalFees - totalPaid;
+
+          const totalFees = balances.reduce((sum, b) => sum + b.totalFees, 0);
+          const totalPaid = balances.reduce((sum, b) => sum + b.totalPaid, 0);
+          const outstanding = Math.max(totalFees - totalPaid, 0);
           const fullyPaid = balances.filter((b) => b.balance <= 0).length;
           const withBalance = balances.filter((b) => b.balance > 0).length;
           const collectionRate = totalFees > 0 ? Math.round((totalPaid / totalFees) * 100) : 0;
+
           return {
             classId: cls.id,
             className: cls.name,
@@ -1371,6 +1433,7 @@ export default function Reports() {
           };
         }),
       );
+
       setReportData(classReports.filter(Boolean));
     } catch (err) {
       console.error("Report generation failed:", err);

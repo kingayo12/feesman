@@ -17,6 +17,7 @@ import {
 import CustomInput from "../common/Input";
 import CustomButton from "../common/CustomButton";
 import CustomSelect from "../common/SelectInput";
+import { TERMS } from "../../constants";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -61,8 +62,6 @@ function generateAdmissionNo(abbr = "SCH", state = "NG") {
   const statePart = (state || "NG").toUpperCase().slice(0, 3).replace(/\s/g, "");
   return `${abbrPart}/${statePart}/${year}/${month}${day}/${rand}`;
 }
-
-const TERMS = ["1st Term", "2nd Term", "3rd Term"];
 
 const EMPTY_IDENTITY = {
   firstName: "",

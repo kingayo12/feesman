@@ -1,0 +1,20 @@
+import React from "react";
+
+export const STORAGE_KEYS = {
+  LETTER_TEMPLATES: "feesman_letter_templates_v2",
+};
+
+export const TERMS = ["1st Term", "2nd Term", "3rd Term"];
+
+export const DEFAULTS = {
+  CURRENCY: "₦",
+};
+
+export const CURRENCIES = ["NGN (₦)", "USD ($)", "GBP (£)", "GHS (₵)", "KES (Ksh)"];
+
+export const ITEMS_PER_PAGE = 10;
+
+export const DASHBOARD_CACHE_PREFIX = "feesman_dashboard_cache_";
+export const SESSION_EXPIRY_KEY = "feesman_session_expiry";
+export const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+export const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000; // 60 minutes

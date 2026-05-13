@@ -18,8 +18,8 @@ import {
 import CustomButton from "../../components/common/CustomButton";
 import { FormModal, ConfirmModal } from "../../components/common/Modal";
 import FeeForm from "../../components/forms/FeeForm";
-
-const TERMS = ["1st Term", "2nd Term", "3rd Term"];
+import { TERMS } from "../../constants";
+import { getClassLevel, getClassOrderNumber, detectGroup, sortClasses } from "../../utils/helpers";
 
 export default function FeeSetup() {
   const [classes, setClasses] = useState([]);
@@ -34,39 +34,6 @@ export default function FeeSetup() {
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const { can } = useRole();
   const canManageFees = can(PERMISSIONS.CREATE_FEE) || can(PERMISSIONS.EDIT_FEE);
-
-  // ─── Helpers ──────────────────────────────────────────────────────────
-  const getClassLevel = (name = "") => {
-    const n = name.toLowerCase();
-    if (n.includes("creche") || n.includes("daycare")) return 0;
-    if (n.includes("kg")) return 1;
-    if (n.includes("nursery")) return 2;
-    if (n.includes("primary")) return 3;
-    if (n.includes("jss")) return 4;
-    if (n.includes("ss")) return 5;
-    return 6;
-  };
-
-  const getClassOrderNumber = (name = "") => {
-    const match = name.match(/\d+/);
-    return match ? Number(match[0]) : 0;
-  };
-
-  const detectGroup = (cls) => {
-    if (cls.group) return cls.group;
-    const name = cls.name?.toLowerCase() || "";
-    if (name.includes("primary") || name.includes("nursery")) return "primary";
-    if (name.includes("jss") || name.includes("ss") || name.includes("secondary"))
-      return "secondary";
-    return "unknown";
-  };
-
-  const sortClasses = (list = []) =>
-    [...list].sort((a, b) => {
-      const levelDiff = getClassLevel(a.name) - getClassLevel(b.name);
-      if (levelDiff !== 0) return levelDiff;
-      return getClassOrderNumber(a.name) - getClassOrderNumber(b.name);
-    });
 
   // ─── Load ──────────────────────────────────────────────────────────────
   const loadData = async () => {

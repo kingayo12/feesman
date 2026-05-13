@@ -7,8 +7,7 @@ import { PERMISSIONS } from "../../config/permissions";
 import { HiCash, HiLibrary, HiCalendar, HiTag, HiClock } from "react-icons/hi";
 import CustomSelect from "../common/SelectInput";
 import CustomInput from "../common/Input";
-
-const TERMS = ["1st Term", "2nd Term", "3rd Term"];
+import { TERMS } from "../../constants";
 
 const EMPTY_FORM = {
   classId: "",

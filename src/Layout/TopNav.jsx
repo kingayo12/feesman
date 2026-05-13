@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useRole } from "../hooks/useRole";
 import { PERMISSIONS } from "../config/permissions";
 import { getAllStudents } from "../pages/students/studentService";
+import { getEnrollmentsByFilter } from "../pages/students/enrollmentService";
 import { getFamilies } from "../pages/families/familyService";
 import { getClasses } from "../pages/classes/classService";
 import { getSettings } from "../pages/settings/settingService";
@@ -34,8 +35,10 @@ import {
   HiCalendar,
   HiStar,
   HiLightningBolt,
+  HiWifi,
 } from "react-icons/hi";
 import { LuMoon, LuSun } from "react-icons/lu";
+import { BiWifiOff } from "react-icons/bi";
 
 /* ─────────────────────────────────────────────────────────────
    HOOKS
@@ -72,6 +75,25 @@ function getInitialTheme() {
     if (storedTheme === "dark" || storedTheme === "light") return storedTheme;
   } catch {}
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function useOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" && navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  return isOnline;
 }
 
 function canAccessNotification(notification, access) {
@@ -127,293 +149,39 @@ const naira = (n) => `₦${Number(n || 0).toLocaleString("en-NG")}`;
 async function buildNotifications(settings) {
   const session = settings?.academicYear;
   const term = settings?.currentTerm;
+
   if (!session || !term) return [];
 
-  const [students, families, classes] = await Promise.all([
+  const [students, families, classes, enrollments] = await Promise.all([
     getAllStudents(),
     getFamilies(),
     getClasses(),
+    getEnrollmentsByFilter({
+      session,
+      term,
+    }),
   ]);
 
   if (!students?.length) return [];
 
-  /* Enrich every student with fee/payment data */
-  const enriched = await Promise.all(
-    students.map(async (student) => {
-      try {
-        const [fees, payments, overrides, prevBal] = await Promise.all([
-          getFeesByClass(student.classId, session, term),
-          getPaymentsByStudent(student.id),
-          getStudentFeeOverrides(student.id),
-          getPreviousBalanceAmount(student.id, session),
-        ]);
-        const disabledIds = new Set(overrides.map((o) => o.feeId));
-        const effectiveFees = fees.filter((f) => !disabledIds.has(f.id));
-        const totalDue =
-          effectiveFees.reduce((s, f) => s + Number(f.amount || 0), 0) + Number(prevBal || 0);
-        const termPaid = payments
-          .filter((p) => p.term === term)
-          .reduce((s, p) => s + Number(p.amount || 0), 0);
-        const allPaid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-        const balance = totalDue - termPaid;
-        const family = families?.find((f) => f.id === student.familyId);
-        const cls = classes?.find((c) => c.id === student.classId);
-        return {
-          ...student,
-          totalDue,
-          termPaid,
-          allPaid,
-          balance,
-          prevBal: Number(prevBal || 0),
-          payStatus: balance <= 0 ? "paid" : termPaid > 0 ? "partial" : "unpaid",
-          familyName: family?.familyName || "",
-          className: cls?.name || "",
-          recentPayments: payments.filter((p) => {
-            const d = p.date?.toDate ? p.date.toDate() : new Date(p.date);
-            return Date.now() - d.getTime() < 7 * 86400000;
-          }),
-        };
-      } catch {
-        return {
-          ...student,
-          totalDue: 0,
-          termPaid: 0,
-          allPaid: 0,
-          balance: 0,
-          prevBal: 0,
-          payStatus: "unknown",
-          recentPayments: [],
-        };
-      }
-    }),
-  );
+  // Build enrollment map
+  const enrollmentMap = {};
 
-  const notifications = [];
-  const now = Date.now();
-
-  /* ── 1. COLLECTION SUMMARY ── */
-  const totalDueAll = enriched.reduce((s, st) => s + st.totalDue, 0);
-  const totalPaidAll = enriched.reduce((s, st) => s + st.termPaid, 0);
-  const collRate = totalDueAll > 0 ? Math.round((totalPaidAll / totalDueAll) * 100) : 0;
-  const fullyPaid = enriched.filter((s) => s.payStatus === "paid").length;
-  const partialPay = enriched.filter((s) => s.payStatus === "partial").length;
-  const notPaid = enriched.filter((s) => s.payStatus === "unpaid").length;
-
-  notifications.push({
-    id: `summary_${session}_${term}`,
-    category: "summary",
-    priority: 1,
-    icon: "chart",
-    title: `${term} Collection Summary`,
-    body: `${naira(totalPaidAll)} collected of ${naira(totalDueAll)} total (${collRate}% rate)`,
-    detail: {
-      totalDue: totalDueAll,
-      totalPaid: totalPaidAll,
-      collRate,
-      fullyPaid,
-      partialPay,
-      notPaid,
-      total: enriched.length,
-    },
-    timestamp: now,
-    action: null,
+  (enrollments || []).forEach((enrollment) => {
+    enrollmentMap[enrollment.studentId] = enrollment;
   });
 
-  /* ── 2. WEEKLY PAYMENTS (last 7 days) ── */
-  const weeklyPayments = enriched.flatMap((s) =>
-    s.recentPayments.map((p) => ({
-      ...p,
-      studentName: `${s.firstName} ${s.lastName}`,
-      familyName: s.familyName,
-    })),
-  );
-  const weeklyTotal = weeklyPayments.reduce((s, p) => s + Number(p.amount || 0), 0);
-  if (weeklyPayments.length > 0) {
-    notifications.push({
-      id: `weekly_${Math.floor(now / (86400000 * 7))}`,
-      category: "weekly",
-      priority: 2,
-      icon: "trending-up",
-      title: "This Week's Collections",
-      body: `${naira(weeklyTotal)} received across ${weeklyPayments.length} payment${weeklyPayments.length !== 1 ? "s" : ""}`,
-      detail: { weeklyTotal, weeklyPayments: weeklyPayments.slice(0, 10) },
-      timestamp: now,
-      action: null,
-    });
-  }
+  // Enrich students with enrollment data
+  const enrichedStudents = students.map((student) => {
+    const enrollment = enrollmentMap[student.id];
 
-  /* ── 3. FAMILIES WITH ZERO PAYMENT ── */
-  const familyMap = {};
-  enriched.forEach((s) => {
-    if (!s.familyId) return;
-    if (!familyMap[s.familyId]) familyMap[s.familyId] = { name: s.familyName, students: [] };
-    familyMap[s.familyId].students.push(s);
+    return {
+      ...student,
+      classId: enrollment?.classId || null,
+      session: enrollment?.session || null,
+      term: enrollment?.term || null,
+    };
   });
-
-  const zeroPayFamilies = Object.values(familyMap)
-    .filter(
-      (f) =>
-        f.students.every((s) => s.payStatus === "unpaid") && f.students.some((s) => s.totalDue > 0),
-    )
-    .map((f) => ({
-      name: f.name,
-      totalOwed: f.students.reduce((s, st) => s + st.balance, 0),
-      count: f.students.length,
-    }))
-    .sort((a, b) => b.totalOwed - a.totalOwed);
-
-  if (zeroPayFamilies.length > 0) {
-    const topOwed = zeroPayFamilies.slice(0, 5);
-    notifications.push({
-      id: `zero_pay_${session}_${term}`,
-      category: "alert",
-      priority: 1,
-      icon: "warning",
-      title: `${zeroPayFamilies.length} Famil${zeroPayFamilies.length === 1 ? "y" : "ies"} Haven't Paid`,
-      body: `${zeroPayFamilies.length} families have made zero payment this term`,
-      detail: { families: topOwed, total: zeroPayFamilies.length },
-      timestamp: now,
-      action: { label: "View all", path: "/families" },
-    });
-  }
-
-  /* ── 4. HIGHEST DEBTORS ── */
-  const highDebtors = enriched
-    .filter((s) => s.balance > 0)
-    .sort((a, b) => b.balance - a.balance)
-    .slice(0, 5);
-
-  if (highDebtors.length > 0) {
-    const totalOutstanding = enriched.reduce((s, st) => s + Math.max(st.balance, 0), 0);
-    notifications.push({
-      id: `debtors_${session}_${term}`,
-      category: "alert",
-      priority: 2,
-      icon: "debt",
-      title: `${naira(totalOutstanding)} Outstanding`,
-      body: `${enriched.filter((s) => s.balance > 0).length} students still owe fees this term`,
-      detail: { students: highDebtors, totalOutstanding },
-      timestamp: now,
-      action: { label: "View all", path: "/students" },
-    });
-  }
-
-  /* ── 5. FULLY PAID FAMILIES (celebrate!) ── */
-  const paidFamilies = Object.values(familyMap).filter(
-    (f) => f.students.length > 0 && f.students.every((s) => s.payStatus === "paid"),
-  ).length;
-
-  if (paidFamilies > 0) {
-    notifications.push({
-      id: `paid_families_${session}_${term}`,
-      category: "success",
-      priority: 3,
-      icon: "check",
-      title: `${paidFamilies} Famil${paidFamilies === 1 ? "y" : "ies"} Fully Settled`,
-      body: `${paidFamilies} famil${paidFamilies === 1 ? "y has" : "ies have"} cleared all fees for ${term}`,
-      detail: { count: paidFamilies },
-      timestamp: now,
-      action: null,
-    });
-  }
-
-  /* ── 6. STUDENTS WITH ARREARS ── */
-  const arrearsStudents = enriched.filter((s) => s.prevBal > 0);
-  if (arrearsStudents.length > 0) {
-    const totalArrears = arrearsStudents.reduce((s, st) => s + st.prevBal, 0);
-    notifications.push({
-      id: `arrears_${session}_${term}`,
-      category: "alert",
-      priority: 3,
-      icon: "clock",
-      title: `${arrearsStudents.length} Students with Arrears`,
-      body: `${naira(totalArrears)} in carried-forward balances from previous sessions`,
-      detail: {
-        students: arrearsStudents.slice(0, 5).map((s) => ({
-          name: `${s.firstName} ${s.lastName}`,
-          amount: s.prevBal,
-          className: s.className,
-        })),
-        total: arrearsStudents.length,
-        totalArrears,
-      },
-      timestamp: now,
-      action: null,
-    });
-  }
-
-  /* ── 7. CLASS-BY-CLASS BREAKDOWN ── */
-  const classStats = {};
-  enriched.forEach((s) => {
-    if (!s.classId) return;
-    if (!classStats[s.classId])
-      classStats[s.classId] = { name: s.className, due: 0, paid: 0, count: 0 };
-    classStats[s.classId].due += s.totalDue;
-    classStats[s.classId].paid += s.termPaid;
-    classStats[s.classId].count++;
-  });
-  const classBreakdown = Object.values(classStats)
-    .filter((c) => c.due > 0)
-    .map((c) => ({ ...c, rate: Math.round((c.paid / c.due) * 100) }))
-    .sort((a, b) => b.rate - a.rate);
-
-  if (classBreakdown.length > 0) {
-    const bestClass = classBreakdown[0];
-    const worstClass = classBreakdown[classBreakdown.length - 1];
-    notifications.push({
-      id: `class_perf_${session}_${term}`,
-      category: "info",
-      priority: 4,
-      icon: "school",
-      title: "Class Performance",
-      body: `Best: ${bestClass.name} (${bestClass.rate}%) · Needs attention: ${worstClass.name} (${worstClass.rate}%)`,
-      detail: { classes: classBreakdown },
-      timestamp: now,
-      action: null,
-    });
-  }
-
-  /* ── 8. TERM DATE ALERT ── */
-  if (settings?.termEndDate) {
-    const termEnd = new Date(settings.termEndDate);
-    const daysLeft = Math.ceil((termEnd - new Date()) / 86400000);
-    if (daysLeft > 0 && daysLeft <= 30) {
-      notifications.push({
-        id: `term_end_${settings.termEndDate}`,
-        category: daysLeft <= 7 ? "alert" : "info",
-        priority: daysLeft <= 7 ? 1 : 3,
-        icon: "calendar",
-        title: `Term Ends in ${daysLeft} Day${daysLeft !== 1 ? "s" : ""}`,
-        body: `${enriched.filter((s) => s.balance > 0).length} students still have outstanding balances`,
-        detail: {
-          daysLeft,
-          termEndDate: settings.termEndDate,
-          outstanding: enriched.filter((s) => s.balance > 0).length,
-        },
-        timestamp: now,
-        action: null,
-      });
-    }
-  }
-
-  /* ── 9. COLLECTION MILESTONE ── */
-  const milestones = [25, 50, 75, 90, 100];
-  const milestone = milestones.filter((m) => collRate >= m).pop();
-  if (milestone) {
-    notifications.push({
-      id: `milestone_${milestone}_${session}_${term}`,
-      category: "success",
-      priority: 4,
-      icon: "star",
-      title: `${milestone}% Collection Milestone Reached!`,
-      body: `The school has collected ${milestone}% of expected fees for ${term}`,
-      detail: { milestone, collRate, totalPaid: totalPaidAll, totalDue: totalDueAll },
-      timestamp: now,
-      action: null,
-    });
-  }
-
-  return notifications.sort((a, b) => a.priority - b.priority);
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -754,7 +522,7 @@ function NotifDetail({ notification: n, navigate, onClose }) {
           <span className='nd-sub-val nd-red'>{naira(d.totalOutstanding)}</span>
         </div>
         <div className='nd-mini-list'>
-          {d.students.map((s, i) => (
+          {d.enrichedStudents.map((s, i) => (
             <div key={i} className='nd-mini-row'>
               <span className='nd-mini-name'>
                 {s.firstName} {s.lastName}
@@ -782,7 +550,7 @@ function NotifDetail({ notification: n, navigate, onClose }) {
           <span className='nd-sub-val nd-amber'>{naira(d.totalArrears)}</span>
         </div>
         <div className='nd-mini-list'>
-          {d.students.map((s, i) => (
+          {d.enrichedStudents.map((s, i) => (
             <div key={i} className='nd-mini-row'>
               <span className='nd-mini-name'>{s.name}</span>
               <span className='nd-mini-sub'>{s.className}</span>
@@ -874,6 +642,7 @@ export default function TopNav() {
   const { user, logout } = useAuth();
   const { can } = useRole();
   const navigate = useNavigate();
+  const isOnline = useOnlineStatus();
 
   const canViewPayments = can(PERMISSIONS.VIEW_PAYMENTS);
   const canViewReports = can(PERMISSIONS.VIEW_REPORTS) || can(PERMISSIONS.VIEW_FULL_DASHBOARD);
@@ -1072,6 +841,11 @@ export default function TopNav() {
     navigate(`/profile?tab=${tab}`);
   };
 
+  const openSettings = (tab) => {
+    setUserMenuOpen(false);
+    navigate(`/${tab}`);
+  };
+
   const handleLogout = async () => {
     setUserMenuOpen(false);
     await logout();
@@ -1084,6 +858,33 @@ export default function TopNav() {
       <header className='top-nav'>
         <h1 className='app-title'>Feesman</h1>
         <div className='top-nav-actions'>
+          {/* Online Status Indicator */}
+          <div
+            className='online-status-indicator'
+            title={isOnline ? "Connected" : "Offline - using cached data"}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "4px 8px",
+              borderRadius: "6px",
+              backgroundColor: isOnline ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
+              color: isOnline ? "#22c55e" : "#ef4444",
+              fontSize: "12px",
+              fontWeight: "500",
+            }}
+          >
+            {isOnline ? (
+              <>
+                <HiWifi size={14} title='Online' />
+              </>
+            ) : (
+              <>
+                <BiWifiOff size={14} title='Offline' />
+              </>
+            )}
+          </div>
+
           {/* Search */}
           {canUseSearch && (
             <button className='nav-search-btn' onClick={openSearch} title='Search (Ctrl+K)'>
@@ -1173,6 +974,9 @@ export default function TopNav() {
                 <button className='user-menu-item' onClick={() => openProfileTab("theme")}>
                   Select Theme
                 </button>
+                <button className='user-menu-item' onClick={() => openSettings("settings")}>
+                  settings
+                </button>
                 <button className='user-menu-item logout' onClick={handleLogout}>
                   Logout
                 </button>
@@ -1253,7 +1057,7 @@ export default function TopNav() {
                       <p className='search-group-label'>
                         <HiAcademicCap /> Students ({results.students.length})
                       </p>
-                      {results.students.map((s) => (
+                      {results.enrichedStudents.map((s) => (
                         <button
                           key={s.id}
                           className='search-result-item'

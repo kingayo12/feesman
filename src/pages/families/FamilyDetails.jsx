@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { getCacheItem, setCacheItem, SETTINGS_CACHE_KEY } from "../../utils/cache";
 import { getFamilyById } from "./familyService";
 import { getStudentsByFamily } from "../students/studentService";
 import { getEnrollmentsByFilter } from "../students/enrollmentService";
@@ -111,15 +112,26 @@ export default function FamilyDetails() {
   const [loading, setLoading] = useState(true);
 
   // ── Load ──────────────────────────────────────────────────────────────────
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const appSettings = await getSettings();
-      const session = appSettings?.academicYear;
-      const term = appSettings?.currentTerm;
+      const cachedSettings = getCacheItem(SETTINGS_CACHE_KEY);
+      const appSettings = await getSettings().catch(() => cachedSettings || null);
+      const settingsToUse = appSettings || cachedSettings;
+
+      if (settingsToUse?.academicYear && settingsToUse?.currentTerm) {
+        setCacheItem(SETTINGS_CACHE_KEY, {
+          academicYear: settingsToUse.academicYear,
+          currentTerm: settingsToUse.currentTerm,
+        });
+        setSettings(settingsToUse);
+      }
+
+      const session = settingsToUse?.academicYear;
+      const term = settingsToUse?.currentTerm;
 
       if (!session || !term) {
-        console.error("Missing session or term in settings:", appSettings);
+        console.error("Missing session or term in settings:", settingsToUse);
         setLoading(false);
         return;
       }
@@ -184,7 +196,7 @@ export default function FamilyDetails() {
       setStudents(enrichedStudents);
       setPayments(pays || []);
       setClasses(cls || []);
-      setSettings(appSettings);
+      setSettings(settingsToUse);
       setFeesByStudent(feeMap);
       setPrevByStudent(prevMap);
     } catch (error) {
@@ -192,17 +204,14 @@ export default function FamilyDetails() {
     } finally {
       setLoading(false);
     }
-  };
+  });
 
   useEffect(() => {
     loadAll();
-  }, [id]);
+  }, [id, loadAll]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const getClassName = (classId) => classes.find((c) => c.id === classId)?.name ?? "Not Assigned";
-
-  const getStudentPaid = (studentId) =>
-    payments.filter((p) => p.studentId === studentId).reduce((sum, p) => sum + Number(p.amount), 0);
 
   const familyTotalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
   const familyTotalFees = students.reduce((sum, s) => sum + (feesByStudent[s.id] || 0), 0);

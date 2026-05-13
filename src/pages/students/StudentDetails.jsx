@@ -11,6 +11,7 @@ import { formatDate } from "../../utils/helpers";
 import { getSettings } from "../settings/settingService";
 import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS } from "../../config/permissions";
+// import
 import {
   disableStudentFee,
   enableStudentFee,
@@ -38,6 +39,7 @@ import {
   HiTag,
   HiDocumentText,
 } from "react-icons/hi";
+import CustomButton from "../../components/common/CustomButton";
 
 export default function StudentDetails() {
   const { id } = useParams();
@@ -267,12 +269,12 @@ export default function StudentDetails() {
             </button>
           )}
           {can(PERMISSIONS.VIEW_LETTERS) && (
-            <button
-              className='outline-btn'
+            <CustomButton
+              className='outline-btn rounded-lg'
+              children=' Generate Letter'
+              icon={<HiDocumentText />}
               onClick={() => navigate(`/letters?context=student&id=${id}&template=fees`)}
-            >
-              <HiDocumentText /> Generate Letter
-            </button>
+            />
           )}
         </div>
       </div>

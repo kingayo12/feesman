@@ -42,3 +42,43 @@ export const formatDate = (timestamp) => {
     day: "numeric",
   });
 };
+
+// src/utils/classHelpers.js
+
+export const getClassLevel = (name = "") => {
+  const n = name.toLowerCase();
+
+  if (n.includes("creche") || n.includes("daycare")) return 0;
+  if (n.includes("kg")) return 1;
+  if (n.includes("nursery")) return 2;
+  if (n.includes("primary")) return 3;
+  if (n.includes("jss")) return 4;
+  if (n.includes("ss")) return 5;
+
+  return 6;
+};
+
+export const getClassOrderNumber = (name = "") => {
+  const match = name.match(/\d+/);
+  return match ? Number(match[0]) : 0;
+};
+
+export const detectGroup = (cls = {}) => {
+  if (cls.group) return cls.group;
+
+  const name = cls.name?.toLowerCase() || "";
+
+  if (name.includes("primary") || name.includes("nursery")) return "primary";
+  if (name.includes("jss") || name.includes("ss") || name.includes("secondary")) return "secondary";
+
+  return "unknown";
+};
+
+export const sortClasses = (list = []) => {
+  return [...list].sort((a, b) => {
+    const levelDiff = getClassLevel(a.name) - getClassLevel(b.name);
+    if (levelDiff !== 0) return levelDiff;
+
+    return getClassOrderNumber(a.name) - getClassOrderNumber(b.name);
+  });
+};

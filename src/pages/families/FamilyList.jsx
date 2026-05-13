@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getCacheItem, setCacheItem, SETTINGS_CACHE_KEY } from "../../utils/cache";
 import { getFamilies, deleteFamily } from "./familyService";
 import CustomButton from "../../components/common/CustomButton";
 import { filterData } from "../../utils/helpers";
@@ -65,7 +66,7 @@ export default function FamilyList() {
   // We still pass currentTerm when picking classId so we only use the enrollment
   // that matches the term being displayed.
   //
-  const calculateFamilyFinancials = async (familyId, settings, activeDiscounts) => {
+  const calculateFamilyFinancials = useCallback(async (familyId, settings, activeDiscounts) => {
     const { academicYear, currentTerm } = settings;
 
     try {
@@ -132,13 +133,26 @@ export default function FamilyList() {
       console.error(`Financials calculation failed for ${familyId}:`, err);
       return { totalAmount: 0, totalPaid: 0, outstanding: 0, status: "Unpaid" };
     }
-  };
+  }, []);
 
   // ── Load ──────────────────────────────────────────────────────────────────
-  const loadFamilies = async () => {
+  const loadFamilies = useCallback(async () => {
     setLoading(true);
     try {
-      const [basicFamilyData, settings] = await Promise.all([getFamilies(), getSettings()]);
+      const cachedSettings = getCacheItem(SETTINGS_CACHE_KEY);
+      const [basicFamilyData, rawSettings] = await Promise.all([
+        getFamilies(),
+        getSettings().catch(() => cachedSettings || null),
+      ]);
+
+      const settings = rawSettings || cachedSettings;
+      if (settings?.academicYear && settings?.currentTerm) {
+        setCurrentTerm(settings.currentTerm);
+        setCacheItem(SETTINGS_CACHE_KEY, {
+          academicYear: settings.academicYear,
+          currentTerm: settings.currentTerm,
+        });
+      }
 
       if (!settings?.academicYear || !settings?.currentTerm) {
         setFamilies(
@@ -188,14 +202,14 @@ export default function FamilyList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [calculateFamilyFinancials]);
 
   useEffect(() => {
     loadFamilies();
     return () => {
       clearMemoryCache();
     };
-  }, []);
+  }, [loadFamilies]);
 
   // ── DataTables action root cleanup ────────────────────────────────────────
   //
@@ -210,23 +224,25 @@ export default function FamilyList() {
       roots.forEach((root) => {
         try {
           root.unmount();
-        } catch (_) {}
+        } catch (err) {
+          console.warn("Failed to unmount action root", err);
+        }
       });
     }, 0);
   };
 
+  const filteredFamilies = filterData(families, searchQuery, [
+    "familyName",
+    "phone",
+    "email",
+    "status",
+  ]).filter(
+    (family) => !statusFilter || family.status?.toLowerCase() === statusFilter.toLowerCase(),
+  );
+
   // ── DataTables setup ──────────────────────────────────────────────────────
   useEffect(() => {
     if (loading || !tableRef.current) return;
-
-    const filteredFamilies = filterData(families, searchQuery, [
-      "familyName",
-      "phone",
-      "email",
-      "status",
-    ]).filter(
-      (family) => !statusFilter || family.status?.toLowerCase() === statusFilter.toLowerCase(),
-    );
 
     // Destroy existing instance before rebuilding
     if ($.fn.DataTable.isDataTable(tableRef.current)) {
@@ -315,17 +331,11 @@ export default function FamilyList() {
       cleanupActionRoots();
       try {
         if ($.fn.DataTable.isDataTable(tableRef.current)) dt.destroy();
-      } catch (_) {}
+      } catch (err) {
+        console.warn("Failed to destroy DataTable", err);
+      }
     };
-  }, [families, searchQuery, statusFilter, loading]);
-
-  // ── Export ────────────────────────────────────────────────────────────────
-  const filteredFamilies = filterData(families, searchQuery, [
-    "familyName",
-    "phone",
-    "email",
-    "status",
-  ]);
+  }, [families, searchQuery, statusFilter, loading, can]);
 
   const exportHeaders = [
     "Family Name",
