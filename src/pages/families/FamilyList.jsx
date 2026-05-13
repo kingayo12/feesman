@@ -116,9 +116,7 @@ export default function FamilyList() {
           });
 
           totalAssessed += Math.max(termFees + (prevBal || 0) - (totalDiscount || 0), 0);
-        } catch (studentErr) {
-          console.warn(`Student calculation error for ${student.id}:`, studentErr);
-        }
+        } catch (studentErr) {}
       }
 
       const totalPaid = (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
@@ -173,7 +171,6 @@ export default function FamilyList() {
       await Promise.allSettled(
         basicFamilyData.map((f) =>
           preCacheFamilyData(f.id, settings.academicYear, settings.currentTerm).catch((e) => {
-            console.warn(`Pre-cache failed for family ${f.id}:`, e);
             return { success: false };
           }),
         ),
@@ -224,9 +221,7 @@ export default function FamilyList() {
       roots.forEach((root) => {
         try {
           root.unmount();
-        } catch (err) {
-          console.warn("Failed to unmount action root", err);
-        }
+        } catch (err) {}
       });
     }, 0);
   };
@@ -332,7 +327,6 @@ export default function FamilyList() {
       try {
         if ($.fn.DataTable.isDataTable(tableRef.current)) dt.destroy();
       } catch (err) {
-        console.warn("Failed to destroy DataTable", err);
       }
     };
   }, [families, searchQuery, statusFilter, loading, can]);

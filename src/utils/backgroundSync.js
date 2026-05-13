@@ -21,7 +21,6 @@ class BackgroundSyncManager {
    */
   startSync(syncIntervalMs = null) {
     if (this.syncInterval) {
-      //   console.warn("Sync already running");
       return;
     }
 
@@ -104,7 +103,6 @@ class BackgroundSyncManager {
       this.lastSyncTime[collectionName] = Date.now();
       return count;
     } catch (error) {
-      console.warn(`Failed to sync ${collectionName}:`, error);
       return 0;
     }
   }

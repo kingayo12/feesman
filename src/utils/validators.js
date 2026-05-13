@@ -233,7 +233,6 @@ export async function exportLetterAsDocx(values, template, schoolMeta) {
 ───────────────────────────────────────────────────────────── */
 export async function exportLetterAsImage(sheetElement) {
   if (!sheetElement) {
-    console.warn("exportLetterAsImage: sheetElement is null — make sure ref is attached");
     return;
   }
 

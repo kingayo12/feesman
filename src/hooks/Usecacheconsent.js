@@ -32,9 +32,7 @@ export function useCacheConsent() {
       });
 
       setInterval(() => reg.update(), 60_000);
-    } catch (err) {
-      console.warn("Service worker registration failed:", err);
-    }
+    } catch (err) {}
   }, []);
 
   // ── Accept ────────────────────────────────────────────────────────────

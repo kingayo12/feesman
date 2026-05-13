@@ -54,7 +54,6 @@ const feeExists = async ({ classId, session, term, feeType }) => {
 export const createFee = async (feeData) => {
   const exists = await feeExists(feeData);
   if (exists) {
-    console.warn("Duplicate fee skipped:", feeData);
     return null;
   }
 
@@ -85,9 +84,7 @@ export const createBulkFees = async (feesArray) => {
     );
 
   const skipped = existsFlags.filter(Boolean).length;
-  if (skipped > 0) console.warn(`Skipped ${skipped} duplicate fee(s).`);
-
-  return await Promise.all(writePromises);
+  if (skipped > 0) return await Promise.all(writePromises);
 };
 
 export const getFees = async () => {

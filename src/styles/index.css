@@ -1451,6 +1451,7 @@ main {
   align-items: center;
   margin-bottom: 2rem;
   background: #ffffff1d;
+  -webkit-backdrop-filter: blur(30px);
   backdrop-filter: blur(30px);
   box-shadow: var(--shadow-md);
   padding: 10px;
@@ -4056,8 +4057,8 @@ a {
 
 .db-metric-card {
   background: linear-gradient(to top, var(--modal-bg), var(--bg-secondary));
-  backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
+  backdrop-filter: blur(30px);
   border-radius: var(--border-radius-md);
   padding: 14px 16px;
   display: flex;
@@ -6116,8 +6117,8 @@ a {
   justify-content: center;
   z-index: 2000;
   padding: 1rem;
-  backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
 }
 .lp-modal {
   background: #fff;
@@ -7166,6 +7167,7 @@ a {
   inset: 0;
   z-index: 9000;
   background: var(--overlay);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-start;
@@ -8700,6 +8702,7 @@ a {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.7);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -9150,6 +9153,7 @@ a {
   inset: 0;
   z-index: 3000;
   background: rgba(0, 0, 0, 0.78);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-start;
@@ -9448,6 +9452,7 @@ a {
   inset: 0;
   z-index: 3000;
   background: rgba(0, 0, 0, 0.78);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-start;
@@ -10014,6 +10019,7 @@ a {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.72);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -10975,6 +10981,7 @@ a {
 }
 
 .dashboard-promo {
+  -webkit-user-select: none;
   user-select: none;
 }
 

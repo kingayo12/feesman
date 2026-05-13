@@ -331,7 +331,6 @@ export const getCachedPreviousBalanceAmount = async (studentId, session) => {
     const balances = await getCachedPreviousBalance(studentId, session);
     return balances.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
   } catch (err) {
-    console.warn(`Failed to fetch previous balance for ${studentId}:`, err);
     return 0;
   }
 };
@@ -452,7 +451,6 @@ export const fetchWithOfflineFallback = async (fetchFn, fallbackValue = null) =>
   try {
     return await fetchFn();
   } catch (err) {
-    console.warn("Fetch failed, using fallback:", err);
     return fallbackValue;
   }
 };

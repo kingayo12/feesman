@@ -11,7 +11,6 @@ const safeParse = (value) => {
   try {
     return JSON.parse(value);
   } catch (error) {
-    console.warn("[cache] Failed to parse stored JSON", error);
     return null;
   }
 };

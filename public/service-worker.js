@@ -199,9 +199,7 @@ async function safeCachePut(cache, request, responseOrPromise) {
   try {
     const response = await responseOrPromise;
     await cache.put(request, response);
-  } catch (err) {
-    console.warn("[SW] Cache put skipped:", request.url, err);
-  }
+  } catch (err) {}
 }
 
 function getOfflinePage() {

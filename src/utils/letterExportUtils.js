@@ -470,7 +470,6 @@ export async function exportLetterAsDocx(values, template, schoolMeta) {
 ───────────────────────────────────────────────────────────── */
 export async function exportLetterAsImage(sheetElement) {
   if (!sheetElement) {
-    console.warn("exportLetterAsImage: sheetElement is null — ensure ref is attached");
     return;
   }
   const { toPng } = await loadH2Image();

@@ -71,9 +71,7 @@ export async function calculateStudentBalance(studentId, classId, session, term,
     });
 
     totalDiscount = result.totalDiscount ?? 0;
-  } catch (err) {
-    console.warn("[calculateStudentBalance] Discount calculation failed:", err);
-  }
+  } catch (err) {}
 
   // ── Net fees = term fees + arrears - discounts ────────────────────────
   const totalFees = Math.max(termFees + Number(previousBalance || 0) - totalDiscount, 0);

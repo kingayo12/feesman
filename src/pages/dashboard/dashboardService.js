@@ -128,11 +128,6 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
         selectedSession,
       );
     } catch (err) {
-      console.warn(
-        "[dashboardService] Failed to load family discount assignments for",
-        familyId,
-        err,
-      );
       familyAssignmentCache[familyId] = [];
     }
   }
@@ -150,24 +145,16 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
     const [feesSnap, overrides, prevBal, stuAssignments] = await Promise.all([
       feeQuery
         ? getDocs(feeQuery).catch((err) => {
-            console.warn("[dashboardService] Failed to load class fees for", student.classId, err);
             return { docs: [] };
           })
         : { docs: [] },
       getCachedStudentFeeOverrides(student.id).catch((err) => {
-        console.warn("[dashboardService] Failed to load fee overrides for", student.id, err);
         return [];
       }),
       getCachedPreviousBalanceAmount(student.id, selectedSession).catch((err) => {
-        console.warn("[dashboardService] Failed to load previous balance for", student.id, err);
         return 0;
       }),
       getCachedAssignmentsForStudent(student.id, selectedSession).catch((err) => {
-        console.warn(
-          "[dashboardService] Failed to load student discount assignments for",
-          student.id,
-          err,
-        );
         return [];
       }),
     ]);
@@ -217,7 +204,6 @@ export const getDashboardFinanceStats = async (selectedSession, selectedTerm) =>
       classNames[d.id] = d.data().name;
     });
   } catch (err) {
-    console.warn("[dashboardService] Failed to load classes:", err);
     classNames = {};
   }
 
@@ -328,7 +314,6 @@ export async function getTodayPayments(academicYear, currentTerm) {
     setCacheItem(getDashboardCacheKey(academicYear, `${normalizedTerm}_today`), result);
     return result;
   } catch (err) {
-    console.warn("[dashboardService] Failed to load today payments:", err);
     return { total: 0, count: 0, studentsPaid: 0, methodsUsed: 0, recentPayments: [] };
   }
 }
