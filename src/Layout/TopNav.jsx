@@ -8,10 +8,8 @@ import { getEnrollmentsByFilter } from "../pages/students/enrollmentService";
 import { getFamilies } from "../pages/families/familyService";
 import { getClasses } from "../pages/classes/classService";
 import { getSettings } from "../pages/settings/settingService";
-import { getFeesByClass } from "../pages/fees/feesService";
-import { getPaymentsByStudent } from "../pages/fees/paymentService";
 import { getPreviousBalanceAmount } from "../pages/previous_balance/Previousbalanceservice";
-import { getStudentFeeOverrides } from "../pages/students/studentFeeOverrideService";
+import { calculateStudentBalance } from "../hooks/Usestudentbalance";
 import { FaBell } from "react-icons/fa";
 import {
   HiSearch,
@@ -164,24 +162,147 @@ async function buildNotifications(settings) {
 
   if (!students?.length) return [];
 
-  // Build enrollment map
-  const enrollmentMap = {};
+  const classMap = (classes || []).reduce((map, cls) => {
+    if (cls?.id) map[cls.id] = cls;
+    return map;
+  }, {});
 
-  (enrollments || []).forEach((enrollment) => {
-    enrollmentMap[enrollment.studentId] = enrollment;
-  });
+  const familyMap = (families || []).reduce((map, family) => {
+    if (family?.id) map[family.id] = family;
+    return map;
+  }, {});
 
-  // Enrich students with enrollment data
-  const enrichedStudents = students.map((student) => {
-    const enrollment = enrollmentMap[student.id];
+  const enrollmentMap = (enrollments || []).reduce((map, enrollment) => {
+    if (enrollment?.studentId) map[enrollment.studentId] = enrollment;
+    return map;
+  }, {});
 
-    return {
-      ...student,
-      classId: enrollment?.classId || null,
-      session: enrollment?.session || null,
-      term: enrollment?.term || null,
-    };
-  });
+  const enrichedStudents = await Promise.all(
+    students.map(async (student) => {
+      const enrollment = enrollmentMap[student.id] || {};
+      const studentClass = classMap[enrollment.classId] || {};
+      const family = familyMap[student.familyId] || {};
+      const name = [student.firstName, student.lastName].filter(Boolean).join(" ") || student.admissionNo || student.id || "Student";
+
+      const balanceData = student.classId || enrollment.classId
+        ? await calculateStudentBalance(
+            student.id,
+            enrollment.classId,
+            session,
+            term,
+            {
+              familyId: student.familyId,
+              siblingCount: 1,
+            },
+          )
+        : {
+            totalFees: 0,
+            totalPaid: 0,
+            balance: 0,
+            previousBalance: await getPreviousBalanceAmount(student.id, session).catch(() => 0),
+          };
+
+      return {
+        ...student,
+        ...balanceData,
+        classId: enrollment.classId || null,
+        className: studentClass.name || studentClass.label || "Unknown class",
+        familyName: family.familyName || family.name || "Unknown family",
+        name,
+        firstName: student.firstName || name,
+        lastName: student.lastName || "",
+        session: enrollment.session || null,
+        term: enrollment.term || null,
+      };
+    }),
+  );
+
+  const studentsWithDebt = enrichedStudents.filter((student) => student.balance > 0);
+  const studentsWithArrears = enrichedStudents.filter((student) => student.previousBalance > 0);
+
+  const totalPaid = enrichedStudents.reduce((sum, student) => sum + Number(student.totalPaid || 0), 0);
+  const totalDue = enrichedStudents.reduce((sum, student) => sum + Math.max(Number(student.totalFees || 0), 0), 0);
+  const fullyPaid = enrichedStudents.filter((student) => Number(student.totalFees || 0) > 0 && Number(student.balance || 0) <= 0).length;
+  const partialPay = enrichedStudents.filter(
+    (student) => Number(student.totalPaid || 0) > 0 && Number(student.balance || 0) > 0,
+  ).length;
+  const notPaid = enrichedStudents.filter(
+    (student) => Number(student.totalPaid || 0) === 0 && Number(student.totalFees || 0) > 0,
+  ).length;
+  const collRate = totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 0;
+
+  const classPerformance = (classes || [])
+    .map((cls) => {
+      const studentsInClass = enrichedStudents.filter((student) => student.classId === cls.id);
+      const paid = studentsInClass.reduce((sum, student) => sum + Number(student.totalPaid || 0), 0);
+      const due = studentsInClass.reduce((sum, student) => sum + Math.max(Number(student.totalFees || 0), 0), 0);
+      const rate = due > 0 ? Math.round((paid / due) * 100) : 0;
+      return {
+        name: cls.name || cls.label || "Unnamed class",
+        count: studentsInClass.length,
+        paid,
+        due,
+        rate,
+      };
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+
+  return [
+    {
+      id: "summary_fees",
+      title: "Fees collection summary",
+      body: `${enrichedStudents.length} students enrolled for ${term} ${session}.`,
+      category: "summary",
+      icon: "chart",
+      detail: {
+        totalPaid,
+        totalDue,
+        collRate,
+        fullyPaid,
+        partialPay,
+        notPaid,
+      },
+    },
+    {
+      id: "debtors_top_students",
+      title: "Students with outstanding balances",
+      body: `${studentsWithDebt.length} students currently owe fees this term.`,
+      category: "alert",
+      icon: "debt",
+      detail: {
+        totalOutstanding: studentsWithDebt.reduce((sum, student) => sum + Number(student.balance || 0), 0),
+        enrichedStudents: studentsWithDebt
+          .sort((a, b) => Number(b.balance || 0) - Number(a.balance || 0))
+          .slice(0, 5),
+      },
+    },
+    {
+      id: "arrears_carried_forward",
+      title: "Carried-forward arrears",
+      body: `${studentsWithArrears.length} students still have previous balances.`,
+      category: "alert",
+      icon: "warning",
+      detail: {
+        totalArrears: studentsWithArrears.reduce((sum, student) => sum + Number(student.previousBalance || 0), 0),
+        total: studentsWithArrears.length,
+        students: studentsWithArrears,
+        enrichedStudents: studentsWithArrears
+          .sort((a, b) => Number(b.previousBalance || 0) - Number(a.previousBalance || 0))
+          .slice(0, 5),
+      },
+    },
+    {
+      id: "class_perf_summary",
+      title: "Class performance overview",
+      body: "See how each class is collecting fees this term.",
+      category: "info",
+      icon: "school",
+      detail: {
+        classes: classPerformance,
+      },
+    },
+  ];
 }
 
 /* ─────────────────────────────────────────────────────────────
