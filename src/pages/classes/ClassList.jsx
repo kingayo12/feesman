@@ -11,6 +11,7 @@ import ClassForm from "../../components/forms/ClassForm";
 import { ClassListSkeleton } from "../../components/common/Skeleton";
 import CustomButton from "../../components/common/CustomButton";
 import { FormModal } from "../../components/common/Modal";
+import {MetricCard} from "../dashboard/DashboardWidgets";
 import {
   HiCollection,
   HiViewGrid,
@@ -239,25 +240,23 @@ export default function ClassList() {
       )}
 
       {/* ── Stats ── */}
-      <div className='stats-row'>
-        <div className='stat-card'>
-          <HiViewGrid className='stat-icon' />
-          <div className='stat-content'>
-            <label>Total Classes</label>
-            <h3>{classes.length}</h3>
-          </div>
-        </div>
-
-        <div className='stat-card'>
-          <HiUserGroup className='stat-icon' />
-          <div className='stat-content'>
-            <label>
-              Students
-              {currentTerm ? ` (${currentTerm})` : ""}
-            </label>
-            <h3>{totalStudentsShown}</h3>
-          </div>
-        </div>
+      <div className='finance-grid'>
+        <MetricCard
+          label="Total Classes"
+          value={classes.length}
+          sub="All classes"
+          icon={<HiViewGrid />}
+          iconBg="var(--color-primary-light, #e0e7ff)"
+          iconColor="var(--color-primary, #4338ca)"
+        />
+        <MetricCard
+          label="Total Students"
+          value={totalStudentsShown}
+          sub={`${currentTerm} (current term)`}
+          icon={<HiUserGroup />}
+          iconBg="var(--color-primary-light, #e0e7ff)"
+          iconColor="var(--color-primary, #4338ca)"
+        />
       </div>
 
       {/* ── Table ── */}

@@ -85,6 +85,11 @@ export const PERMISSIONS = {
   EDIT_SETTINGS: "edit_settings",
   DANGER_ZONE: "danger_zone",
 
+  //Inventory
+    VIEW_INVENTORY:   "view_inventory",
+    MANAGE_INVENTORY: "manage_inventory",
+
+
   // Role management
   VIEW_ROLES: "view_roles",
   ASSIGN_ROLES: "assign_roles",
@@ -157,6 +162,14 @@ export const PERMISSION_GROUPS = [
       { key: PERMISSIONS.EXPORT_REPORTS, label: "Export reports" },
       { key: PERMISSIONS.MANAGE_LETERS, label: "Manage letters" },
       { key: PERMISSIONS.VIEW_LETTERS, label: "View letters" },
+    ],
+  },
+  {
+    key: "Inventory",
+    label: "Inventory",
+    permissions: [
+      { key: PERMISSIONS.VIEW_INVENTORY, label: "View inventory" },
+      { key: PERMISSIONS.MANAGE_INVENTORY, label: "Manage inventory" },
     ],
   },
   {

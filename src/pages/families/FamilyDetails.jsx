@@ -204,11 +204,11 @@ export default function FamilyDetails() {
     } finally {
       setLoading(false);
     }
-  });
+  },[id]);
 
   useEffect(() => {
     loadAll();
-  }, [id, loadAll]);
+  }, [loadAll]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const getClassName = (classId) => classes.find((c) => c.id === classId)?.name ?? "Not Assigned";

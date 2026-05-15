@@ -15,6 +15,7 @@ import {
   FaChevronUp,
   FaUserShield,
   FaEnvelopeOpenText,
+  FaBox,
 } from "react-icons/fa";
 import Logo from "../assets/logo.svg";
 import { useRole } from "../hooks/useRole";
@@ -72,6 +73,12 @@ const NAV_CONFIG = [
     path: "/discount",
     icon: <FaPercent />,
     permission: PERMISSIONS.VIEW_DISCOUNTS,
+  },
+    {
+    label: "Inventory",
+    path: "/inventory",
+    icon: <FaBox />, // or <FaPackage>
+    permission: PERMISSIONS.VIEW_INVENTORY,
   },
   { label: "Roles", path: "/roles", icon: <FaUserShield />, permission: PERMISSIONS.VIEW_ROLES },
   {

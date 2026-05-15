@@ -485,6 +485,7 @@ export default function StudentList() {
               <th>Session</th>
               <th>Term</th>
               <th>Family</th>
+              <th>Outstanding</th>
               <th>Status</th>
               <th>Action</th>
             </tr>
@@ -519,6 +520,7 @@ export default function StudentList() {
                   <td>{student.session}</td>
                   <td>{student.term || "—"}</td>
                   <td className='family-cell'>{student.resolvedFamilyName}</td>
+                  <td>{student?.resovedOutstanding}</td>
                   <td>
                     <span className='status-badge active'>Active</span>
                   </td>

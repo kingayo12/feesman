@@ -1178,7 +1178,7 @@ export default function TopNav() {
                       <p className='search-group-label'>
                         <HiAcademicCap /> Students ({results.students.length})
                       </p>
-                      {results.enrichedStudents.map((s) => (
+                      {results.students.map((s) => (
                         <button
                           key={s.id}
                           className='search-result-item'

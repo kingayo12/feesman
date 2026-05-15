@@ -4,7 +4,16 @@ import { getAllStudents } from "../students/studentService";
 import { useSettings } from "../../hooks/Usesettings";
 import { formatDate } from "../../utils/helpers";
 import TableToolbar from "../../components/common/TableToolbar";
-import { HiCash, HiSearch, HiChevronUp, HiChevronDown, HiSelector } from "react-icons/hi";
+import  {MetricCard } from "../dashboard/DashboardWidgets";
+import {
+  HiCash,
+  HiSearch,
+  HiChevronUp,
+  HiChevronDown,
+  HiSelector,
+  HiCurrencyDollar,
+  HiCreditCard,
+} from "react-icons/hi";
 
 // ── Skeleton ──────────────────────────────────────────────────────────────
 function Bone({ w = "100%", h = 16, r = 6, style = {} }) {
@@ -255,23 +264,33 @@ export default function PaymentHistory() {
         ))}
       </div>
 
-      {/* Method cards */}
-      <div className='finance-grid' style={{ marginBottom: "1.5rem" }}>
-        {Object.entries(methodBreakdown).map(([method, amount]) => (
-          <div className='finance-card' key={method}>
-            <div className='f-data'>
-              <label>{method}</label>
-              <h3>₦{Number(amount).toLocaleString()}</h3>
-            </div>
-          </div>
-        ))}
-        <div className='finance-card balance-card'>
-          <div className='f-data'>
-            <label>Grand Total ({filtered.length} payments)</label>
-            <h3 className='cleared'>₦{totalCollected.toLocaleString()}</h3>
-          </div>
-        </div>
-      </div>
+   
+
+<div className='finance-grid' style={{ marginBottom: "1.5rem" }}>
+  {Object.entries(methodBreakdown).map(([method, amount]) => (
+    <MetricCard
+      key={method}
+      label={method}
+      value={`₦${Number(amount).toLocaleString()}`}
+      sub="Payment method total"
+      icon={<HiCreditCard />}
+      iconBg="var(--color-primary-light, #e0e7ff)"
+      iconColor="var(--color-primary, #4338ca)"
+    />
+  ))}
+
+  {/* 2. Add the Grand Total card */}
+  <MetricCard
+    label="Grand Total"
+    value={`₦${totalCollected.toLocaleString()}`}
+    sub={`${filtered.length} transactions`}
+    pill="Total Collected"
+    pillClass="pill-success" // Assuming you have a green pill class
+    icon={<HiCurrencyDollar />}
+    iconBg="var(--color-success-light, #dcfce7)"
+    iconColor="var(--color-success, #15803d)"
+  />
+</div>
 
       {/* Table */}
       <div className='table-card'>

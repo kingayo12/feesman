@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import useToast from "../../hooks/UseToast";
 import Logo from "../../assets/logo.svg";
 import { HiMail, HiLockClosed, HiEye, HiEyeOff, HiExclamationCircle } from "react-icons/hi";
 
 export default function Login() {
   const { login, loginWithGoogle, user, loading: authLoading } = useAuth();
+  const { showToast, ToastComponent } = useToast();
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,9 +34,13 @@ export default function Login() {
 
     setError("");
     setLoading(true);
+    let navigated = false;
 
     try {
       await login(email.trim(), password);
+      showToast({ message: "Signed in successfully.", type: "success" });
+      navigate(from, { replace: true });
+      navigated = true;
     } catch (err) {
       const map = {
         "auth/user-not-found": "No account found with this email.",
@@ -44,9 +50,11 @@ export default function Login() {
         "auth/invalid-credential": "Invalid email or password.",
       };
 
-      setError(map[err?.code] || "Invalid login credentials.");
+      const message = map[err?.code] || "Invalid login credentials.";
+      setError(message);
+      showToast({ message, type: "error" });
     } finally {
-      setLoading(false);
+      if (!navigated) setLoading(false);
     }
   };
 
@@ -54,13 +62,19 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     setError("");
     setGoogleLoading(true);
+    let navigated = false;
 
     try {
       await loginWithGoogle();
+      showToast({ message: "Signed in successfully.", type: "success" });
+      navigate(from, { replace: true });
+      navigated = true;
     } catch (err) {
-      setError("Google sign-in failed. Please try again.");
+      const message = "Google sign-in failed. Please try again.";
+      setError(message);
+      showToast({ message, type: "error" });
     } finally {
-      setGoogleLoading(false);
+      if (!navigated) setGoogleLoading(false);
     }
   };
 
@@ -159,6 +173,8 @@ export default function Login() {
               {loading ? "Signing in..." : "Sign in"}
             </button>
           </form>
+
+          <ToastComponent />
 
           {/* GOOGLE LOGIN */}
           <button

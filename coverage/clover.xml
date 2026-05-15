@@ -1,0 +1,525 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1778754855931" clover="3.2.0">
+  <project timestamp="1778754855931" name="All files">
+    <metrics statements="432" coveredstatements="316" conditionals="466" coveredconditionals="215" methods="127" coveredmethods="72" elements="1025" coveredelements="603" complexity="0" loc="432" ncloc="432" packages="9" files="20" classes="20"/>
+    <package name="assets">
+      <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <file name="Problem solving-rafiki.svg" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\assets\Problem solving-rafiki.svg">
+        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      </file>
+      <file name="logo.svg" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\assets\logo.svg">
+        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      </file>
+      <file name="money.svg" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\assets\money.svg">
+        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      </file>
+      <file name="web2.svg" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\assets\web2.svg">
+        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      </file>
+    </package>
+    <package name="components.common">
+      <metrics statements="30" coveredstatements="27" conditionals="76" coveredconditionals="60" methods="14" coveredmethods="11"/>
+      <file name="CustomButton.jsx" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\components\common\CustomButton.jsx">
+        <metrics statements="3" coveredstatements="3" conditionals="16" coveredconditionals="16" methods="1" coveredmethods="1"/>
+        <line num="1" count="2" type="stmt"/>
+        <line num="12" count="7" type="cond" truecount="2" falsecount="0"/>
+        <line num="14" count="7" type="stmt"/>
+      </file>
+      <file name="Input.jsx" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\components\common\Input.jsx">
+        <metrics statements="2" coveredstatements="2" conditionals="20" coveredconditionals="19" methods="1" coveredmethods="1"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="17" count="4" type="stmt"/>
+      </file>
+      <file name="Modal.jsx" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\components\common\Modal.jsx">
+        <metrics statements="18" coveredstatements="15" conditionals="36" coveredconditionals="21" methods="11" coveredmethods="8"/>
+        <line num="8" count="3" type="stmt"/>
+        <line num="10" count="3" type="stmt"/>
+        <line num="11" count="3" type="stmt"/>
+        <line num="12" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="14" count="3" type="stmt"/>
+        <line num="15" count="3" type="stmt"/>
+        <line num="16" count="3" type="stmt"/>
+        <line num="17" count="3" type="stmt"/>
+        <line num="18" count="3" type="stmt"/>
+        <line num="22" count="3" type="stmt"/>
+        <line num="27" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="46" count="5" type="stmt"/>
+        <line num="56" count="3" type="stmt"/>
+        <line num="73" count="1" type="stmt"/>
+        <line num="116" count="1" type="stmt"/>
+        <line num="177" count="0" type="stmt"/>
+        <line num="258" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="262" count="1" type="stmt"/>
+      </file>
+      <file name="ProtectedRoute.jsx" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\components\common\ProtectedRoute.jsx">
+        <metrics statements="7" coveredstatements="7" conditionals="4" coveredconditionals="4" methods="1" coveredmethods="1"/>
+        <line num="5" count="3" type="stmt"/>
+        <line num="6" count="3" type="stmt"/>
+        <line num="8" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="9" count="1" type="stmt"/>
+        <line num="23" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="24" count="1" type="stmt"/>
+        <line num="26" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="config">
+      <metrics statements="34" coveredstatements="12" conditionals="32" coveredconditionals="0" methods="7" coveredmethods="0"/>
+      <file name="permissions.js" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\config\permissions.js">
+        <metrics statements="34" coveredstatements="12" conditionals="32" coveredconditionals="0" methods="7" coveredmethods="0"/>
+        <line num="14" count="1" type="stmt"/>
+        <line num="24" count="1" type="stmt"/>
+        <line num="35" count="1" type="stmt"/>
+        <line num="94" count="1" type="stmt"/>
+        <line num="199" count="1" type="stmt"/>
+        <line num="201" count="1" type="stmt"/>
+        <line num="222" count="1" type="stmt"/>
+        <line num="233" count="1" type="stmt"/>
+        <line num="245" count="1" type="stmt"/>
+        <line num="251" count="1" type="stmt"/>
+        <line num="262" count="1" type="stmt"/>
+        <line num="323" count="1" type="stmt"/>
+        <line num="333" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="337" count="0" type="stmt"/>
+        <line num="338" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="339" count="0" type="stmt"/>
+        <line num="347" count="0" type="stmt"/>
+        <line num="351" count="0" type="stmt"/>
+        <line num="352" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="356" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="358" count="0" type="stmt"/>
+        <line num="360" count="0" type="stmt"/>
+        <line num="362" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="363" count="0" type="stmt"/>
+        <line num="366" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="367" count="0" type="stmt"/>
+        <line num="368" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="369" count="0" type="stmt"/>
+        <line num="370" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="376" count="0" type="cond" truecount="0" falsecount="4"/>
+        <line num="378" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="379" count="0" type="stmt"/>
+        <line num="382" count="0" type="stmt"/>
+        <line num="383" count="0" type="cond" truecount="0" falsecount="2"/>
+      </file>
+    </package>
+    <package name="constants">
+      <metrics statements="9" coveredstatements="9" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <file name="index.jsx" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\constants\index.jsx">
+        <metrics statements="9" coveredstatements="9" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="7" count="1" type="stmt"/>
+        <line num="9" count="1" type="stmt"/>
+        <line num="13" count="1" type="stmt"/>
+        <line num="15" count="1" type="stmt"/>
+        <line num="17" count="1" type="stmt"/>
+        <line num="18" count="1" type="stmt"/>
+        <line num="19" count="1" type="stmt"/>
+        <line num="20" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="firebase">
+      <metrics statements="4" coveredstatements="4" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <file name="auth.js" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\firebase\auth.js">
+        <metrics statements="2" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="4" count="1" type="stmt"/>
+        <line num="5" count="1" type="stmt"/>
+      </file>
+      <file name="firebase.config.js" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\firebase\firebase.config.js">
+        <metrics statements="2" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="12" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="hooks">
+      <metrics statements="8" coveredstatements="7" conditionals="4" coveredconditionals="4" methods="4" coveredmethods="3"/>
+      <file name="UseToast.jsx" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\hooks\UseToast.jsx">
+        <metrics statements="8" coveredstatements="7" conditionals="4" coveredconditionals="4" methods="4" coveredmethods="3"/>
+        <line num="4" count="24" type="stmt"/>
+        <line num="6" count="24" type="cond" truecount="2" falsecount="0"/>
+        <line num="7" count="4" type="stmt"/>
+        <line num="9" count="4" type="stmt"/>
+        <line num="10" count="0" type="stmt"/>
+        <line num="14" count="24" type="stmt"/>
+        <line num="15" count="24" type="cond" truecount="2" falsecount="0"/>
+        <line num="18" count="24" type="stmt"/>
+      </file>
+    </package>
+    <package name="pages.auth">
+      <metrics statements="102" coveredstatements="88" conditionals="58" coveredconditionals="47" methods="18" coveredmethods="15"/>
+      <file name="ForgotPassword.jsx" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\pages\auth\ForgotPassword.jsx">
+        <metrics statements="18" coveredstatements="16" conditionals="12" coveredconditionals="12" methods="4" coveredmethods="3"/>
+        <line num="9" count="15" type="stmt"/>
+        <line num="10" count="15" type="stmt"/>
+        <line num="11" count="15" type="stmt"/>
+        <line num="12" count="15" type="stmt"/>
+        <line num="14" count="15" type="stmt"/>
+        <line num="15" count="3" type="stmt"/>
+        <line num="16" count="3" type="stmt"/>
+        <line num="17" count="3" type="stmt"/>
+        <line num="18" count="3" type="stmt"/>
+        <line num="19" count="3" type="stmt"/>
+        <line num="20" count="1" type="stmt"/>
+        <line num="22" count="2" type="stmt"/>
+        <line num="26" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="28" count="3" type="stmt"/>
+        <line num="32" count="15" type="stmt"/>
+        <line num="96" count="0" type="stmt"/>
+        <line num="97" count="0" type="stmt"/>
+        <line num="114" count="4" type="stmt"/>
+      </file>
+      <file name="Login.jsx" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\pages\auth\Login.jsx">
+        <metrics statements="47" coveredstatements="47" conditionals="24" coveredconditionals="21" methods="7" coveredmethods="7"/>
+        <line num="9" count="24" type="stmt"/>
+        <line num="10" count="24" type="stmt"/>
+        <line num="12" count="24" type="stmt"/>
+        <line num="13" count="24" type="stmt"/>
+        <line num="14" count="24" type="cond" truecount="1" falsecount="1"/>
+        <line num="16" count="24" type="stmt"/>
+        <line num="17" count="24" type="stmt"/>
+        <line num="18" count="24" type="stmt"/>
+        <line num="19" count="24" type="stmt"/>
+        <line num="20" count="24" type="stmt"/>
+        <line num="21" count="24" type="stmt"/>
+        <line num="24" count="24" type="stmt"/>
+        <line num="25" count="8" type="cond" truecount="4" falsecount="0"/>
+        <line num="26" count="1" type="stmt"/>
+        <line num="31" count="24" type="stmt"/>
+        <line num="32" count="2" type="stmt"/>
+        <line num="33" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="35" count="2" type="stmt"/>
+        <line num="36" count="2" type="stmt"/>
+        <line num="37" count="2" type="stmt"/>
+        <line num="39" count="2" type="stmt"/>
+        <line num="40" count="2" type="stmt"/>
+        <line num="41" count="1" type="stmt"/>
+        <line num="42" count="1" type="stmt"/>
+        <line num="43" count="1" type="stmt"/>
+        <line num="45" count="1" type="stmt"/>
+        <line num="53" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="54" count="1" type="stmt"/>
+        <line num="55" count="1" type="stmt"/>
+        <line num="57" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="62" count="24" type="stmt"/>
+        <line num="63" count="2" type="stmt"/>
+        <line num="64" count="2" type="stmt"/>
+        <line num="65" count="2" type="stmt"/>
+        <line num="67" count="2" type="stmt"/>
+        <line num="68" count="2" type="stmt"/>
+        <line num="69" count="1" type="stmt"/>
+        <line num="70" count="1" type="stmt"/>
+        <line num="71" count="1" type="stmt"/>
+        <line num="73" count="1" type="stmt"/>
+        <line num="74" count="1" type="stmt"/>
+        <line num="75" count="1" type="stmt"/>
+        <line num="77" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="81" count="24" type="stmt"/>
+        <line num="145" count="3" type="stmt"/>
+        <line num="161" count="3" type="stmt"/>
+        <line num="165" count="2" type="stmt"/>
+      </file>
+      <file name="Register.jsx" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\pages\auth\Register.jsx">
+        <metrics statements="37" coveredstatements="25" conditionals="22" coveredconditionals="14" methods="7" coveredmethods="5"/>
+        <line num="8" count="25" type="stmt"/>
+        <line num="9" count="25" type="stmt"/>
+        <line num="10" count="25" type="stmt"/>
+        <line num="11" count="25" type="stmt"/>
+        <line num="12" count="25" type="stmt"/>
+        <line num="13" count="25" type="stmt"/>
+        <line num="15" count="100" type="stmt"/>
+        <line num="17" count="25" type="stmt"/>
+        <line num="18" count="3" type="stmt"/>
+        <line num="19" count="3" type="stmt"/>
+        <line num="22" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="23" count="0" type="stmt"/>
+        <line num="24" count="0" type="stmt"/>
+        <line num="26" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="27" count="0" type="stmt"/>
+        <line num="28" count="0" type="stmt"/>
+        <line num="30" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="31" count="1" type="stmt"/>
+        <line num="32" count="1" type="stmt"/>
+        <line num="35" count="2" type="stmt"/>
+        <line num="36" count="2" type="stmt"/>
+        <line num="37" count="2" type="stmt"/>
+        <line num="38" count="1" type="stmt"/>
+        <line num="41" count="1" type="stmt"/>
+        <line num="43" count="1" type="stmt"/>
+        <line num="53" count="1" type="stmt"/>
+        <line num="58" count="2" type="stmt"/>
+        <line num="62" count="25" type="stmt"/>
+        <line num="63" count="0" type="stmt"/>
+        <line num="64" count="0" type="stmt"/>
+        <line num="66" count="0" type="stmt"/>
+        <line num="67" count="0" type="stmt"/>
+        <line num="68" count="0" type="stmt"/>
+        <line num="70" count="0" type="stmt"/>
+        <line num="72" count="0" type="stmt"/>
+        <line num="76" count="25" type="stmt"/>
+        <line num="175" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="pages.dashboard">
+      <metrics statements="170" coveredstatements="132" conditionals="230" coveredconditionals="92" methods="61" coveredmethods="36"/>
+      <file name="Dashboard.jsx" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\pages\dashboard\Dashboard.jsx">
+        <metrics statements="105" coveredstatements="77" conditionals="192" coveredconditionals="68" methods="27" coveredmethods="11"/>
+        <line num="55" count="1" type="stmt"/>
+        <line num="56" count="1" type="stmt"/>
+        <line num="67" count="1" type="stmt"/>
+        <line num="69" count="1" type="stmt"/>
+        <line num="105" count="3" type="stmt"/>
+        <line num="106" count="3" type="stmt"/>
+        <line num="243" count="0" type="stmt"/>
+        <line num="261" count="0" type="stmt"/>
+        <line num="262" count="0" type="stmt"/>
+        <line num="339" count="0" type="stmt"/>
+        <line num="351" count="0" type="stmt"/>
+        <line num="352" count="0" type="stmt"/>
+        <line num="420" count="0" type="stmt"/>
+        <line num="452" count="0" type="stmt"/>
+        <line num="463" count="0" type="stmt"/>
+        <line num="471" count="0" type="stmt"/>
+        <line num="576" count="0" type="stmt"/>
+        <line num="639" count="0" type="stmt"/>
+        <line num="673" count="0" type="stmt"/>
+        <line num="695" count="0" type="stmt"/>
+        <line num="697" count="0" type="cond" truecount="0" falsecount="4"/>
+        <line num="699" count="0" type="stmt"/>
+        <line num="821" count="0" type="stmt"/>
+        <line num="849" count="9" type="stmt"/>
+        <line num="850" count="9" type="stmt"/>
+        <line num="851" count="9" type="stmt"/>
+        <line num="852" count="9" type="stmt"/>
+        <line num="853" count="9" type="stmt"/>
+        <line num="854" count="9" type="stmt"/>
+        <line num="855" count="9" type="stmt"/>
+        <line num="856" count="9" type="stmt"/>
+        <line num="857" count="9" type="stmt"/>
+        <line num="859" count="9" type="cond" truecount="1" falsecount="1"/>
+        <line num="860" count="9" type="cond" truecount="1" falsecount="1"/>
+        <line num="863" count="9" type="cond" truecount="1" falsecount="1"/>
+        <line num="865" count="9" type="cond" truecount="1" falsecount="1"/>
+        <line num="866" count="9" type="cond" truecount="1" falsecount="1"/>
+        <line num="867" count="9" type="cond" truecount="1" falsecount="1"/>
+        <line num="868" count="9" type="stmt"/>
+        <line num="870" count="9" type="stmt"/>
+        <line num="872" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="874" count="6" type="stmt"/>
+        <line num="875" count="6" type="stmt"/>
+        <line num="876" count="4" type="cond" truecount="3" falsecount="1"/>
+        <line num="877" count="4" type="stmt"/>
+        <line num="878" count="4" type="stmt"/>
+        <line num="879" count="4" type="stmt"/>
+        <line num="883" count="4" type="stmt"/>
+        <line num="885" count="1" type="cond" truecount="2" falsecount="2"/>
+        <line num="886" count="1" type="stmt"/>
+        <line num="887" count="1" type="stmt"/>
+        <line num="890" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="896" count="9" type="stmt"/>
+        <line num="898" count="3" type="cond" truecount="3" falsecount="1"/>
+        <line num="899" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="900" count="3" type="stmt"/>
+        <line num="901" count="3" type="stmt"/>
+        <line num="904" count="3" type="stmt"/>
+        <line num="906" count="3" type="stmt"/>
+        <line num="907" count="3" type="stmt"/>
+        <line num="910" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="911" count="0" type="stmt"/>
+        <line num="912" count="0" type="stmt"/>
+        <line num="915" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="916" count="0" type="stmt"/>
+        <line num="918" count="0" type="stmt"/>
+        <line num="920" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="926" count="9" type="stmt"/>
+        <line num="927" count="5" type="stmt"/>
+        <line num="928" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="929" count="5" type="stmt"/>
+        <line num="931" count="5" type="cond" truecount="2" falsecount="0"/>
+        <line num="932" count="2" type="stmt"/>
+        <line num="933" count="2" type="stmt"/>
+        <line num="935" count="2" type="stmt"/>
+        <line num="939" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="940" count="0" type="stmt"/>
+        <line num="941" count="0" type="stmt"/>
+        <line num="942" count="0" type="stmt"/>
+        <line num="945" count="2" type="stmt"/>
+        <line num="949" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="950" count="0" type="stmt"/>
+        <line num="954" count="5" type="cond" truecount="1" falsecount="1"/>
+        <line num="955" count="0" type="stmt"/>
+        <line num="958" count="5" type="stmt"/>
+        <line num="961" count="9" type="stmt"/>
+        <line num="962" count="5" type="cond" truecount="4" falsecount="0"/>
+        <line num="963" count="2" type="stmt"/>
+        <line num="966" count="9" type="stmt"/>
+        <line num="967" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="971" count="9" type="stmt"/>
+        <line num="972" count="3" type="stmt"/>
+        <line num="973" count="3" type="stmt"/>
+        <line num="976" count="9" type="cond" truecount="2" falsecount="0"/>
+        <line num="978" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="979" count="1" type="stmt"/>
+        <line num="993" count="3" type="stmt"/>
+        <line num="1016" count="3" type="cond" truecount="1" falsecount="1"/>
+        <line num="1018" count="9" type="stmt"/>
+        <line num="1051" count="18" type="stmt"/>
+        <line num="1052" count="18" type="stmt"/>
+        <line num="1054" count="9" type="stmt"/>
+        <line num="1067" count="9" type="cond" truecount="1" falsecount="1"/>
+        <line num="1082" count="9" type="stmt"/>
+        <line num="1112" count="0" type="stmt"/>
+      </file>
+      <file name="DashboardWidgets.jsx" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\pages\dashboard\DashboardWidgets.jsx">
+        <metrics statements="65" coveredstatements="55" conditionals="38" coveredconditionals="24" methods="34" coveredmethods="25"/>
+        <line num="5" count="1" type="stmt"/>
+        <line num="6" count="1" type="stmt"/>
+        <line num="14" count="15" type="cond" truecount="2" falsecount="0"/>
+        <line num="18" count="4" type="cond" truecount="3" falsecount="1"/>
+        <line num="22" count="26" type="stmt"/>
+        <line num="26" count="190" type="stmt"/>
+        <line num="30" count="5" type="stmt"/>
+        <line num="42" count="20" type="stmt"/>
+        <line num="93" count="3" type="stmt"/>
+        <line num="94" count="3" type="stmt"/>
+        <line num="102" count="0" type="stmt"/>
+        <line num="108" count="9" type="stmt"/>
+        <line num="114" count="0" type="stmt"/>
+        <line num="126" count="7" type="stmt"/>
+        <line num="127" count="7" type="stmt"/>
+        <line num="141" count="18" type="stmt"/>
+        <line num="157" count="3" type="stmt"/>
+        <line num="158" count="3" type="stmt"/>
+        <line num="159" count="3" type="stmt"/>
+        <line num="160" count="3" type="stmt"/>
+        <line num="162" count="3" type="stmt"/>
+        <line num="241" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="242" count="2" type="stmt"/>
+        <line num="244" count="2" type="stmt"/>
+        <line num="245" count="1" type="stmt"/>
+        <line num="246" count="1" type="stmt"/>
+        <line num="247" count="1" type="stmt"/>
+        <line num="249" count="1" type="stmt"/>
+        <line num="258" count="2" type="stmt"/>
+        <line num="259" count="2" type="stmt"/>
+        <line num="260" count="2" type="stmt"/>
+        <line num="261" count="2" type="stmt"/>
+        <line num="262" count="2" type="stmt"/>
+        <line num="283" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="284" count="2" type="stmt"/>
+        <line num="288" count="1" type="stmt"/>
+        <line num="291" count="1" type="stmt"/>
+        <line num="292" count="1" type="stmt"/>
+        <line num="308" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="309" count="2" type="stmt"/>
+        <line num="311" count="1" type="stmt"/>
+        <line num="312" count="1" type="stmt"/>
+        <line num="313" count="1" type="stmt"/>
+        <line num="314" count="1" type="stmt"/>
+        <line num="315" count="1" type="stmt"/>
+        <line num="317" count="1" type="stmt"/>
+        <line num="318" count="1" type="stmt"/>
+        <line num="319" count="1" type="stmt"/>
+        <line num="322" count="0" type="stmt"/>
+        <line num="326" count="1" type="stmt"/>
+        <line num="336" count="1" type="stmt"/>
+        <line num="337" count="1" type="stmt"/>
+        <line num="338" count="1" type="stmt"/>
+        <line num="378" count="1" type="stmt"/>
+        <line num="406" count="3" type="stmt"/>
+        <line num="409" count="18" type="stmt"/>
+        <line num="419" count="3" type="stmt"/>
+        <line num="427" count="18" type="stmt"/>
+        <line num="445" count="0" type="stmt"/>
+        <line num="446" count="0" type="stmt"/>
+        <line num="447" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="449" count="0" type="stmt"/>
+        <line num="456" count="0" type="stmt"/>
+        <line num="459" count="0" type="stmt"/>
+        <line num="484" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="utils">
+      <metrics statements="75" coveredstatements="37" conditionals="66" coveredconditionals="12" methods="23" coveredmethods="7"/>
+      <file name="cache.js" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\utils\cache.js">
+        <metrics statements="41" coveredstatements="31" conditionals="25" coveredconditionals="12" methods="14" coveredmethods="7"/>
+        <line num="8" count="1" type="stmt"/>
+        <line num="9" count="9" type="cond" truecount="2" falsecount="0"/>
+        <line num="11" count="2" type="stmt"/>
+        <line num="12" count="2" type="stmt"/>
+        <line num="14" count="0" type="stmt"/>
+        <line num="18" count="1" type="stmt"/>
+        <line num="19" count="9" type="cond" truecount="1" falsecount="1"/>
+        <line num="21" count="9" type="stmt"/>
+        <line num="22" count="9" type="stmt"/>
+        <line num="25" count="1" type="stmt"/>
+        <line num="26" count="4" type="cond" truecount="1" falsecount="1"/>
+        <line num="27" count="4" type="stmt"/>
+        <line num="30" count="1" type="stmt"/>
+        <line num="31" count="7" type="cond" truecount="1" falsecount="1"/>
+        <line num="32" count="7" type="stmt"/>
+        <line num="35" count="1" type="stmt"/>
+        <line num="36" count="9" type="stmt"/>
+        <line num="38" count="9" type="cond" truecount="5" falsecount="0"/>
+        <line num="39" count="7" type="stmt"/>
+        <line num="40" count="7" type="stmt"/>
+        <line num="43" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="46" count="1" type="cond" truecount="1" falsecount="0"/>
+        <line num="47" count="4" type="stmt"/>
+        <line num="53" count="1" type="stmt"/>
+        <line num="54" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="56" count="0" type="stmt"/>
+        <line num="57" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="58" count="0" type="stmt"/>
+        <line num="63" count="1" type="stmt"/>
+        <line num="65" count="1" type="stmt"/>
+        <line num="66" count="4" type="stmt"/>
+        <line num="68" count="1" type="stmt"/>
+        <line num="70" count="1" type="cond" truecount="0" falsecount="1"/>
+        <line num="71" count="0" type="stmt"/>
+        <line num="76" count="1" type="stmt"/>
+        <line num="77" count="0" type="stmt"/>
+        <line num="78" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="81" count="1" type="stmt"/>
+        <line num="83" count="1" type="stmt"/>
+        <line num="84" count="0" type="stmt"/>
+        <line num="85" count="0" type="cond" truecount="0" falsecount="2"/>
+      </file>
+      <file name="helpers.js" path="C:\Users\Oreoluwa.Adewunmi\Documents\Work\feesman\src\utils\helpers.js">
+        <metrics statements="34" coveredstatements="6" conditionals="41" coveredconditionals="0" methods="9" coveredmethods="0"/>
+        <line num="7" count="1" type="stmt"/>
+        <line num="8" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="10" count="0" type="stmt"/>
+        <line num="12" count="0" type="stmt"/>
+        <line num="13" count="0" type="stmt"/>
+        <line num="24" count="1" type="stmt"/>
+        <line num="25" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="30" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="31" count="0" type="stmt"/>
+        <line num="35" count="0" type="stmt"/>
+        <line num="39" count="0" type="stmt"/>
+        <line num="48" count="1" type="cond" truecount="0" falsecount="1"/>
+        <line num="49" count="0" type="stmt"/>
+        <line num="51" count="0" type="cond" truecount="0" falsecount="4"/>
+        <line num="52" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="53" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="54" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="55" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="56" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="58" count="0" type="stmt"/>
+        <line num="61" count="1" type="cond" truecount="0" falsecount="1"/>
+        <line num="62" count="0" type="stmt"/>
+        <line num="63" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="66" count="1" type="cond" truecount="0" falsecount="1"/>
+        <line num="67" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="69" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="71" count="0" type="cond" truecount="0" falsecount="4"/>
+        <line num="72" count="0" type="cond" truecount="0" falsecount="5"/>
+        <line num="74" count="0" type="stmt"/>
+        <line num="77" count="1" type="cond" truecount="0" falsecount="1"/>
+        <line num="78" count="0" type="stmt"/>
+        <line num="79" count="0" type="stmt"/>
+        <line num="80" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="82" count="0" type="stmt"/>
+      </file>
+    </package>
+  </project>
+</coverage>

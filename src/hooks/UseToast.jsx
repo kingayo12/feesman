@@ -12,7 +12,7 @@ export default function useToast() {
   };
 
   const ToastComponent = () => {
-    toast && <div className={`toast ${toast.type}`}>{toast.message}</div>;
+    return toast ? <div className={`toast ${toast.type}`}>{toast.message}</div> : null;
   };
 
   return { showToast, ToastComponent };

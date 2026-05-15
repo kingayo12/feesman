@@ -34,6 +34,7 @@ import MasterLayout from "./Layout/MasterLayout.jsx";
 import { PERMISSIONS } from "./config/permissions.js";
 import MigrationPage from "./pages/migration/MigrationPage";
 import Homepage from "./pages/landingPage/homepage.jsx";
+import InventoryList from "./pages/inventory/InventoryList.jsx";
 
 // Combines auth check + role check in one wrapper
 function Guard({ permission, children }) {
@@ -213,6 +214,15 @@ export default function AppRoutes() {
               </Guard>
             }
           />
+
+          <Route
+  path="/inventory"
+  element={
+    <Guard permission={PERMISSIONS.VIEW_FEES}>
+      <InventoryList />
+    </Guard>
+  }
+/>
 
           {/* Catch-all → dashboard */}
           <Route path='*' element={<Navigate to='/dashboard' replace />} />

@@ -503,15 +503,17 @@ aside.side-nav .toggle-icon {
 
 .user-menu-dropdown {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 12px);
   right: 0;
   min-width: 190px;
   background: var(--bg-primary);
   border: 1px solid var(--border-muted);
-  border-radius: 10px;
+  border-radius: 0 0 10px 10px;
   box-shadow: var(--shadow-md);
   padding: 8px;
   z-index: 30;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .user-menu-item {
@@ -519,14 +521,34 @@ aside.side-nav .toggle-icon {
   text-align: left;
   padding: 8px 10px;
   border: none;
-  border-radius: 8px;
+  border-radius: 0;
   background: transparent;
   color: var(--text-primary);
   font-size: var(--font-size-xs);
+  position: relative;
+}
+
+.user-menu-item::before {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 0;
+  background: var(--accent);
+  left: 0;
+  top: 0;
+  transition: all 400ms linear;
+}
+
+.user-menu-item:hover::before {
+  height: 100%;
+}
+
+.user-menu-item {
+  border-left: 1px solid #cccccc70;
 }
 
 .user-menu-item:hover {
-  background: var(--bg-secondary);
+  background: linear-gradient(to left, #fff, var(--bg-secondary));
 }
 
 .user-menu-item.logout {
@@ -860,7 +882,8 @@ main {
 }
 
 /* Input Group Styling */
-.input-group label {
+.input-group label,
+.custom-input-group label {
   display: block;
   font-size: var(--font-size-xs);
   font-weight: 600;
@@ -868,7 +891,8 @@ main {
   margin-bottom: var(--spacing-xs);
 }
 
-.input-wrapper {
+.input-wrapper,
+.textarea-wrapper {
   position: relative;
   display: flex;
   align-items: center;
@@ -888,7 +912,8 @@ main {
 .input-wrapper input,
 .input-wrapper select,
 .input-wrapper .custom-downshift-select,
-.input-wrapper textarea {
+.input-wrapper textarea,
+.textarea-wrapper textarea {
   width: 100%;
   padding: var(--input-padding) var(--input-padding-right) var(--input-padding)
     var(--input-padding-icon-left);
@@ -907,7 +932,8 @@ main {
 
 /* Focus States */
 .input-wrapper .custom-downshift-select:focus,
-.input-wrapper input:focus {
+.input-wrapper input:focus,
+.textarea-wrapper textarea:focus {
   outline: none;
   border-color: var(--accent);
   background-color: var(--card-bg);
@@ -919,7 +945,8 @@ main {
   background: green !important;
 }
 
-.input-wrapper:focus-within .input-icon {
+.input-wrapper:focus-within .input-icon,
+.textarea-wrapper:focus-within .input-icon {
   color: var(--accent);
 }
 
@@ -3914,10 +3941,12 @@ a {
   border-radius: 4px;
 }
 
-.input-group {
+.input-group,
+.custom-input-group {
   position: relative;
 }
-.input-group .hint {
+.input-group .hint,
+.custom-input-group .hint {
   color: rgb(191, 190, 190);
   font-size: 10px;
   position: absolute;
