@@ -82,3 +82,9 @@ export const sortClasses = (list = []) => {
     return getClassOrderNumber(a.name) - getClassOrderNumber(b.name);
   });
 };
+
+// ─── Format currency ──────────────────────────────────────────────────────
+export const formatCurrency = (n) => {
+  const num = typeof n === "number" ? n : parseFloat(n) || 0;
+  return "₦" + Math.round(num).toLocaleString();
+};

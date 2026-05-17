@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getAllStudents, deleteStudentWithEnrollments } from "./studentService";
 import { getEnrollmentsByFilter } from "./enrollmentService";
+import { calculateStudentBalance } from "../../hooks/Usestudentbalance";
 import SetTermButton from "./Settermbutton";
 import {
   HiSearch,
@@ -21,6 +22,7 @@ import StudentForm from "../../components/forms/StudentForm";
 import { getClasses } from "../classes/classService";
 import { getFamilies } from "../families/familyService";
 import { getSettings } from "../settings/settingService";
+import { getItemAssignments, getInventoryItem } from "../inventory/inventoryService";
 import { StudentListSkeleton } from "../../components/common/Skeleton";
 import CustomButton from "../../components/common/CustomButton";
 import CustomSelect from "../../components/common/SelectInput";
@@ -60,6 +62,8 @@ function sortClasses(list = []) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function StudentList() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [hasEnrollments, setHasEnrollments] = useState(false);
@@ -78,6 +82,9 @@ export default function StudentList() {
   const [selectedTerm, setSelectedTerm] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [allSessions, setAllSessions] = useState([]);
+  const [itemAssignments, setItemAssignments] = useState(null);
+  const [itemForAssignments, setItemForAssignments] = useState(null);
+  const [balances, setBalances] = useState({}); // Map of studentId -> balance
   const { can } = useRole();
 
   // ── Load ──────────────────────────────────────────────────────────────────
@@ -130,6 +137,25 @@ export default function StudentList() {
   useEffect(() => {
     loadAllData();
   }, []);
+
+  // If navigated with ?itemId=, load assignments for that item and show modal
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const itemId = params.get("itemId");
+    if (!itemId) return;
+    (async () => {
+      try {
+        const [assignments, it] = await Promise.all([
+          getItemAssignments(itemId),
+          getInventoryItem(itemId),
+        ]);
+        setItemAssignments(assignments || []);
+        setItemForAssignments(it || null);
+      } catch (err) {
+        console.error("Failed to load item assignments:", err);
+      }
+    })();
+  }, [location.search]);
 
   // ── Reload enrollments when filters change ────────────────────────────────
   const reloadEnrollments = async (session, term, classId) => {
@@ -485,7 +511,6 @@ export default function StudentList() {
               <th>Session</th>
               <th>Term</th>
               <th>Family</th>
-              <th>Outstanding</th>
               <th>Status</th>
               <th>Action</th>
             </tr>
@@ -493,7 +518,7 @@ export default function StudentList() {
           <tbody>
             {enrollmentsLoading ? (
               <tr>
-                <td colSpan='7' className='empty-row'>
+                <td colSpan='8' className='empty-row'>
                   Loading...
                 </td>
               </tr>
@@ -520,7 +545,6 @@ export default function StudentList() {
                   <td>{student.session}</td>
                   <td>{student.term || "—"}</td>
                   <td className='family-cell'>{student.resolvedFamilyName}</td>
-                  <td>{student?.resovedOutstanding}</td>
                   <td>
                     <span className='status-badge active'>Active</span>
                   </td>
@@ -557,7 +581,7 @@ export default function StudentList() {
               ))
             ) : (
               <tr>
-                <td colSpan='7' className='empty-row'>
+                <td colSpan='8' className='empty-row'>
                   {searchQuery
                     ? `No results found for "${searchQuery}"`
                     : "No students found for the selected filters"}
@@ -618,6 +642,63 @@ export default function StudentList() {
           onClose={() => !deleting && setDeleteTarget(null)}
           onConfirm={handleDelete}
         />
+      )}
+
+      {/* ── Item assignments modal (opened when ?itemId=) ── */}
+      {itemAssignments && (
+        <FormModal
+          title={
+            itemForAssignments ? `Assignments — ${itemForAssignments.name}` : "Item assignments"
+          }
+          onClose={() => {
+            setItemAssignments(null);
+            setItemForAssignments(null);
+            navigate("/students", { replace: true });
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {itemAssignments.length === 0 ? (
+              <p style={{ color: "var(--text-secondary)", textAlign: "center" }}>
+                No assignments found for this item.
+              </p>
+            ) : (
+              itemAssignments.map((a) => (
+                <div
+                  key={a.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "0.5rem 0",
+                    borderBottom: "1px solid var(--border-muted)",
+                  }}
+                >
+                  <div>
+                    <Link
+                      to={`/students/${a.studentId}`}
+                      onClick={() => {
+                        setItemAssignments(null);
+                        setItemForAssignments(null);
+                      }}
+                    >
+                      <strong>{a.studentName}</strong>
+                    </Link>
+                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                      {getClassName(a.classId)} · {a.term} · {a.academicYear}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontWeight: 700 }}>₦{Number(a.totalAmount).toLocaleString()}</div>
+                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                      {a.quantity} {a.unit}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </FormModal>
       )}
     </div>
   );

@@ -216,13 +216,13 @@ export default function AppRoutes() {
           />
 
           <Route
-  path="/inventory"
-  element={
-    <Guard permission={PERMISSIONS.VIEW_FEES}>
-      <InventoryList />
-    </Guard>
-  }
-/>
+            path='/inventory'
+            element={
+              <Guard permission={PERMISSIONS.VIEW_FEES}>
+                <InventoryList />
+              </Guard>
+            }
+          />
 
           {/* Catch-all → dashboard */}
           <Route path='*' element={<Navigate to='/dashboard' replace />} />

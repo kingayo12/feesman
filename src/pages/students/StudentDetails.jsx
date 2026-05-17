@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getStudentById, getStudentsByFamily } from "./studentService";
 import { getFeesByClass } from "../fees/feesService";
-import { getPaymentsByStudent } from "../fees/paymentService";
+import { getPaymentsByStudent, recordPayment } from "../fees/paymentService";
 import { getClasses } from "../classes/classService";
 import { getCurrentEnrollment } from "./enrollmentService";
 import PaymentForm from "../../components/forms/PaymentForm";
@@ -11,7 +11,6 @@ import { formatDate } from "../../utils/helpers";
 import { getSettings } from "../settings/settingService";
 import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS } from "../../config/permissions";
-// import
 import {
   disableStudentFee,
   enableStudentFee,
@@ -39,14 +38,190 @@ import {
   HiTag,
   HiDocumentText,
 } from "react-icons/hi";
+import { HiArchiveBox } from "react-icons/hi2";
 import CustomButton from "../../components/common/CustomButton";
+import { FormModal } from "../../components/common/Modal";
+import { getStudentAssignments, markAssignmentPaid } from "../inventory/inventoryService";
 
+// ─── Inventory payment form — rendered inside FormModal ───────────────────
+function InventoryPaymentForm({ assignment, student, session, onClose, onSuccess }) {
+  const outstanding = Number(assignment.totalAmount || 0) - Number(assignment.amountPaid || 0);
+
+  const [amount, setAmount] = useState(String(outstanding));
+  const [method, setMethod] = useState("Cash");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    const paid = Number(amount);
+    if (!paid || paid <= 0) return setError("Enter a valid amount.");
+    if (paid > outstanding)
+      return setError(`Amount exceeds outstanding balance of ₦${outstanding.toLocaleString()}.`);
+
+    setSaving(true);
+    try {
+      await recordPayment({
+        studentId: student.id,
+        familyId: student.familyId || null,
+        amount: paid,
+        method,
+        term: assignment.term || "",
+        session: session || assignment.academicYear || "",
+        note: `Inventory: ${assignment.itemName}`,
+        type: "inventory",
+        inventoryAssignmentId: assignment.id,
+      });
+
+      // Mark paid if fully settled
+      const newTotal = Number(assignment.amountPaid || 0) + paid;
+      if (newTotal >= Number(assignment.totalAmount)) {
+        await markAssignmentPaid(assignment.id, true);
+      }
+
+      onSuccess();
+    } catch (err) {
+      setError(err.message || "Failed to record payment.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Item + outstanding summary */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          background: "var(--bg-secondary)",
+          borderRadius: 10,
+          padding: "0.75rem 1rem",
+          fontSize: 13,
+        }}
+      >
+        <div>
+          <p style={{ margin: 0, color: "var(--text-secondary)" }}>Item total</p>
+          <p style={{ margin: 0, fontWeight: 700 }}>
+            ₦{Number(assignment.totalAmount).toLocaleString()}
+          </p>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <p style={{ margin: 0, color: "var(--text-secondary)" }}>Outstanding</p>
+          <p style={{ margin: 0, fontWeight: 700, color: "#dc2626" }}>
+            ₦{outstanding.toLocaleString()}
+          </p>
+        </div>
+      </div>
+
+      {error && (
+        <div
+          style={{
+            background: "var(--bg-danger)",
+            color: "var(--text-danger)",
+            border: "1px solid #fecaca",
+            borderRadius: 8,
+            padding: "0.6rem 0.875rem",
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <HiExclamationCircle style={{ flexShrink: 0 }} />
+          {error}
+        </div>
+      )}
+
+      {/* Amount */}
+      <div>
+        <label
+          style={{
+            display: "block",
+            fontSize: 12,
+            fontWeight: 600,
+            marginBottom: 6,
+            color: "var(--text-secondary)",
+          }}
+        >
+          Amount Paying (₦)
+        </label>
+        <input
+          type='number'
+          min='1'
+          max={outstanding}
+          step='0.01'
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          required
+          style={{
+            width: "100%",
+            padding: "0.65rem 0.875rem",
+            borderRadius: 8,
+            border: "1px solid var(--border-muted)",
+            fontSize: 15,
+            fontWeight: 600,
+            background: "var(--bg-primary)",
+            color: "var(--text-primary)",
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
+
+      {/* Method */}
+      <div>
+        <label
+          style={{
+            display: "block",
+            fontSize: 12,
+            fontWeight: 600,
+            marginBottom: 6,
+            color: "var(--text-secondary)",
+          }}
+        >
+          Payment Method
+        </label>
+        <select
+          value={method}
+          onChange={(e) => setMethod(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "0.65rem 0.875rem",
+            borderRadius: 8,
+            border: "1px solid var(--border-muted)",
+            fontSize: 14,
+            background: "var(--bg-primary)",
+            color: "var(--text-primary)",
+            boxSizing: "border-box",
+          }}
+        >
+          {["Cash", "Bank Transfer", "POS", "Cheque", "Online"].map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 4 }}>
+        <button type='button' className='btn btn-secondary' onClick={onClose} disabled={saving}>
+          Cancel
+        </button>
+        <button type='submit' className='btn btn-primary' disabled={saving}>
+          {saving ? "Saving…" : "Record Payment"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────
 export default function StudentDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [student, setStudent] = useState(null);
-  const [enrollment, setEnrollment] = useState(null); // current active enrollment
+  const [enrollment, setEnrollment] = useState(null);
   const [fees, setFees] = useState([]);
   const [payments, setPayments] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -58,21 +233,29 @@ export default function StudentDetails() {
   const [receiptPayment, setReceiptPayment] = useState(null);
   const [prevBalance, setPrevBalance] = useState(0);
   const [discountData, setDiscountData] = useState({ totalDiscount: 0, breakdown: [] });
+  const [inventoryAssignments, setInventoryAssignments] = useState([]);
+  const [inventoryPayModal, setInventoryPayModal] = useState(null); // assignment object
   const { can } = useRole();
 
-  // ── Derived from enrollment (not student doc) ─────────────────────────────
-  // classId and session now live in studentEnrollments, not the student doc.
+  // ── Derived ───────────────────────────────────────────────────────────────
   const classId = enrollment?.classId || null;
   const session = enrollment?.session || settings?.academicYear || "";
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
   const getClassName = (cid) => classes.find((c) => c.id === cid)?.name ?? "Not Assigned";
 
+  // ── Loaders ───────────────────────────────────────────────────────────────
   const loadPayments = async () => {
     try {
       setPayments((await getPaymentsByStudent(id)) || []);
     } catch (e) {
-      console.error("loadPayments error:", e);
+      console.error("loadPayments:", e);
+    }
+  };
+
+  const loadInventory = async () => {
+    try {
+      setInventoryAssignments((await getStudentAssignments(id)) || []);
+    } catch (e) {
+      console.error("loadInventory:", e);
     }
   };
 
@@ -80,7 +263,7 @@ export default function StudentDetails() {
     try {
       setOverrides((await getStudentFeeOverrides(id)) || []);
     } catch (e) {
-      console.error("refreshOverrides error:", e);
+      console.error("refreshOverrides:", e);
     }
   };
 
@@ -92,7 +275,7 @@ export default function StudentDetails() {
       }
       setFees((await getFeesByClass(cid, sess, term)) || []);
     } catch (e) {
-      console.error("loadFeesForTerm error:", e);
+      console.error("loadFeesForTerm:", e);
       setFees([]);
     }
   };
@@ -104,7 +287,6 @@ export default function StudentDetails() {
       else await disableStudentFee(id, feeId);
       await refreshOverrides();
     } catch (e) {
-      console.error(e);
       alert("Failed to update fee status.");
     }
   };
@@ -114,23 +296,24 @@ export default function StudentDetails() {
     async function init() {
       try {
         setLoading(true);
-
-        const [appSettings, classData, studentData, enrollmentData] = await Promise.all([
-          getSettings(),
-          getClasses(),
-          getStudentById(id),
-          getCurrentEnrollment(id), // ← fetch active enrollment
-        ]);
+        const [appSettings, classData, studentData, enrollmentData, invAssignments] =
+          await Promise.all([
+            getSettings(),
+            getClasses(),
+            getStudentById(id),
+            getCurrentEnrollment(id),
+            getStudentAssignments(id),
+          ]);
 
         setSettings(appSettings || {});
         setClasses(classData || []);
         setStudent(studentData);
-        setEnrollment(enrollmentData); // may be null if not enrolled this term
+        setEnrollment(enrollmentData);
+        setInventoryAssignments(invAssignments || []);
 
         const activeSession = enrollmentData?.session || appSettings?.academicYear;
         const activeTerm = enrollmentData?.term || appSettings?.currentTerm || "1st Term";
 
-        // Previous balance
         if (activeSession) {
           try {
             const pb = await getPreviousBalance(id, activeSession);
@@ -140,17 +323,14 @@ export default function StudentDetails() {
           }
         }
 
-        // Discounts
         if (activeSession && studentData?.familyId) {
           try {
-            // getStudentsByFamily accepts only familyId — no session arg
             const [siblings, activeDiscounts, famAssignments, stuAssignments] = await Promise.all([
               getStudentsByFamily(studentData.familyId),
               getActiveDiscounts(activeSession),
               getAssignmentsForFamily(studentData.familyId, activeSession),
               getAssignmentsForStudent(id, activeSession),
             ]);
-
             setDiscountData({
               _raw: {
                 activeDiscounts,
@@ -162,33 +342,26 @@ export default function StudentDetails() {
               breakdown: [],
             });
           } catch (e) {
-            console.error("Discount load error:", e);
+            console.error("Discount load:", e);
           }
         }
 
         await Promise.all([refreshOverrides(), loadPayments()]);
         setSelectedTerm(activeTerm);
       } catch (e) {
-        console.error("StudentDetails init error:", e);
+        console.error("StudentDetails init:", e);
       } finally {
         setLoading(false);
       }
     }
-
     init();
   }, [id]);
 
-  // ── Reload fees when selected term changes ────────────────────────────────
-  // Uses classId + session from enrollment doc, not student doc.
   useEffect(() => {
-    if (classId && session && selectedTerm) {
-      loadFeesForTerm(classId, session, selectedTerm);
-    } else {
-      setFees([]);
-    }
+    if (classId && session && selectedTerm) loadFeesForTerm(classId, session, selectedTerm);
+    else setFees([]);
   }, [selectedTerm, classId, session]);
 
-  // ── Re-compute discount when fees or overrides change ────────────────────
   useEffect(() => {
     if (!discountData?._raw) return;
     const { activeDiscounts, famAssignments, stuAssignments, siblingCount } = discountData._raw;
@@ -210,13 +383,25 @@ export default function StudentDetails() {
   const disabledFeeIds = overrides.map((o) => o.feeId);
   const effectiveFees = fees.filter((f) => !disabledFeeIds.includes(f.id));
   const currentTermFees = effectiveFees.reduce((s, f) => s + Number(f.amount || 0), 0);
-  const termTotalFees = currentTermFees + prevBalance;
   const discount = discountData.totalDiscount || 0;
-  const netFees = Math.max(termTotalFees - discount, 0);
-  const termSpecificPay = payments.filter((p) => p.term === selectedTerm);
+  const netFees = Math.max(currentTermFees + prevBalance - discount, 0);
+
+  // Exclude inventory payments from school fee totals
+  const termSpecificPay = payments.filter((p) => p.term === selectedTerm && p.type !== "inventory");
   const termTotalPaid = termSpecificPay.reduce((s, p) => s + Number(p.amount || 0), 0);
   const termBalance = netFees - termTotalPaid;
-  const totalPaidAllTime = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+  const totalPaidAllTime = payments
+    .filter((p) => p.type !== "inventory")
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+
+  // ── Inventory derived (scoped to selected term) ───────────────────────────
+  const termInventory = inventoryAssignments.filter(
+    (a) => !selectedTerm || a.term === selectedTerm,
+  );
+  const inventoryTotal = termInventory.reduce((s, a) => s + Number(a.totalAmount || 0), 0);
+  const inventoryUnpaidTotal = termInventory
+    .filter((a) => !a.isPaid)
+    .reduce((s, a) => s + Number(a.totalAmount || 0), 0);
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) return <StudentDetailsSkeleton />;
@@ -271,7 +456,7 @@ export default function StudentDetails() {
           {can(PERMISSIONS.VIEW_LETTERS) && (
             <CustomButton
               className='outline-btn rounded-lg'
-              children=' Generate Letter'
+              children='Generate Letter'
               icon={<HiDocumentText />}
               onClick={() => navigate(`/letters?context=student&id=${id}&template=fees`)}
             />
@@ -279,7 +464,7 @@ export default function StudentDetails() {
         </div>
       </div>
 
-      {/* ── Banners ── */}
+      {/* ── Alert Banners ── */}
       {prevBalance > 0 && (
         <div className='pb-alert-banner'>
           <HiExclamationCircle />
@@ -293,8 +478,30 @@ export default function StudentDetails() {
         <div className='discount-alert-banner'>
           <HiTag />
           <span>
-            <strong>₦{discount.toLocaleString()}</strong> discount applied.{" "}
+            <strong>₦{discount.toLocaleString()}</strong> discount applied —{" "}
             {discountData.breakdown.map((b) => b.discountName).join(", ")}
+          </span>
+        </div>
+      )}
+      {inventoryUnpaidTotal > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "0.75rem 1rem",
+            marginBottom: "1rem",
+            borderRadius: 8,
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            color: "#1e40af",
+            fontSize: 13,
+          }}
+        >
+          <HiArchiveBox style={{ flexShrink: 0 }} />
+          <span>
+            <strong>₦{inventoryUnpaidTotal.toLocaleString()}</strong> unpaid for items collected in{" "}
+            {selectedTerm}. Use the Pay button below to record payment.
           </span>
         </div>
       )}
@@ -314,12 +521,11 @@ export default function StudentDetails() {
         >
           <HiExclamationCircle style={{ marginRight: 6, verticalAlign: "middle" }} />
           This student has no active enrollment for the current term. Fees cannot be displayed until
-          they are enrolled. Use the <strong>Edit Student</strong> or <strong>Promote</strong> flow
-          to enroll them.
+          they are enrolled.
         </div>
       )}
 
-      {/* ── Payment Form ── */}
+      {/* ── School Fees Payment Form ── */}
       {showPaymentForm && (
         <div className='form-card animate-slide'>
           <PaymentForm
@@ -348,14 +554,14 @@ export default function StudentDetails() {
         ))}
       </div>
 
-      {/* ── Finance Cards ── */}
+      {/* ── Finance Summary Cards ── */}
       <div className='finance-grid'>
         <div className='finance-card'>
           <div className='f-icon blue'>
             <HiReceiptTax />
           </div>
           <div className='f-data'>
-            <label>{selectedTerm} Total</label>
+            <label>{selectedTerm} Fees</label>
             <h3>₦{netFees.toLocaleString()}</h3>
             {(prevBalance > 0 || discount > 0) && (
               <small style={{ color: "#64748b", fontSize: 11 }}>
@@ -390,19 +596,173 @@ export default function StudentDetails() {
             </h3>
           </div>
         </div>
+
+        {/* Only show inventory card if items exist for this term */}
+        {inventoryTotal > 0 && (
+          <div className='finance-card'>
+            <div className='f-icon' style={{ background: "#eff6ff", color: "#1d4ed8" }}>
+              <HiArchiveBox />
+            </div>
+            <div className='f-data'>
+              <label>{selectedTerm} Items</label>
+              <h3>₦{inventoryTotal.toLocaleString()}</h3>
+              {inventoryUnpaidTotal > 0 ? (
+                <small style={{ color: "#dc2626", fontSize: 11 }}>
+                  ₦{inventoryUnpaidTotal.toLocaleString()} unpaid
+                </small>
+              ) : (
+                <small style={{ color: "#16a34a", fontSize: 11 }}>All paid</small>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* ── Main Detail Cards ── */}
       <div className='details-layout-grid'>
+        {/* ── Items Collected ── */}
+        <div className='history-card' style={{ marginTop: "1.25rem" }}>
+          <div className='card-top'>
+            <h4 style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <HiArchiveBox style={{ color: "#1d4ed8", fontSize: 16 }} />
+              {selectedTerm} Items Collected
+            </h4>
+            <span className='count-badge'>{termInventory.length} items</span>
+          </div>
+
+          {termInventory.length === 0 ? (
+            <p
+              style={{
+                padding: "1.5rem",
+                color: "var(--text-secondary)",
+                fontSize: 13,
+                textAlign: "center",
+                margin: 0,
+              }}
+            >
+              No items collected in {selectedTerm}.
+            </p>
+          ) : (
+            <table className='data-table display'>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Category</th>
+                  <th className='text-right'>Qty</th>
+                  <th className='text-right'>Price</th>
+                  <th className='text-right'>Total</th>
+                  <th className='text-center'>Status</th>
+                  {can(PERMISSIONS.EDIT_STUDENT) && <th className='text-center'>Action</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {termInventory.map((a) => (
+                  <tr key={a.id}>
+                    <td>
+                      <span style={{ fontWeight: 500 }}>{a.itemName}</span>
+                      {a.note && (
+                        <small
+                          style={{
+                            display: "block",
+                            color: "var(--text-secondary)",
+                            fontSize: 11,
+                            fontStyle: "italic",
+                          }}
+                        >
+                          {a.note}
+                        </small>
+                      )}
+                    </td>
+                    <td>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: "2px 8px",
+                          borderRadius: 99,
+                          background: "var(--bg-secondary)",
+                          color: "var(--text-secondary)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {a.category}
+                      </span>
+                    </td>
+                    <td className='text-right'>
+                      {a.quantity} {a.unit}
+                    </td>
+                    <td className='text-right'>₦{Number(a.priceSnapshot).toLocaleString()}</td>
+                    <td className='text-right' style={{ fontWeight: 600 }}>
+                      ₦{Number(a.totalAmount).toLocaleString()}
+                    </td>
+                    <td className='text-center'>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: "2px 8px",
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          background: a.isPaid ? "#dcfce7" : "#fef3c7",
+                          color: a.isPaid ? "#15803d" : "#92400e",
+                        }}
+                      >
+                        {a.isPaid ? "✓ Paid" : "Unpaid"}
+                      </span>
+                    </td>
+                    {can(PERMISSIONS.EDIT_STUDENT) && (
+                      <td className='text-center'>
+                        {!a.isPaid ? (
+                          <button
+                            className='receipt-btn-small'
+                            style={{ color: "#1d4ed8", borderColor: "#bfdbfe" }}
+                            onClick={() => setInventoryPayModal(a)}
+                          >
+                            <HiCurrencyDollar /> Pay
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 12, color: "#15803d" }}>
+                            <HiCheckCircle style={{ verticalAlign: "middle" }} /> Done
+                          </span>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+
+                {/* Summary footer */}
+                <tr className='total-row'>
+                  <td colSpan={4}>
+                    <strong>Total</strong>
+                  </td>
+                  <td className='text-right'>
+                    <strong>₦{inventoryTotal.toLocaleString()}</strong>
+                  </td>
+                  <td className='text-center'>
+                    {inventoryUnpaidTotal > 0 ? (
+                      <span style={{ fontSize: 11, color: "#dc2626", fontWeight: 600 }}>
+                        ₦{inventoryUnpaidTotal.toLocaleString()} unpaid
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: "#15803d", fontWeight: 600 }}>
+                        All paid
+                      </span>
+                    )}
+                  </td>
+                  {can(PERMISSIONS.EDIT_STUDENT) && <td />}
+                </tr>
+              </tbody>
+            </table>
+          )}
+        </div>
         <div className='main-content finance_details'>
           {/* ── Fee Breakdown ── */}
           <div className='billing-card'>
             <div className='card-top'>
-              <h4>{selectedTerm} Breakdown</h4>
+              <h4>{selectedTerm} Fee Breakdown</h4>
               <span className='count-badge'>
                 {effectiveFees.length +
                   (prevBalance > 0 ? 1 : 0) +
                   (discount > 0 ? discountData.breakdown.length : 0)}{" "}
-                Items
+                items
               </span>
             </div>
             <table className='ledger-table'>
@@ -414,7 +774,7 @@ export default function StudentDetails() {
                 </tr>
               </thead>
               <tbody>
-                {/* Arrears row */}
+                {/* Arrears */}
                 {prevBalance > 0 && (
                   <tr style={{ background: "#fffbeb" }}>
                     <td>
@@ -538,7 +898,6 @@ export default function StudentDetails() {
                   </tr>
                 ))}
 
-                {/* Net total row */}
                 <tr className='total-row'>
                   <td>
                     <strong>Net Total</strong>
@@ -552,11 +911,11 @@ export default function StudentDetails() {
             </table>
           </div>
 
-          {/* ── Payment History ── */}
+          {/* ── School Fees Payment History ── */}
           <div className='history-card'>
             <div className='card-top'>
               <h4>{selectedTerm} Payments</h4>
-              <span className='count-badge'>{termSpecificPay.length} Items</span>
+              <span className='count-badge'>{termSpecificPay.length} records</span>
             </div>
             <table className='data-table display'>
               <thead>
@@ -564,7 +923,7 @@ export default function StudentDetails() {
                   <th>Date</th>
                   <th>Method</th>
                   <th className='text-right'>Amount</th>
-                  <th className='text-center'>Action</th>
+                  <th className='text-center'>Receipt</th>
                 </tr>
               </thead>
               <tbody>
@@ -576,7 +935,7 @@ export default function StudentDetails() {
                       <td className='text-right font-bold'>₦{Number(p.amount).toLocaleString()}</td>
                       <td className='text-center'>
                         <button className='receipt-btn-small' onClick={() => setReceiptPayment(p)}>
-                          <HiReceiptTax /> Receipt
+                          <HiReceiptTax /> View
                         </button>
                       </td>
                     </tr>
@@ -584,7 +943,7 @@ export default function StudentDetails() {
                 ) : (
                   <tr>
                     <td colSpan='4' className='empty-ledger'>
-                      No payments for this term.
+                      No payments recorded for {selectedTerm}.
                     </td>
                   </tr>
                 )}
@@ -594,7 +953,7 @@ export default function StudentDetails() {
         </div>
       </div>
 
-      {/* ── Receipt Modal ── */}
+      {/* ── School Fees Receipt Modal ── */}
       {receiptPayment && (
         <StudentReceipt
           payment={receiptPayment}
@@ -606,6 +965,28 @@ export default function StudentDetails() {
           discountBreakdown={discountData.breakdown}
           onClose={() => setReceiptPayment(null)}
         />
+      )}
+
+      {/* ── Inventory Payment Modal ── */}
+      {inventoryPayModal && (
+        <FormModal
+          title='Record Item Payment'
+          subtitle={`${inventoryPayModal.itemName} · ${inventoryPayModal.quantity} ${inventoryPayModal.unit}`}
+          onClose={() => setInventoryPayModal(null)}
+          maxWidth='420px'
+        >
+          <InventoryPaymentForm
+            assignment={inventoryPayModal}
+            student={student}
+            session={session}
+            onClose={() => setInventoryPayModal(null)}
+            onSuccess={() => {
+              setInventoryPayModal(null);
+              loadInventory();
+              loadPayments();
+            }}
+          />
+        </FormModal>
       )}
     </div>
   );

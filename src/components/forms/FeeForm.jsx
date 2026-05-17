@@ -27,7 +27,7 @@ const EMPTY_FORM = {
  *                                  pre-fills with the fee's data.
  *  - onCancelEdit : () => void   — called when the user clicks "Cancel" while editing.
  */
-const FeeForm = ({ onSaved, editingFee, onCancelEdit }) => {
+const FeeForm = ({ onSaved, editingFee, onCancelEdit, initialItem }) => {
   const [classes, setClasses] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,6 +92,17 @@ const FeeForm = ({ onSaved, editingFee, onCancelEdit }) => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Prefill from initialItem when provided (only when not editing)
+  useEffect(() => {
+    if (initialItem && !editingFee) {
+      setForm((prev) => ({
+        ...prev,
+        feeType: initialItem.name || prev.feeType,
+        amount: initialItem.price || prev.amount,
+      }));
+    }
+  }, [initialItem, editingFee]);
 
   // ─── Sync form when editingFee changes ──────────────────────────────
   useEffect(() => {

@@ -74,7 +74,7 @@ const NAV_CONFIG = [
     icon: <FaPercent />,
     permission: PERMISSIONS.VIEW_DISCOUNTS,
   },
-    {
+  {
     label: "Inventory",
     path: "/inventory",
     icon: <FaBox />, // or <FaPackage>

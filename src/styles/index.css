@@ -2803,7 +2803,10 @@ button:disabled {
 .btn-outline {
   background: transparent;
   border-color: #4f46e5;
+  border: 2px solid #4f46e5;
   color: #4f46e5;
+  display: flex;
+  gap: 10px;
 }
 
 .btn-danger {

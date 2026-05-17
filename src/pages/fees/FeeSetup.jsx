@@ -5,6 +5,8 @@ import TableToolbar from "../../components/common/TableToolbar";
 import { Bone } from "../../components/common/Skeleton";
 import { getFees, deleteFee } from "./feesService";
 import { getClasses } from "../classes/classService";
+import { useLocation } from "react-router-dom";
+import { getInventoryItem } from "../inventory/inventoryService";
 import { getSettings } from "../settings/settingService";
 import {
   HiPencil,
@@ -61,6 +63,25 @@ export default function FeeSetup() {
 
   useEffect(() => {
     loadData();
+    // check for ?itemId= and open modal prefilled
+    const params = new URLSearchParams(window.location.search);
+    const itemId = params.get("itemId");
+    if (itemId) {
+      (async () => {
+        try {
+          const it = await getInventoryItem(itemId);
+          setEditingFee(null);
+          setModalOpen(true);
+          // pass via editingFee state by setting editingFee to null and storing item in a ref-like state
+          setTimeout(() => {
+            // store initial item on modal by attaching to window (simple short-lived approach)
+            window.__initialFeeItem = it;
+          }, 0);
+        } catch (err) {
+          console.error("Failed to prefill fee from inventory item:", err);
+        }
+      })();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -77,6 +98,7 @@ export default function FeeSetup() {
   const closeModal = () => {
     setModalOpen(false);
     setEditingFee(null);
+    if (window.__initialFeeItem) delete window.__initialFeeItem;
   };
 
   // ─── Action handlers ──────────────────────────────────────────────────
@@ -206,6 +228,7 @@ export default function FeeSetup() {
         <FormModal title={editingFee?.id ? "Edit Fee" : "Add Fee"} onClose={closeModal}>
           <FeeForm
             editingFee={editingFee}
+            initialItem={window.__initialFeeItem}
             onSaved={async () => {
               await loadData();
               closeModal();
