@@ -1314,7 +1314,7 @@ export default function Reports() {
   const [downloading, setDownloading] = useState(null);
 
   // Only super_admin and admin see full term-level finance data
-  const isFinanceAdmin = role === ROLES.super_admin || ROLES === ROLES.admin;
+  const isFinanceAdmin = role === ROLES.super_admin || role === ROLES.admin;
 
   useEffect(() => {
     if (settings.currentTerm && !selectedTerm) setSelectedTerm(settings.currentTerm);
