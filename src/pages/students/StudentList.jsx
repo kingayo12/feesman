@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getAllStudents, deleteStudentWithEnrollments } from "./studentService";
 import { getEnrollmentsByFilter } from "./enrollmentService";
 import { calculateStudentBalance } from "../../hooks/Usestudentbalance";
-import SetTermButton from "./Settermbutton";
 import {
   HiSearch,
   HiOutlineAcademicCap,
@@ -13,6 +12,7 @@ import {
   HiPencilAlt,
   HiChevronLeft,
   HiChevronRight,
+  HiUpload, // ← NEW
 } from "react-icons/hi";
 import { filterData } from "../../utils/helpers";
 import { useRole } from "../../hooks/useRole";
@@ -27,16 +27,17 @@ import { StudentListSkeleton } from "../../components/common/Skeleton";
 import CustomButton from "../../components/common/CustomButton";
 import CustomSelect from "../../components/common/SelectInput";
 import { FormModal, ConfirmModal } from "../../components/common/Modal";
+import BulkEnrolmentModal from "../../components/common/BulkEnrolmentModal";
 import { TERMS } from "../../constants";
+
 const ITEMS_PER_PAGE = 10;
 
-// ─── Sort helpers ─────────────────────────────────────────────────────────────
+// ─── Sort helpers ──────────────────────────────────────────────────────────
 function parseClassName(name = "") {
   const m = name.trim().match(/^(.*?)(\d+)\s*([A-Za-z]?)$/);
   if (!m) return { prefix: name.trim(), level: Infinity, arm: "" };
   return { prefix: m[1].trim(), level: parseInt(m[2], 10), arm: m[3].toUpperCase() };
 }
-
 function getGroupOrder(prefix = "") {
   const p = prefix.toLowerCase();
   if (p.includes("creche") || p.includes("daycare")) return 0;
@@ -47,7 +48,6 @@ function getGroupOrder(prefix = "") {
   if (p.includes("ss") || p.includes("senior") || p.includes("secondary")) return 5;
   return 6;
 }
-
 function sortClasses(list = []) {
   return [...list].sort((a, b) => {
     const pa = parseClassName(a.name);
@@ -60,7 +60,6 @@ function sortClasses(list = []) {
   });
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
 export default function StudentList() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -76,6 +75,7 @@ export default function StudentList() {
   const [loading, setLoading] = useState(true);
   const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
   const [showAddStudent, setShowAddStudent] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false); // ← NEW
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -84,35 +84,27 @@ export default function StudentList() {
   const [allSessions, setAllSessions] = useState([]);
   const [itemAssignments, setItemAssignments] = useState(null);
   const [itemForAssignments, setItemForAssignments] = useState(null);
-  const [balances, setBalances] = useState({}); // Map of studentId -> balance
+  const [balances, setBalances] = useState({});
   const { can } = useRole();
 
-  // ── Load ──────────────────────────────────────────────────────────────────
+  // ── Load ───────────────────────────────────────────────────────────────
   const loadAllData = async () => {
     try {
       setLoading(true);
-
       const [studentData, classData, familyData, appSettings] = await Promise.all([
         getAllStudents(),
         getClasses(),
         getFamilies(),
         getSettings(),
       ]);
-
       const defaultSession = appSettings?.academicYear || null;
       const defaultTerm = appSettings?.currentTerm || null;
-
-      // Enrollments for current session/term (active only)
       const enrollmentData = await getEnrollmentsByFilter({
         session: defaultSession || undefined,
         term: defaultTerm || undefined,
       });
-
-      // Check if ANY active enrollments exist (unfiltered) to detect model
-      // status: "active" is already applied inside getEnrollmentsByFilter
       const anyEnrollments = await getEnrollmentsByFilter({});
       const newModel = (anyEnrollments || []).length > 0;
-
       setStudents(studentData || []);
       setClasses(classData || []);
       setFamilies(familyData || []);
@@ -120,12 +112,9 @@ export default function StudentList() {
       setHasEnrollments(newModel);
       setSelectedSession(defaultSession);
       setSelectedTerm(defaultTerm);
-
-      // Sessions list from enrollment docs (new model) or student docs (old model)
       const sessionSource = newModel
         ? anyEnrollments.map((e) => e.session)
         : (studentData || []).map((s) => s.session);
-
       setAllSessions([...new Set(sessionSource.filter(Boolean))].sort().reverse());
     } catch (error) {
       console.error("Error loading Student List data:", error);
@@ -138,7 +127,6 @@ export default function StudentList() {
     loadAllData();
   }, []);
 
-  // If navigated with ?itemId=, load assignments for that item and show modal
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const itemId = params.get("itemId");
@@ -157,7 +145,6 @@ export default function StudentList() {
     })();
   }, [location.search]);
 
-  // ── Reload enrollments when filters change ────────────────────────────────
   const reloadEnrollments = async (session, term, classId) => {
     try {
       setEnrollmentsLoading(true);
@@ -175,11 +162,9 @@ export default function StudentList() {
     }
   };
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
   const getClassName = (cid) => classes.find((c) => c.id === cid)?.name ?? "Not Assigned";
   const getFamilyName = (fid) => families.find((f) => f.id === fid)?.familyName ?? "No Family";
 
-  // ── Build display rows ────────────────────────────────────────────────────
   const displayData = hasEnrollments
     ? enrollments
         .map((enrollment) => {
@@ -202,15 +187,12 @@ export default function StudentList() {
         resolvedFamilyName: getFamilyName(s.familyId),
       }));
 
-  // ── Search ────────────────────────────────────────────────────────────────
   let finalFilteredStudents = filterData(displayData, searchQuery, [
     "firstName",
     "lastName",
     "resolvedClassName",
     "resolvedFamilyName",
   ]);
-
-  // Old model: filter client-side
   if (!hasEnrollments) {
     if (selectedClassId)
       finalFilteredStudents = finalFilteredStudents.filter((s) => s.classId === selectedClassId);
@@ -222,19 +204,15 @@ export default function StudentList() {
       finalFilteredStudents = finalFilteredStudents.filter((s) => s.term === selectedTerm);
   }
 
-  // ── Pagination ────────────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(finalFilteredStudents.length / ITEMS_PER_PAGE));
-
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
-
   const paginatedStudents = finalFilteredStudents.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
   );
 
-  // ── Export ────────────────────────────────────────────────────────────────
   const exportHeaders = ["Student Name", "Class", "Session", "Term", "Family", "Status"];
   const exportRows = finalFilteredStudents.map((s) => [
     `${s.firstName} ${s.lastName}`,
@@ -245,21 +223,18 @@ export default function StudentList() {
     "Active",
   ]);
 
-  // ── Filter handlers ───────────────────────────────────────────────────────
   const handleClassChange = (e) => {
     const val = e.target.value || null;
     setSelectedClassId(val);
     if (hasEnrollments) reloadEnrollments(selectedSession, selectedTerm, val);
     else setCurrentPage(1);
   };
-
   const handleSessionChange = (e) => {
     const val = e.target.value || null;
     setSelectedSession(val);
     if (hasEnrollments) reloadEnrollments(val, selectedTerm, selectedClassId);
     else setCurrentPage(1);
   };
-
   const handleTermChange = (e) => {
     const val = e.target.value || null;
     setSelectedTerm(val);
@@ -297,7 +272,6 @@ export default function StudentList() {
     },
   ].filter(Boolean);
 
-  // ── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -314,12 +288,10 @@ export default function StudentList() {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
   if (loading) return <StudentListSkeleton />;
 
   return (
     <div className='student-list-container'>
-      {/* ── Header ── */}
       <div className='list-page-header'>
         <div className='header-title'>
           <HiOutlineAcademicCap className='main-icon' />
@@ -334,32 +306,41 @@ export default function StudentList() {
         </div>
       </div>
 
-      <SetTermButton onDone={() => loadAllData()} />
-
-      {/* ── Add Student ── */}
+      {/* ── Add / Bulk buttons ── */}
       <div className='add_button'>
         {can(PERMISSIONS.CREATE_STUDENT) && (
-          <CustomButton
-            onClick={() => {
-              setEditStudent(null);
-              if (showAddStudent) {
-                setModalOpen(false);
-                setShowAddStudent(false);
-              } else {
-                setModalOpen(true);
-                setShowAddStudent(true);
-              }
-            }}
-            icon={!showAddStudent && <HiPlus />}
-            variant={showAddStudent ? "cancel" : "primary"}
-            otherClass='rounded-full'
-          >
-            {showAddStudent ? "Cancel" : "Add Student"}
-          </CustomButton>
+          <>
+            <CustomButton
+              onClick={() => {
+                setEditStudent(null);
+                if (showAddStudent) {
+                  setModalOpen(false);
+                  setShowAddStudent(false);
+                } else {
+                  setModalOpen(true);
+                  setShowAddStudent(true);
+                }
+              }}
+              icon={!showAddStudent && <HiPlus />}
+              variant={showAddStudent ? "cancel" : "primary"}
+              otherClass='rounded-full'
+            >
+              {showAddStudent ? "Cancel" : "Add Student"}
+            </CustomButton>
+
+            {/* ── NEW: Bulk Upload button ── */}
+            <CustomButton
+              onClick={() => setShowBulkUpload(true)}
+              icon={<HiUpload />}
+              variant='secondary'
+              otherClass='rounded-full'
+            >
+              Bulk Upload
+            </CustomButton>
+          </>
         )}
       </div>
 
-      {/* ── Form Modal ── */}
       {modalOpen && (
         <FormModal
           title={editStudent ? "Edit Student" : "Add Student"}
@@ -386,7 +367,6 @@ export default function StudentList() {
         </FormModal>
       )}
 
-      {/* ── Search ── */}
       <div className='table-controls'>
         <div className='search-box'>
           <HiSearch className='search-icon' />
@@ -404,7 +384,6 @@ export default function StudentList() {
 
       <TableToolbar fileName='students' headers={exportHeaders} rows={exportRows} />
 
-      {/* ── Filters ── */}
       <div className='student-filters'>
         <CustomSelect
           name='class'
@@ -441,7 +420,6 @@ export default function StudentList() {
         />
       </div>
 
-      {/* ── Active filter pills ── */}
       {activeFilters.length > 0 && (
         <div
           style={{
@@ -501,7 +479,6 @@ export default function StudentList() {
         </div>
       )}
 
-      {/* ── Table ── */}
       <div className='table-card'>
         <table className='data-table'>
           <thead>
@@ -591,7 +568,6 @@ export default function StudentList() {
           </tbody>
         </table>
 
-        {/* ── Pagination ── */}
         <div
           style={{
             display: "flex",
@@ -634,7 +610,6 @@ export default function StudentList() {
         </div>
       </div>
 
-      {/* ── Delete Confirm Modal ── */}
       {deleteTarget && (
         <ConfirmModal
           entityName={`${deleteTarget.firstName} ${deleteTarget.lastName}`}
@@ -644,7 +619,6 @@ export default function StudentList() {
         />
       )}
 
-      {/* ── Item assignments modal (opened when ?itemId=) ── */}
       {itemAssignments && (
         <FormModal
           title={
@@ -699,6 +673,18 @@ export default function StudentList() {
             )}
           </div>
         </FormModal>
+      )}
+
+      {/* ── NEW: Bulk enrolment modal ── */}
+      {showBulkUpload && (
+        <BulkEnrolmentModal
+          classes={classes}
+          onClose={() => setShowBulkUpload(false)}
+          onComplete={() => {
+            setShowBulkUpload(false);
+            loadAllData();
+          }}
+        />
       )}
     </div>
   );

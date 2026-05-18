@@ -1,17 +1,34 @@
 import { useState } from "react";
 import { recordPayment } from "../../pages/fees/paymentService";
-import { HiCurrencyDollar, HiCreditCard, HiCheckCircle, HiClock } from "react-icons/hi";
 
-export default function PaymentForm({ studentId, familyId, term, session, onSuccess }) {
+import { HiCurrencyDollar, HiCreditCard, HiExclamationCircle } from "react-icons/hi";
+
+import { FormModal } from "../common/Modal";
+import CustomInput from "../common/Input";
+import CustomSelect from "../common/SelectInput";
+import CustomButton from "../common/CustomButton";
+
+export default function PaymentForm({ studentId, familyId, term, session, onSuccess, onClose }) {
   const [form, setForm] = useState({
     amount: "",
     method: "",
   });
 
+  const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+
+    if (!form.amount || Number(form.amount) <= 0) {
+      return setError("Enter a valid amount.");
+    }
+
+    if (!form.method) {
+      return setError("Select a payment method.");
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -20,86 +37,96 @@ export default function PaymentForm({ studentId, familyId, term, session, onSucc
         familyId,
         amount: Number(form.amount),
         method: form.method,
-        term, // ✅ enforced from parent
-        session, // ✅ enforced from settings
+        term,
+        session,
       });
 
       setForm({ amount: "", method: "" });
-      onSuccess();
-    } catch (error) {
-      console.error("Payment failed:", error);
-      alert("Error saving payment. Please try again.");
+
+      onSuccess?.();
+      onClose?.();
+    } catch (err) {
+      console.error(err);
+      setError("Payment failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <form className='modern-form payment-form-card' onSubmit={handleSubmit}>
-      <div className='form-header'>
-        <h3>Record Payment</h3>
-        <p>
-          Payment will be recorded for
-          <strong> {term}</strong> ({session})
-        </p>
-      </div>
-
-      <div className='form-grid'>
-        {/* Amount */}
-        <div className='input-group full-width'>
-          <label>Amount (₦)</label>
-          <div className='input-wrapper'>
-            <HiCurrencyDollar className='input-icon' />
-            <input
-              type='number'
-              placeholder='0.00'
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              required
-              min='1'
-            />
+    <FormModal
+      title='Record Payment'
+      subtitle={`Payment for ${term} (${session})`}
+      onClose={onClose}
+      maxWidth='500px'
+    >
+      <form onSubmit={handleSubmit}>
+        {/* Error */}
+        {error && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: "var(--bg-danger)",
+              color: "var(--text-danger)",
+              border: "1px solid #fecaca",
+              borderRadius: 8,
+              padding: "0.6rem 0.875rem",
+              fontSize: 13,
+            }}
+          >
+            <HiExclamationCircle />
+            {error}
           </div>
-        </div>
-
-        {/* Term (Read Only Display) */}
-        <div className='input-group'>
-          <label>Academic Term</label>
-          <div className='input-wrapper'>
-            <HiClock className='input-icon' />
-            <input value={term} disabled />
-          </div>
-        </div>
-
-        {/* Payment Method */}
-        <div className='input-group'>
-          <label>Payment Method</label>
-          <div className='input-wrapper'>
-            <HiCreditCard className='input-icon' />
-            <select
-              value={form.method}
-              onChange={(e) => setForm({ ...form, method: e.target.value })}
-              required
-            >
-              <option value='' disabled>
-                Select Method
-              </option>
-              <option value='Cash'>Cash</option>
-              <option value='Transfer'>Bank Transfer</option>
-              <option value='POS'>POS</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <button type='submit' className='submit-btn' disabled={isSubmitting}>
-        {isSubmitting ? (
-          "Processing..."
-        ) : (
-          <>
-            <HiCheckCircle /> Confirm Payment
-          </>
         )}
-      </button>
-    </form>
+        <div className='form-grid'>
+          <CustomInput
+            name='amount'
+            type='number'
+            labelName='Amount (₦)'
+            value={form.amount}
+            onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+            icon={<HiCurrencyDollar />}
+            placeholder='Enter amount'
+            min='1'
+            required
+          />
+
+          {/* Payment Method */}
+          <CustomSelect
+            icon={<HiCreditCard />}
+            labelName='Payment Method'
+            value={form.method}
+            onChange={(e) => setForm((f) => ({ ...f, method: e.target.value }))}
+            placeholder='Select method'
+            options={[
+              { value: "Cash", label: "Cash" },
+              { value: "Transfer", label: "Bank Transfer" },
+              { value: "POS", label: "POS" },
+              { value: "Cheque", label: "Cheque" },
+              { value: "Online", label: "Online" },
+            ]}
+            required
+          />
+
+          {/* Actions */}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <CustomButton
+              type='button'
+              variant='secondary'
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </CustomButton>
+
+            <CustomButton type='submit' variant='primary' loading={isSubmitting}>
+              Confirm Payment
+            </CustomButton>
+          </div>
+        </div>
+      </form>
+    </FormModal>
   );
 }

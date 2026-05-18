@@ -18,3 +18,12 @@ export const DASHBOARD_CACHE_PREFIX = "feesman_dashboard_cache_";
 export const SESSION_EXPIRY_KEY = "feesman_session_expiry";
 export const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000; // 60 minutes
+
+export const fmt = (d) =>
+  d
+    ? (d.toDate ? d.toDate() : new Date(d)).toLocaleDateString("en-NG", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : "—";
