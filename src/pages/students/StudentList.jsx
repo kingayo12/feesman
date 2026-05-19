@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getAllStudents, deleteStudentWithEnrollments } from "./studentService";
 import { getEnrollmentsByFilter } from "./enrollmentService";
 import { calculateStudentBalance } from "../../hooks/Usestudentbalance";
+import SetTermButton from "./Settermbutton";
 import {
   HiSearch,
   HiOutlineAcademicCap,
@@ -305,6 +306,8 @@ export default function StudentList() {
           <span className='stat-pill'>Showing: {finalFilteredStudents.length}</span>
         </div>
       </div>
+
+      <SetTermButton onDone={() => loadAllData()} />
 
       {/* ── Add / Bulk buttons ── */}
       <div className='add_button'>

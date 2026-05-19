@@ -295,10 +295,11 @@ export async function importRows(validatedRows, { onProgress } = {}) {
           warning: `Enrollment already exists for ${row.firstName} ${row.lastName} in ${row._resolvedClassName} (${row.academicYear} ${row.term}).`,
         });
       } else {
-        // Create new enrollment
+        // Create new enrollment in the correct studentEnrollments collection
+        const enrollmentCollection = collection(db, "studentEnrollments");
         const enrolSnap = await getDocs(
           query(
-            collection(db, "enrollments"),
+            enrollmentCollection,
             where("studentId", "==", studentId),
             where("classId", "==", row._resolvedClassId),
             where("session", "==", row.academicYear),
@@ -307,7 +308,7 @@ export async function importRows(validatedRows, { onProgress } = {}) {
         );
 
         if (enrolSnap.empty) {
-          await addDoc(collection(db, "enrollments"), {
+          await addDoc(enrollmentCollection, {
             studentId,
             familyId,
             classId: row._resolvedClassId,
