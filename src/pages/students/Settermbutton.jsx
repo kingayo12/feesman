@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { collection, getDocs, query, where, writeBatch, doc } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
-import { getSettings } from "../../pages/settings/settingService";
+import { getSettings } from "../../services/settings/settingService";
 import CustomButton from "../../components/common/CustomButton";
 
 /**

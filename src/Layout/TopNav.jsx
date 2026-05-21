@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useRole } from "../hooks/useRole";
 import { PERMISSIONS } from "../config/permissions";
-import { getAllStudents } from "../pages/students/studentService";
-import { getEnrollmentsByFilter } from "../pages/students/enrollmentService";
-import { getFamilies } from "../pages/families/familyService";
-import { getClasses } from "../pages/classes/classService";
-import { getSettings } from "../pages/settings/settingService";
-import { getPreviousBalanceAmount } from "../pages/previous_balance/Previousbalanceservice";
+import { getAllStudents } from "../services/students/studentService";
+import { getEnrollmentsByFilter } from "../services/students/enrollmentService";
+import { getFamilies } from "../services/families/familyService";
+import { getClasses } from "../services/class/classService";
+import { getSettings } from "../services/settings/settingService";
+import { getPreviousBalanceAmount } from "../services/previous_balance/Previousbalanceservice";
 import { calculateStudentBalance } from "../hooks/Usestudentbalance";
 import { FaBell } from "react-icons/fa";
 import {
@@ -182,25 +182,24 @@ async function buildNotifications(settings) {
       const enrollment = enrollmentMap[student.id] || {};
       const studentClass = classMap[enrollment.classId] || {};
       const family = familyMap[student.familyId] || {};
-      const name = [student.firstName, student.lastName].filter(Boolean).join(" ") || student.admissionNo || student.id || "Student";
+      const name =
+        [student.firstName, student.lastName].filter(Boolean).join(" ") ||
+        student.admissionNo ||
+        student.id ||
+        "Student";
 
-      const balanceData = student.classId || enrollment.classId
-        ? await calculateStudentBalance(
-            student.id,
-            enrollment.classId,
-            session,
-            term,
-            {
+      const balanceData =
+        student.classId || enrollment.classId
+          ? await calculateStudentBalance(student.id, enrollment.classId, session, term, {
               familyId: student.familyId,
               siblingCount: 1,
-            },
-          )
-        : {
-            totalFees: 0,
-            totalPaid: 0,
-            balance: 0,
-            previousBalance: await getPreviousBalanceAmount(student.id, session).catch(() => 0),
-          };
+            })
+          : {
+              totalFees: 0,
+              totalPaid: 0,
+              balance: 0,
+              previousBalance: await getPreviousBalanceAmount(student.id, session).catch(() => 0),
+            };
 
       return {
         ...student,
@@ -220,9 +219,17 @@ async function buildNotifications(settings) {
   const studentsWithDebt = enrichedStudents.filter((student) => student.balance > 0);
   const studentsWithArrears = enrichedStudents.filter((student) => student.previousBalance > 0);
 
-  const totalPaid = enrichedStudents.reduce((sum, student) => sum + Number(student.totalPaid || 0), 0);
-  const totalDue = enrichedStudents.reduce((sum, student) => sum + Math.max(Number(student.totalFees || 0), 0), 0);
-  const fullyPaid = enrichedStudents.filter((student) => Number(student.totalFees || 0) > 0 && Number(student.balance || 0) <= 0).length;
+  const totalPaid = enrichedStudents.reduce(
+    (sum, student) => sum + Number(student.totalPaid || 0),
+    0,
+  );
+  const totalDue = enrichedStudents.reduce(
+    (sum, student) => sum + Math.max(Number(student.totalFees || 0), 0),
+    0,
+  );
+  const fullyPaid = enrichedStudents.filter(
+    (student) => Number(student.totalFees || 0) > 0 && Number(student.balance || 0) <= 0,
+  ).length;
   const partialPay = enrichedStudents.filter(
     (student) => Number(student.totalPaid || 0) > 0 && Number(student.balance || 0) > 0,
   ).length;
@@ -234,8 +241,14 @@ async function buildNotifications(settings) {
   const classPerformance = (classes || [])
     .map((cls) => {
       const studentsInClass = enrichedStudents.filter((student) => student.classId === cls.id);
-      const paid = studentsInClass.reduce((sum, student) => sum + Number(student.totalPaid || 0), 0);
-      const due = studentsInClass.reduce((sum, student) => sum + Math.max(Number(student.totalFees || 0), 0), 0);
+      const paid = studentsInClass.reduce(
+        (sum, student) => sum + Number(student.totalPaid || 0),
+        0,
+      );
+      const due = studentsInClass.reduce(
+        (sum, student) => sum + Math.max(Number(student.totalFees || 0), 0),
+        0,
+      );
       const rate = due > 0 ? Math.round((paid / due) * 100) : 0;
       return {
         name: cls.name || cls.label || "Unnamed class",
@@ -271,7 +284,10 @@ async function buildNotifications(settings) {
       category: "alert",
       icon: "debt",
       detail: {
-        totalOutstanding: studentsWithDebt.reduce((sum, student) => sum + Number(student.balance || 0), 0),
+        totalOutstanding: studentsWithDebt.reduce(
+          (sum, student) => sum + Number(student.balance || 0),
+          0,
+        ),
         enrichedStudents: studentsWithDebt
           .sort((a, b) => Number(b.balance || 0) - Number(a.balance || 0))
           .slice(0, 5),
@@ -284,7 +300,10 @@ async function buildNotifications(settings) {
       category: "alert",
       icon: "warning",
       detail: {
-        totalArrears: studentsWithArrears.reduce((sum, student) => sum + Number(student.previousBalance || 0), 0),
+        totalArrears: studentsWithArrears.reduce(
+          (sum, student) => sum + Number(student.previousBalance || 0),
+          0,
+        ),
         total: studentsWithArrears.length,
         students: studentsWithArrears,
         enrichedStudents: studentsWithArrears

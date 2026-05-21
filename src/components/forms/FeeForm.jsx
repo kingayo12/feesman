@@ -1,13 +1,12 @@
-import { useState, useEffect } from "react";
-import { createFee, updateFee, createBulkFees } from "../../pages/fees/feesService";
-import { getClasses } from "../../pages/classes/classService";
-import { getSettings } from "../../pages/settings/settingService";
-import { useRole } from "../../hooks/useRole";
+import { useEffect, useState } from "react";
+import { HiCalendar, HiCash, HiClock, HiLibrary, HiTag } from "react-icons/hi";
 import { PERMISSIONS } from "../../config/permissions";
-import { HiCash, HiLibrary, HiCalendar, HiTag, HiClock } from "react-icons/hi";
-import CustomSelect from "../common/SelectInput";
-import CustomInput from "../common/Input";
 import { TERMS } from "../../constants";
+import { useRole } from "../../hooks/useRole";
+import { getClasses } from "../../services/class/classService";
+import { createBulkFees, createFee, updateFee } from "../../services/fees/feesService";
+import { getSettings } from "../../services/settings/settingService";
+import CustomSelect from "../common/SelectInput";
 
 const EMPTY_FORM = {
   classId: "",
@@ -27,7 +26,7 @@ const EMPTY_FORM = {
  *                                  pre-fills with the fee's data.
  *  - onCancelEdit : () => void   — called when the user clicks "Cancel" while editing.
  */
-const FeeForm = ({ onSaved, editingFee, onCancelEdit, initialItem }) => {
+const FeeForm = ({ onSaved, editingFee, onCancelEdit, initialItem, formId = "fee-form", onSubmittingChange }) => {
   const [classes, setClasses] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -141,6 +140,7 @@ const FeeForm = ({ onSaved, editingFee, onCancelEdit, initialItem }) => {
     }
 
     setIsSubmitting(true);
+    onSubmittingChange?.(true);
 
     try {
       const payload = {
@@ -176,6 +176,7 @@ const FeeForm = ({ onSaved, editingFee, onCancelEdit, initialItem }) => {
       alert("Failed to save fee.");
     } finally {
       setIsSubmitting(false);
+      onSubmittingChange?.(false);
     }
   };
 
@@ -225,12 +226,7 @@ const FeeForm = ({ onSaved, editingFee, onCancelEdit, initialItem }) => {
   ];
 
   return (
-    <>
-      <div className='form-header'>
-        <p>Set a charge for a class, session, and term.</p>
-      </div>
-
-      <form className='modern-form' onSubmit={handleSubmit}>
+    <form id={formId} className='modern-form' onSubmit={handleSubmit}>
         <div className='form-grid'>
           {/* Class */}
           <CustomSelect
@@ -308,19 +304,8 @@ const FeeForm = ({ onSaved, editingFee, onCancelEdit, initialItem }) => {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "0.75rem" }}>
-          <button className='submit-btn' disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : editingFee ? "Update Fee" : "Add Fee"}
-          </button>
-          {editingFee && (
-            <button type='button' className='cancel-btn' onClick={handleCancel}>
-              Cancel
-            </button>
-          )}
-        </div>
       </form>
-    </>
-  );
+    );
 };
 
 export default FeeForm;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { recordPayment } from "../../pages/fees/paymentService";
+import { recordPayment } from "../../services/payment-history/paymentService";
 
 import { HiCurrencyDollar, HiCreditCard, HiExclamationCircle } from "react-icons/hi";
 

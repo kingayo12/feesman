@@ -8,9 +8,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { getAllStudents } from "../students/studentService";
-import { getFamilies } from "../families/familyService";
-import { getSettings } from "../settings/settingService";
+import { getAllStudents } from "../../services/students/studentService";
+import { getFamilies } from "../../services/families/familyService";
+import { getSettings } from "../../services/settings/settingService";
 import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS } from "../../config/permissions";
 import TableToolbar from "../../components/common/TableToolbar";
@@ -18,7 +18,7 @@ import {
   getAllPreviousBalancesForSession,
   setPreviousBalance,
   deletePreviousBalance,
-} from "./Previousbalanceservice";
+} from "../../services/previous_balance/Previousbalanceservice";
 import {
   HiCurrencyDollar,
   HiSearch,

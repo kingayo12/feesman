@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getDashboardFinanceStats, getTodayPayments } from "./dashboardService";
-import { getSettings } from "../settings/settingService";
+import {
+  getDashboardFinanceStats,
+  getTodayPayments,
+} from "../../services/dashboard/dashboardService";
+import { getSettings } from "../../services/settings/settingService";
 import {
   getCacheItem,
   getDashboardCacheKey,

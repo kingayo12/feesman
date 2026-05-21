@@ -12,7 +12,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase/firestore";
 import { useAuth } from "../context/AuthContext";
 import { can as canFn, ROLES, PERMISSIONS } from "../config/permissions";
-import { subscribeToRoleDefinitionsMap } from "../pages/roles/userService";
+import { subscribeToRoleDefinitionsMap } from "../services/roles/userService";
 
 export function useRole() {
   const { user } = useAuth();

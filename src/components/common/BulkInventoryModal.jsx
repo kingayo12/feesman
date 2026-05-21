@@ -1,107 +1,26 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { FormModal, SuccessModal } from "../../components/common/Modal";
+import { useAuth } from "../../context/AuthContext";
+import { FormModal, SuccessModal } from "./Modal";
 import {
-  parseEnrolmentFile,
+  parseInventoryFile,
   validateRows,
   importRows,
-} from "../../services/students/BulkEnrolmentService";
-import { getAllStudents } from "../../services/students/studentService";
-import { getFamilies } from "../../services/families/familyService";
-import { getEnrollmentsByFilter } from "../../services/students/enrollmentService";
-import { getSettings } from "../../services/settings/settingService";
+  loadExistingItems,
+} from "../../services/inventory/BulkInventoryService";
 import {
+  HiCloudUpload,
   HiDownload,
-  HiUpload,
-  HiCheckCircle,
-  HiExclamationCircle,
-  HiRefresh,
   HiDocumentText,
+  HiExclamationCircle,
+  HiCheckCircle,
   HiInformationCircle,
   HiXCircle,
 } from "react-icons/hi";
 
-/**
- * Generates the Template using ExcelJS
- */
-async function downloadTemplate() {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Students");
-
-  const headers = [
-    "First Name *",
-    "Last Name *",
-    "Other Name",
-    "Date of Birth (YYYY-MM-DD)",
-    "Gender *",
-    "Admission No.",
-    "Family Name *",
-    "Parent/Guardian *",
-    "Phone Number *",
-    "Alt. Phone",
-    "Email",
-    "Address",
-    "Class Name *",
-    "Academic Year *",
-    "Term *",
-    "Religion",
-    "State of Origin",
-    "Blood Group",
-    "Notes",
-  ];
-
-  // 1. Add visual instructions
-  sheet.mergeCells("A1:S1");
-  const instruction = sheet.getCell("A1");
-  instruction.value =
-    "FEESMAN BULK IMPORT TEMPLATE - Fill from row 5 onwards. Columns with * are required.";
-  instruction.font = { bold: true, color: { argb: "FFFFFFFF" } };
-  instruction.alignment = { horizontal: "center" };
-  instruction.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E40AF" } };
-
-  // 2. Set Headers
-  const headerRow = sheet.getRow(4);
-  headerRow.values = headers;
-  headerRow.font = { bold: true };
-
-  // 3. Set Example Row
-  sheet.getRow(5).values = [
-    "Chukwuemeka",
-    "Okafor",
-    "James",
-    "2015-04-12",
-    "Male",
-    "ADM-001",
-    "Okafor Family",
-    "Mr. Emeka Okafor",
-    "08012345678",
-    "",
-    "emeka@email.com",
-    "Lagos",
-    "Primary 3A",
-    "2024/2025",
-    "1st Term",
-    "Christian",
-    "Lagos",
-    "O+",
-    "Example Row",
-  ];
-
-  // 4. Formatting
-  sheet.columns = headers.map((h) => ({ header: h, width: 20 }));
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  saveAs(blob, "feesman_bulk_enrolment_template.xlsx");
-}
-
-// ... StepIndicator Component remains the same as your original ...
-
 function StepIndicator({ step }) {
-  const steps = ["Upload file", "Review rows", "Import"];
+  const steps = ["Upload file", "Review items", "Import"];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: "1.5rem" }}>
       {steps.map((label, i) => {
@@ -154,10 +73,43 @@ function StepIndicator({ step }) {
   );
 }
 
-/**
- * UploadStep Component - File upload with drag-and-drop support
- */
-function UploadStep({ onFileParsed, classes, onDownload, existingData }) {
+async function downloadTemplate() {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Inventory Items");
+
+  const headers = ["Name *", "Description", "Category *", "Unit *", "Price *", "Stock"];
+
+  sheet.mergeCells("A1:F1");
+  const instruction = sheet.getCell("A1");
+  instruction.value =
+    "FEESMAN INVENTORY BULK UPLOAD TEMPLATE - Fill from row 5 onwards. Required fields are marked with *.";
+  instruction.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  instruction.alignment = { horizontal: "center" };
+  instruction.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E40AF" } };
+
+  const headerRow = sheet.getRow(4);
+  headerRow.values = headers;
+  headerRow.font = { bold: true };
+
+  sheet.getRow(5).values = [
+    "Uniform Shirt",
+    "White school shirt for junior students",
+    "Uniform",
+    "piece",
+    "1500",
+    "25",
+  ];
+
+  sheet.columns = headers.map((h) => ({ header: h, width: 22 }));
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  saveAs(blob, "feesman_bulk_inventory_template.xlsx");
+}
+
+function UploadStep({ onFileParsed, onDownload }) {
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -166,7 +118,6 @@ function UploadStep({ onFileParsed, classes, onDownload, existingData }) {
   const handleFile = async (file) => {
     setError("");
     if (!file) return;
-
     if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
       setError("Please upload an Excel file (.xlsx or .xls)");
       return;
@@ -174,17 +125,10 @@ function UploadStep({ onFileParsed, classes, onDownload, existingData }) {
 
     try {
       setUploading(true);
-      const parsed = await parseEnrolmentFile(file);
-      const validated = validateRows(parsed, classes, {
-        existingStudents: existingData.students || [],
-        existingFamilies: existingData.families || [],
-        existingEnrollments: existingData.enrollments || [],
-        schoolAbbr: existingData.settings?.abbr || "SCH",
-        schoolState: existingData.settings?.state || "NG",
-      });
-      onFileParsed(validated, file.name);
+      const rows = await parseInventoryFile(file);
+      onFileParsed(rows, file.name);
     } catch (err) {
-      setError(`Error reading file: ${err.message}`);
+      setError(`Error reading file: ${err.message || String(err)}`);
     } finally {
       setUploading(false);
     }
@@ -235,7 +179,7 @@ function UploadStep({ onFileParsed, classes, onDownload, existingData }) {
         }}
       >
         <div style={{ fontSize: 32, marginBottom: "0.5rem" }}>
-          <HiDocumentText style={{ display: "inline" }} />
+          <HiCloudUpload style={{ display: "inline" }} />
         </div>
         <p style={{ fontWeight: 500, marginBottom: "0.25rem" }}>
           Drag and drop your Excel file here or click to select
@@ -300,13 +244,10 @@ function UploadStep({ onFileParsed, classes, onDownload, existingData }) {
   );
 }
 
-/**
- * PreviewStep Component - Review rows before import
- */
 function PreviewStep({ rows, fileName, onBack, onImport, importing, importProgress }) {
   const validRows = rows.filter((r) => r._valid);
-  const errorRows = rows.filter((r) => !r._valid);
-  const rowsWithWarnings = rows.filter((r) => r._valid && r._warnings?.length > 0);
+  const errorRows = rows.filter((r) => !r._valid && r._errors?.length);
+  const skippedRows = rows.filter((r) => !r._valid && !r._errors?.length);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -324,9 +265,7 @@ function PreviewStep({ rows, fileName, onBack, onImport, importing, importProgre
           }}
         >
           <div style={{ fontSize: 12, color: "#16a34a" }}>✓ Ready to import</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: "#22c55e" }}>
-            {validRows.filter((r) => !r._warnings?.length).length}
-          </div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: "#22c55e" }}>{validRows.length}</div>
         </div>
         <div
           style={{
@@ -336,9 +275,9 @@ function PreviewStep({ rows, fileName, onBack, onImport, importing, importProgre
             borderLeft: "3px solid #f59e0b",
           }}
         >
-          <div style={{ fontSize: 12, color: "#b45309" }}>⚠ Duplicates detected</div>
+          <div style={{ fontSize: 12, color: "#b45309" }}>⚠ Skipped / warnings</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: "#f59e0b" }}>
-            {rowsWithWarnings.length}
+            {skippedRows.length}
           </div>
         </div>
         <div
@@ -380,102 +319,113 @@ function PreviewStep({ rows, fileName, onBack, onImport, importing, importProgre
         </div>
       )}
 
-      {/* Rows with Warnings */}
-      {rowsWithWarnings.length > 0 && (
-        <div
-          style={{
-            maxHeight: "250px",
-            overflow: "auto",
-            padding: "1rem",
-            backgroundColor: "#fef3c7",
-            borderRadius: "0.375rem",
-            border: "1px solid #fcd34d",
-          }}
-        >
-          <p
+      <div style={{ overflowX: "auto", border: "1px solid var(--border-muted)", borderRadius: 12 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              {["Row", "Name", "Category", "Unit", "Price", "Stock", "Status"].map((label) => (
+                <th
+                  key={label}
+                  style={{
+                    textAlign: "left",
+                    padding: "0.75rem 0.75rem",
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                    borderBottom: "1px solid var(--border-muted)",
+                  }}
+                >
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row._rowIndex}>
+                <td style={{ padding: "0.75rem", borderBottom: "1px solid var(--border-muted)" }}>
+                  {row._rowIndex}
+                </td>
+                <td style={{ padding: "0.75rem", borderBottom: "1px solid var(--border-muted)" }}>
+                  {row.name || "—"}
+                </td>
+                <td style={{ padding: "0.75rem", borderBottom: "1px solid var(--border-muted)" }}>
+                  {row.category || "—"}
+                </td>
+                <td style={{ padding: "0.75rem", borderBottom: "1px solid var(--border-muted)" }}>
+                  {row.unit || "—"}
+                </td>
+                <td style={{ padding: "0.75rem", borderBottom: "1px solid var(--border-muted)" }}>
+                  {row.price !== "" ? `₦${Number(row.price).toLocaleString()}` : "—"}
+                </td>
+                <td style={{ padding: "0.75rem", borderBottom: "1px solid var(--border-muted)" }}>
+                  {row.stock === "" ? "Unlimited" : row.stock}
+                </td>
+                <td
+                  style={{
+                    padding: "0.75rem",
+                    borderBottom: "1px solid var(--border-muted)",
+                    color:
+                      row._status === "Error"
+                        ? "#991b1b"
+                        : row._status === "Skipped"
+                          ? "#b45309"
+                          : "#166534",
+                    fontWeight: 600,
+                  }}
+                >
+                  {row._status}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {errorRows.length > 0 && (
+        <div style={{ padding: "1rem", backgroundColor: "#fef2f2", borderRadius: 12 }}>
+          <div
             style={{
-              fontSize: 12,
-              fontWeight: 500,
-              marginBottom: "0.75rem",
-              color: "#b45309",
               display: "flex",
               alignItems: "center",
-              gap: "0.5rem",
+              gap: 8,
+              marginBottom: "0.75rem",
+              color: "#991b1b",
             }}
           >
-            <HiInformationCircle /> Duplicate Records Found
-          </p>
-          {rowsWithWarnings.map((row, idx) => (
-            <div
-              key={idx}
-              style={{
-                marginBottom: "0.75rem",
-                paddingBottom: "0.75rem",
-                borderBottom: "1px solid #fde68a",
-              }}
-            >
-              <div
-                style={{ fontSize: 11, fontWeight: 600, color: "#92400e", marginBottom: "0.25rem" }}
-              >
-                Row {row._rowIndex}: {row.firstName} {row.lastName}
-              </div>
-              {row._warnings?.map((w, widx) => (
-                <div key={widx} style={{ fontSize: 11, color: "#b45309", marginLeft: "1rem" }}>
-                  • {w}
+            <HiXCircle /> Validation Errors
+          </div>
+          {errorRows.map((row) => (
+            <div key={row._rowIndex} style={{ marginBottom: "0.75rem" }}>
+              <div style={{ fontWeight: 600, marginBottom: "0.35rem" }}>Row {row._rowIndex}</div>
+              {row._errors.map((error, idx) => (
+                <div key={idx} style={{ fontSize: 12, marginLeft: "1rem" }}>
+                  • {error}
                 </div>
               ))}
             </div>
           ))}
-          <div
-            style={{ fontSize: 11, color: "#b45309", marginTop: "0.75rem", fontStyle: "italic" }}
-          >
-            💡 These rows will be processed but may skip enrollment if it already exists.
-          </div>
         </div>
       )}
 
-      {/* Rows with Errors */}
-      {errorRows.length > 0 && (
-        <div
-          style={{
-            maxHeight: "250px",
-            overflow: "auto",
-            padding: "1rem",
-            backgroundColor: "#fef2f2",
-            borderRadius: "0.375rem",
-            border: "1px solid #fecaca",
-          }}
-        >
-          <p
+      {skippedRows.length > 0 && (
+        <div style={{ padding: "1rem", backgroundColor: "#fef3c7", borderRadius: 12 }}>
+          <div
             style={{
-              fontSize: 12,
-              fontWeight: 500,
-              marginBottom: "0.75rem",
-              color: "#991b1b",
               display: "flex",
               alignItems: "center",
-              gap: "0.5rem",
+              gap: 8,
+              marginBottom: "0.75rem",
+              color: "#92400e",
             }}
           >
-            <HiXCircle /> Validation Errors
-          </p>
-          {errorRows.map((row, idx) => (
-            <div
-              key={idx}
-              style={{
-                marginBottom: "0.75rem",
-                paddingBottom: "0.75rem",
-                borderBottom: "1px solid #fee2e2",
-              }}
-            >
-              <div
-                style={{ fontSize: 11, fontWeight: 600, color: "#7f1d1d", marginBottom: "0.25rem" }}
-              >
-                Row {row._rowIndex}
-              </div>
-              {row._errors?.map((e, eidx) => (
-                <div key={eidx} style={{ fontSize: 11, color: "#991b1b", marginLeft: "1rem" }}>
-                  • {e}
+            <HiInformationCircle /> Skipped rows
+          </div>
+          {skippedRows.map((row) => (
+            <div key={row._rowIndex} style={{ marginBottom: "0.75rem" }}>
+              <div style={{ fontWeight: 600, marginBottom: "0.35rem" }}>Row {row._rowIndex}</div>
+              {row._warnings.map((warning, idx) => (
+                <div key={idx} style={{ fontSize: 12, marginLeft: "1rem" }}>
+                  • {warning}
                 </div>
               ))}
             </div>
@@ -513,55 +463,43 @@ function PreviewStep({ rows, fileName, onBack, onImport, importing, importProgre
             cursor: validRows.length > 0 && !importing ? "pointer" : "not-allowed",
           }}
         >
-          {importing ? "Importing..." : `Import ${validRows.length} Rows`}
+          {importing
+            ? "Importing..."
+            : `Import ${validRows.length} item${validRows.length !== 1 ? "s" : ""}`}
         </button>
       </div>
     </div>
   );
 }
 
-export default function BulkEnrolmentModal({ classes, onClose, onComplete }) {
+export default function BulkInventoryModal({ onClose, onComplete }) {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [rows, setRows] = useState([]);
   const [fileName, setFileName] = useState("");
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [result, setResult] = useState(null);
-  const [existingData, setExistingData] = useState({
-    students: [],
-    families: [],
-    enrollments: [],
-    settings: {},
-  });
+  const [existingItems, setExistingItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Load existing data on mount
   useEffect(() => {
-    async function loadData() {
+    async function loadItems() {
       try {
-        const [students, families, enrollments, settings] = await Promise.all([
-          getAllStudents(),
-          getFamilies(),
-          getEnrollmentsByFilter({}),
-          getSettings(),
-        ]);
-        setExistingData({
-          students: students || [],
-          families: families || [],
-          enrollments: enrollments || [],
-          settings: settings || {},
-        });
+        const inventory = await loadExistingItems();
+        setExistingItems(inventory || []);
       } catch (err) {
-        console.error("Error loading existing data:", err);
+        console.error("Error loading existing inventory:", err);
       } finally {
         setLoading(false);
       }
     }
-    loadData();
+    loadItems();
   }, []);
 
-  const handleFileParsed = (validatedRows, name) => {
-    setRows(validatedRows);
+  const handleFileParsed = (parsedRows, name) => {
+    const validated = validateRows(parsedRows, existingItems);
+    setRows(validated);
     setFileName(name);
     setStep(2);
   };
@@ -569,8 +507,8 @@ export default function BulkEnrolmentModal({ classes, onClose, onComplete }) {
   const handleImport = async () => {
     setImporting(true);
     try {
-      const res = await importRows(rows, {
-        onProgress: (p) => setImportProgress(p),
+      const res = await importRows(rows, user?.uid, {
+        onProgress: (progress) => setImportProgress(progress),
       });
       setResult(res);
       setStep(3);
@@ -578,7 +516,7 @@ export default function BulkEnrolmentModal({ classes, onClose, onComplete }) {
       setResult({
         imported: 0,
         skipped: 0,
-        errors: [{ row: "System", error: err.message }],
+        errors: [{ row: "System", error: err.message || String(err) }],
         warnings: [],
       });
       setStep(3);
@@ -589,9 +527,9 @@ export default function BulkEnrolmentModal({ classes, onClose, onComplete }) {
 
   if (loading) {
     return (
-      <FormModal title='Bulk Student Enrolment' onClose={onClose} maxWidth='720px'>
+      <FormModal title='Bulk Inventory Upload' onClose={onClose} maxWidth='760px'>
         <div style={{ textAlign: "center", padding: "2rem" }}>
-          <p>Loading existing data...</p>
+          <p>Loading inventory data…</p>
         </div>
       </FormModal>
     );
@@ -600,15 +538,10 @@ export default function BulkEnrolmentModal({ classes, onClose, onComplete }) {
   return (
     <>
       {step < 3 && (
-        <FormModal title='Bulk Student Enrolment' onClose={onClose} maxWidth='720px'>
+        <FormModal title='Bulk Inventory Upload' onClose={onClose} maxWidth='760px'>
           <StepIndicator step={step} />
           {step === 1 && (
-            <UploadStep
-              onFileParsed={handleFileParsed}
-              classes={classes}
-              onDownload={downloadTemplate}
-              existingData={existingData}
-            />
+            <UploadStep onFileParsed={handleFileParsed} onDownload={downloadTemplate} />
           )}
           {step === 2 && (
             <PreviewStep
@@ -625,11 +558,11 @@ export default function BulkEnrolmentModal({ classes, onClose, onComplete }) {
 
       {step === 3 && result && (
         <SuccessModal
-          title={result.imported > 0 ? "Import Complete!" : "Import Finished"}
-          message={`${result.imported} students imported. ${result.skipped} skipped.`}
+          title={result.imported > 0 ? "Inventory upload complete" : "Inventory import finished"}
+          message={`${result.imported} item${result.imported !== 1 ? "s" : ""} imported. ${result.skipped} skipped.`}
           onClose={onComplete}
           onAction={onComplete}
-          actionLabel='View Students'
+          actionLabel='View Inventory'
         />
       )}
     </>

@@ -1,9 +1,3 @@
-/**
- * Filters an array of objects based on a search query.
- * @param {Array} items - The list of families or students.
- * @param {String} query - The search text.
- * @param {Array} keys - The properties to search in (e.g., ['familyName', 'phone']).
- */
 export const filterData = (items, query, keys) => {
   if (!query) return items;
 
@@ -14,13 +8,6 @@ export const filterData = (items, query, keys) => {
   );
 };
 
-// src/utils/dateUtils.js
-
-/**
- * Converts Firebase Timestamps or JS Dates into a readable string
- * @param {Object|Date|String} timestamp - The date object from Firestore
- * @returns {String} Formatted date (e.g., "Jan 12, 2024")
- */
 export const formatDate = (timestamp) => {
   if (!timestamp) return "N/A";
 
@@ -74,12 +61,37 @@ export const detectGroup = (cls = {}) => {
   return "unknown";
 };
 
+export const getGroupOrder = (prefix = "") => {
+  const p = prefix.toLowerCase();
+
+  const rank = {
+    earlyYears: ["creche", "daycare"],
+    kindergarten: ["kg", "kindergarten"],
+    nursery: ["nursery"],
+    primary: ["primary"],
+    junior: ["jss", "junior"],
+    senior: ["ss", "senior", "secondary"],
+  };
+
+  if (rank.earlyYears.some((word) => p.includes(word))) return 0;
+  if (rank.kindergarten.some((word) => p.includes(word))) return 1;
+  if (rank.nursery.some((word) => p.includes(word))) return 2;
+  if (rank.primary.some((word) => p.includes(word))) return 3;
+  if (rank.junior.some((word) => p.includes(word))) return 4;
+  if (rank.senior.some((word) => p.includes(word))) return 5;
+
+  return 6; // Unknown/Other
+};
+
 export const sortClasses = (list = []) => {
   return [...list].sort((a, b) => {
-    const levelDiff = getClassLevel(a.name) - getClassLevel(b.name);
-    if (levelDiff !== 0) return levelDiff;
-
-    return getClassOrderNumber(a.name) - getClassOrderNumber(b.name);
+    const pa = parseClassName(a.name);
+    const pb = parseClassName(b.name);
+    const groupOrder = getGroupOrder(pa.prefix) - getGroupOrder(pb.prefix);
+    if (groupOrder !== 0) return groupOrder;
+    if (pa.prefix !== pb.prefix) return pa.prefix.localeCompare(pb.prefix);
+    if (pa.level !== pb.level) return pa.level - pb.level;
+    return pa.arm.localeCompare(pb.arm);
   });
 };
 
@@ -87,4 +99,31 @@ export const sortClasses = (list = []) => {
 export const formatCurrency = (n) => {
   const num = typeof n === "number" ? n : parseFloat(n) || 0;
   return "₦" + Math.round(num).toLocaleString();
+};
+
+export const parseClassName = (name = "") => {
+  const m = name.trim().match(/^(.*?)(\d+)\s*([A-Za-z]?)$/);
+  if (!m) return { prefix: name.trim(), level: Infinity, arm: "" };
+  return { prefix: m[1].trim(), level: parseInt(m[2], 10), arm: m[3].toUpperCase() };
+};
+
+export const formatDateValue = (value) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value.toDate === "function") {
+    return value.toDate().toISOString().slice(0, 10);
+  }
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return "";
+};
+
+export const generateAdmissionNo = (abbr = "SCH", state = "NG") => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const rand = String(Math.floor(Math.random() * 90) + 10);
+  const abbrPart = (abbr || "SCH").toUpperCase().slice(0, 4).replace(/\s/g, "");
+  const statePart = (state || "NG").toUpperCase().slice(0, 3).replace(/\s/g, "");
+  return `${abbrPart}/${statePart}/${year}/${month}${day}/${rand}`;
 };

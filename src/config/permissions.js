@@ -1,15 +1,3 @@
-/**
- * permissions.js
- * Single source of truth for RBAC.
- * Place in: src/config/permissions.js
- *
- * How it works:
- *  1. When a user registers, AuthContext writes role: "user" to Firestore users/{uid}.
- *  2. useRole() hook reads that role and exposes can(permission) helper.
- *  3. Every page / button checks can() before rendering.
- *  4. RoleGuard component wraps routes — redirects if role lacks the permission.
- */
-
 // ── Role definitions (ordered highest → lowest) ───────────────────────────
 export const ROLES = {
   super_admin: "super_admin",
@@ -86,9 +74,8 @@ export const PERMISSIONS = {
   DANGER_ZONE: "danger_zone",
 
   //Inventory
-    VIEW_INVENTORY:   "view_inventory",
-    MANAGE_INVENTORY: "manage_inventory",
-
+  VIEW_INVENTORY: "view_inventory",
+  MANAGE_INVENTORY: "manage_inventory",
 
   // Role management
   VIEW_ROLES: "view_roles",

@@ -7,19 +7,24 @@
  */
 
 import { useState } from "react";
-import { recordPayment } from "../../pages/fees/paymentService";
-import { markAssignmentPaid } from "../../pages/inventory/inventoryService";
-import { HiCreditCard, HiExclamationCircle } from "react-icons/hi";
-import { HiOutlineCash } from "react-icons/hi";
+import { HiCreditCard, HiExclamationCircle, HiOutlineCash } from "react-icons/hi";
+import { markAssignmentPaid } from "../../services/inventory/inventoryService";
+import { recordPayment } from "../../services/payment-history/paymentService";
 import CustomInput from "../common/Input";
 import CustomSelect from "../common/SelectInput";
 
-export default function InventoryPaymentForm({ assignment, student, session, onClose, onSuccess }) {
+export default function InventoryPaymentForm({
+  assignment,
+  student,
+  session,
+  onSuccess,
+  formId = "inventory-payment-form",
+  onSubmittingChange,
+}) {
   const outstanding = Number(assignment.totalAmount || 0) - Number(assignment.amountPaid || 0);
 
   const [amount, setAmount] = useState(String(outstanding));
   const [method, setMethod] = useState("Cash");
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
@@ -31,7 +36,7 @@ export default function InventoryPaymentForm({ assignment, student, session, onC
     if (paid > outstanding)
       return setError(`Amount exceeds outstanding balance of ₦${outstanding.toLocaleString()}.`);
 
-    setSaving(true);
+    onSubmittingChange?.(true);
     try {
       await recordPayment({
         studentId: student.id,
@@ -54,12 +59,18 @@ export default function InventoryPaymentForm({ assignment, student, session, onC
       onSuccess?.();
     } catch (err) {
       setError(err.message || "Failed to record payment.");
-      setSaving(false);
+      onSubmittingChange?.(false);
+    } finally {
+      onSubmittingChange?.(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <form
+      id={formId}
+      onSubmit={handleSubmit}
+      style={{ display: "flex", flexDirection: "column", gap: 14 }}
+    >
       {/* Item total vs outstanding summary */}
       <div
         style={{
@@ -134,16 +145,6 @@ export default function InventoryPaymentForm({ assignment, student, session, onC
         ]}
         required
       />
-
-      {/* Footer actions */}
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 4 }}>
-        <button type='button' className='btn btn-secondary' onClick={onClose} disabled={saving}>
-          Cancel
-        </button>
-        <button type='submit' className='btn btn-primary' disabled={saving}>
-          {saving ? "Saving…" : "Record Payment"}
-        </button>
-      </div>
     </form>
   );
 }

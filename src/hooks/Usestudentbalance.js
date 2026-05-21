@@ -1,8 +1,8 @@
-import { getFeesByClass } from "../pages/fees/feesService";
-import { getStudentFeeOverrides } from "../pages/students/studentFeeOverrideService";
-import { getPaymentsByStudent } from "../pages/fees/paymentService";
-import { getStudentAssignments } from "../pages/inventory/inventoryService";
-import { computeStudentDiscount } from "../pages/discount/Discountservice";
+import { getFeesByClass } from "../services/fees/feesService";
+import { getStudentFeeOverrides } from "../services/students/studentFeeOverrideService";
+import { getPaymentsByStudent } from "../services/payment-history/paymentService";
+import { getStudentAssignments } from "../services/inventory/inventoryService";
+import { computeStudentDiscount } from "../services/discount/Discountservice";
 import {
   getCachedDiscounts,
   getCachedPreviousBalanceAmount,

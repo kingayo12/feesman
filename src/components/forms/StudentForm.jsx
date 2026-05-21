@@ -1,118 +1,51 @@
-import { useState, useEffect, useCallback } from "react";
-import { createStudent, updateStudent } from "../../pages/students/studentService";
-import { getCurrentEnrollment } from "../../pages/students/enrollmentService";
-import { getClasses } from "../../pages/classes/classService";
-import { getSettings } from "../../pages/settings/settingService";
-import { getFamilies, getFamilyById } from "../../pages/families/familyService";
+import { EMPTY_ENROLLMENT, EMPTY_IDENTITY } from "@/fixtures/studentForm";
+import { formatDateValue, generateAdmissionNo, sortClasses } from "@/utils/helpers";
+import { useCallback, useEffect, useState } from "react";
 import {
-  HiUser,
-  HiIdentification,
   HiAcademicCap,
   HiCalendar,
-  HiRefresh,
+  HiClock,
+  HiIdentification,
+  HiLocationMarker,
   HiLockClosed,
   HiLockOpen,
-  HiClock,
+  HiRefresh,
+  HiUser,
 } from "react-icons/hi";
-import CustomInput from "../common/Input";
-import CustomButton from "../common/CustomButton";
-import CustomSelect from "../common/SelectInput";
 import { TERMS } from "../../constants";
+import { getClasses } from "../../services/class/classService";
+import { getFamilies, getFamilyById } from "../../services/families/familyService";
+import { getSettings } from "../../services/settings/settingService";
+import { getCurrentEnrollment } from "../../services/students/enrollmentService";
+import { createStudent, updateStudent } from "../../services/students/studentService";
+import CustomButton from "../common/CustomButton";
+import CustomInput from "../common/Input";
+import CustomSelect from "../common/SelectInput";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function parseClassName(name = "") {
-  const m = name.trim().match(/^(.*?)(\d+)\s*([A-Za-z]?)$/);
-  if (!m) return { prefix: name.trim(), level: Infinity, arm: "" };
-  return { prefix: m[1].trim(), level: parseInt(m[2], 10), arm: m[3].toUpperCase() };
-}
-
-function getGroupOrder(prefix = "") {
-  const p = prefix.toLowerCase();
-  if (p.includes("creche") || p.includes("daycare")) return 0;
-  if (p.includes("kg") || p.includes("kindergarten")) return 1;
-  if (p.includes("nursery")) return 2;
-  if (p.includes("primary")) return 3;
-  if (p.includes("jss") || p.includes("junior")) return 4;
-  if (p.includes("ss") || p.includes("senior") || p.includes("secondary")) return 5;
-  return 6;
-}
-
-function sortClasses(list = []) {
-  return [...list].sort((a, b) => {
-    const pa = parseClassName(a.name);
-    const pb = parseClassName(b.name);
-    const go = getGroupOrder(pa.prefix) - getGroupOrder(pb.prefix);
-    if (go !== 0) return go;
-    if (pa.prefix !== pb.prefix) return pa.prefix.localeCompare(pb.prefix);
-    if (pa.level !== pb.level) return pa.level - pb.level;
-    return pa.arm.localeCompare(pb.arm);
-  });
-}
-
-// ── Admission number generator ────────────────────────────────────────────────
-// Format: ABBR/ST/YYYY/MMDD/RR  e.g. GCI/OY/2025/0115/47
-function generateAdmissionNo(abbr = "SCH", state = "NG") {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const rand = String(Math.floor(Math.random() * 90) + 10);
-  const abbrPart = (abbr || "SCH").toUpperCase().slice(0, 4).replace(/\s/g, "");
-  const statePart = (state || "NG").toUpperCase().slice(0, 3).replace(/\s/g, "");
-  return `${abbrPart}/${statePart}/${year}/${month}${day}/${rand}`;
-}
-
-const EMPTY_IDENTITY = {
-  firstName: "",
-  otherName: "",
-  lastName: "",
-  admissionNo: "",
-};
-
-const EMPTY_ENROLLMENT = {
-  classId: "",
-  session: "",
-  term: "",
-};
-
-// ── Component ─────────────────────────────────────────────────────────────────
-
-/**
- * StudentForm
- *
- * CREATE mode — passes all fields (identity + enrollment) to createStudent(),
- *               which internally calls enrollStudent() via autoEnroll.
- *               No separate enrollStudent() call needed here.
- *
- * EDIT mode   — updates identity fields only via updateStudent().
- *               Current enrollment is shown read-only.
- *               To change class/session/term use the Promote flow.
- *
- * Props:
- *  - familyId    : string|null  — pre-selects & locks family (opened from FamilyDetails)
- *  - initialData : object|null  — switches to edit mode; must include student `id`
- *  - onSuccess   : () => void
- *  - onCancel    : () => void
- */
-export default function StudentForm({ familyId, onSuccess, initialData, onCancel }) {
+export default function StudentForm({
+  familyId,
+  onSuccess,
+  formId = "student-form",
+  onSubmittingChange,
+  initialData,
+  onCancel,
+}) {
   const isEditMode = Boolean(initialData?.id);
-
   const [classes, setClasses] = useState([]);
   const [families, setFamilies] = useState([]);
   const [selectedFamilyId, setSelectedFamilyId] = useState(familyId || "");
   const [schoolAbbr, setSchoolAbbr] = useState("");
   const [schoolState, setSchoolState] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [admLocked, setAdmLocked] = useState(true);
   const [currentEnrollment, setCurrentEnrollment] = useState(null);
-
-  // Identity fields → students collection
   const [identity, setIdentity] = useState(EMPTY_IDENTITY);
-
-  // Enrollment fields → studentEnrollments (create mode only)
-  // These are passed into createStudent() which handles enrollment internally
   const [enrollment, setEnrollment] = useState(EMPTY_ENROLLMENT);
+  const [isSubmitting, _setIsSubmitting] = useState(false);
+
+  const setIsSubmitting = (val) => {
+    _setIsSubmitting(val);
+    onSubmittingChange?.(val);
+  };
 
   // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -142,9 +75,14 @@ export default function StudentForm({ familyId, onSuccess, initialData, onCancel
           otherName: initialData.otherName || "",
           lastName: initialData.lastName || "",
           admissionNo: initialData.admissionNo || generateAdmissionNo(abbr, state),
+          gender: initialData.gender || "",
+          dateOfBirth: formatDateValue(initialData.dateOfBirth),
+          religion: initialData.religion || "",
+          stateOfOrigin: initialData.stateOfOrigin || "",
+          bloodGroup: initialData.bloodGroup || "",
+          notes: initialData.notes || "",
         });
 
-        // Fetch current active enrollment to show read-only
         try {
           const enr = await getCurrentEnrollment(initialData.id);
           setCurrentEnrollment(enr);
@@ -154,14 +92,18 @@ export default function StudentForm({ familyId, onSuccess, initialData, onCancel
         return;
       }
 
-      // CREATE MODE — pre-fill session/term from settings
       setEnrollment({ classId: "", session, term });
       setIdentity((prev) => ({
         ...prev,
         admissionNo: generateAdmissionNo(abbr, state),
+        gender: "",
+        dateOfBirth: "",
+        religion: "",
+        stateOfOrigin: "",
+        bloodGroup: "",
+        notes: "",
       }));
 
-      // Pre-fill surname when opened from a family page
       if (familyId) {
         const family =
           (familyData || []).find((f) => f.id === familyId) || (await getFamilyById(familyId));
@@ -171,7 +113,6 @@ export default function StudentForm({ familyId, onSuccess, initialData, onCancel
     }
 
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [familyId, initialData]);
 
   // ── Regenerate admission number ───────────────────────────────────────────
@@ -193,6 +134,8 @@ export default function StudentForm({ familyId, onSuccess, initialData, onCancel
     setEnrollment((prev) => ({ ...prev, [name]: value }));
   };
 
+  const classOptions = classes.map((cls) => ({ value: cls.id, label: cls.name }));
+
   const handleSurnameSelect = (e) => {
     const nextFamilyId = e.target.value;
     const family = families.find((f) => f.id === nextFamilyId);
@@ -204,38 +147,43 @@ export default function StudentForm({ familyId, onSuccess, initialData, onCancel
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     try {
       const effectiveFamilyId = familyId || selectedFamilyId;
-
       if (isEditMode) {
-        // EDIT: identity only — enrollment unchanged
+        const identityPayload = { ...identity };
+        if (identityPayload.dateOfBirth) {
+          identityPayload.dateOfBirth = new Date(identityPayload.dateOfBirth);
+        }
         await updateStudent(initialData.id, {
-          ...identity,
+          ...identityPayload,
           familyId: effectiveFamilyId,
         });
       } else {
-        // CREATE: pass identity + enrollment fields together.
-        // createStudent() strips enrollment fields from the student doc
-        // and calls enrollStudent() internally via autoEnroll: true.
+        const identityPayload = { ...identity };
+        if (identityPayload.dateOfBirth) {
+          identityPayload.dateOfBirth = new Date(identityPayload.dateOfBirth);
+        }
         await createStudent(
           {
-            ...identity,
+            ...identityPayload,
             familyId: effectiveFamilyId,
-            // Enrollment fields — picked up by createStudent, not saved on student doc
             classId: enrollment.classId,
             session: enrollment.session,
             term: enrollment.term,
           },
           { autoEnroll: true },
         );
-
-        // Reset for next entry (keep session/term context)
         setIdentity({
           firstName: "",
           otherName: "",
           lastName: familyId ? families.find((f) => f.id === familyId)?.familyName || "" : "",
           admissionNo: generateAdmissionNo(schoolAbbr, schoolState),
+          gender: "",
+          dateOfBirth: "",
+          religion: "",
+          stateOfOrigin: "",
+          bloodGroup: "",
+          notes: "",
         });
         setEnrollment((prev) => ({ classId: "", session: prev.session, term: prev.term }));
         if (!familyId) setSelectedFamilyId("");
@@ -251,14 +199,9 @@ export default function StudentForm({ familyId, onSuccess, initialData, onCancel
     }
   };
 
-  // ── Class options ─────────────────────────────────────────────────────────
-  const classOptions = classes.map((cls) => ({ value: cls.id, label: cls.name }));
-
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <form className='modern-form' onSubmit={handleSubmit}>
-      {/* ── Student Identity ── */}
-      <div className='form-section-label'>Student Details</div>
+    <form id={formId} className='modern-form' onSubmit={handleSubmit}>
       <div className='form-grid'>
         <CustomInput
           name='firstName'
@@ -281,7 +224,6 @@ export default function StudentForm({ familyId, onSuccess, initialData, onCancel
           autoComplete='off'
         />
 
-        {/* Surname — locked when opened from FamilyDetails */}
         {familyId ? (
           <div className='input-group'>
             <label>Surname</label>
@@ -310,7 +252,31 @@ export default function StudentForm({ familyId, onSuccess, initialData, onCancel
           />
         )}
 
-        {/* Admission Number */}
+        <CustomSelect
+          name='gender'
+          labelName='Gender'
+          icon={<HiUser />}
+          value={identity.gender}
+          onChange={handleIdentityChange}
+          required={!isEditMode}
+          placeholder='Select gender'
+          options={[
+            { value: "Male", label: "Male" },
+            { value: "Female", label: "Female" },
+            { value: "Other", label: "Other" },
+          ]}
+        />
+
+        <CustomInput
+          name='dateOfBirth'
+          type='date'
+          value={identity.dateOfBirth}
+          onChange={handleIdentityChange}
+          labelName='Date of Birth'
+          icon={<HiCalendar />}
+          required={!isEditMode}
+        />
+
         <CustomInput
           name='admissionNo'
           value={identity.admissionNo}
@@ -343,14 +309,51 @@ export default function StudentForm({ familyId, onSuccess, initialData, onCancel
             </>
           }
         />
+
+        <CustomInput
+          name='religion'
+          value={identity.religion}
+          onChange={handleIdentityChange}
+          labelName='Religion'
+          icon={<HiUser />}
+          placeholder='e.g. Christianity'
+          autoComplete='off'
+        />
+
+        <CustomInput
+          name='stateOfOrigin'
+          value={identity.stateOfOrigin}
+          onChange={handleIdentityChange}
+          labelName='State of Origin'
+          icon={<HiLocationMarker />}
+          placeholder='e.g. Lagos'
+          autoComplete='off'
+        />
+
+        <CustomInput
+          name='bloodGroup'
+          value={identity.bloodGroup}
+          onChange={handleIdentityChange}
+          labelName='Blood Group'
+          icon={<HiIdentification />}
+          placeholder='e.g. A+, O-'
+          autoComplete='off'
+        />
+
+        <CustomInput
+          name='notes'
+          value={identity.notes}
+          onChange={handleIdentityChange}
+          labelName='Additional Notes'
+          icon={<HiClock />}
+          placeholder='Optional medical or admission notes'
+          autoComplete='off'
+        />
       </div>
 
       {/* ── Enrollment (create mode only) ── */}
       {!isEditMode && (
         <>
-          <div className='form-section-label' style={{ marginTop: "1.25rem" }}>
-            Enrollment
-          </div>
           <div className='form-grid'>
             <CustomSelect
               name='classId'
@@ -439,25 +442,6 @@ export default function StudentForm({ familyId, onSuccess, initialData, onCancel
           </div>
         </>
       )}
-
-      {/* ── Actions ── */}
-      <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
-        <CustomButton
-          type='submit'
-          loading={isSubmitting}
-          loadingText='Saving...'
-          icon={<HiAcademicCap />}
-          otherClass='submit-btn'
-        >
-          {isEditMode ? "Update Student" : "Add Student"}
-        </CustomButton>
-
-        {onCancel && (
-          <CustomButton type='button' variant='cancel' onClick={onCancel}>
-            Cancel
-          </CustomButton>
-        )}
-      </div>
     </form>
   );
 }

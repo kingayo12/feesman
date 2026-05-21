@@ -4,7 +4,7 @@ import Register from "./pages/auth/Register.jsx";
 import ForgotPassword from "./pages/auth/ForgotPassword.jsx";
 
 import Dashboard from "./pages/dashboard/Dashboard.jsx";
-import Reports from "./pages/dashboard/Reports.jsx";
+import Reports from "./pages/reports/Reports.jsx";
 
 import FamilyList from "./pages/families/FamilyList.jsx";
 import FamilyDetails from "./pages/families/FamilyDetails.jsx";
@@ -16,7 +16,7 @@ import ClassList from "./pages/classes/ClassList.jsx";
 import ClassDetails from "./pages/classes/ClassDetails.jsx";
 
 import FeeSetup from "./pages/fees/FeeSetup.jsx";
-import PaymentHistory from "./pages/fees/PaymentHistory.jsx";
+import PaymentHistory from "./pages/payment-history/PaymentHistory.jsx";
 import LetterTemplates from "./pages/letters/LetterTemplates.jsx";
 
 import SettingsPage from "./pages/settings/Setting.jsx";

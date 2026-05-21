@@ -1,6 +1,6 @@
 // src/components/common/Modal.jsx
 import { useEffect, useRef } from "react";
-import { HiX, HiCheckCircle, HiHeart, HiSparkles } from "react-icons/hi";
+import { HiCheckCircle, HiHeart, HiX } from "react-icons/hi";
 import CustomButton from "./CustomButton";
 
 // ── Shared overlay ──────────────────────────────────────────────────────────
@@ -69,34 +69,82 @@ function CloseBtn({ onClose }) {
 // 1. FORM MODAL — wraps any form component
 // Usage: <FormModal title="Add Student" onClose={...}><StudentForm .../></FormModal>
 // ─────────────────────────────────────────────────────────────────────────────
-export function FormModal({ title, subtitle, onClose, children, maxWidth = "560px" }) {
+export function FormModal({ title, subtitle, onClose, children, footer, maxWidth = "560px" }) {
   return (
     <ModalOverlay onClose={onClose} maxWidth={maxWidth} noPadding>
-      <div style={{ padding: "1.5rem 1.5rem 0", borderBottom: "1px solid var(--border-muted)" }}>
-        <div style={{ paddingRight: "2rem" }}>
-          <h3
-            style={{
-              margin: "0 0 0.2rem",
-              color: "var(--text-primary)",
-            }}
-          >
-            {title}
-          </h3>
-          {subtitle && (
-            <p
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          maxHeight: "85vh",
+          overflow: "hidden",
+        }}
+      >
+        {/* Fixed header */}
+        <div
+          style={{
+            padding: "1.25rem 1.5rem",
+            borderBottom: "1px solid var(--border-muted)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: "1rem",
+            flexShrink: 0,
+          }}
+        >
+          <div>
+            <h3
               style={{
-                margin: "0 0 1rem",
-                fontSize: "var(--font-size-xs)",
-                color: "var(--text-secondary)",
+                margin: "0 0 0.25rem",
+                color: "var(--text-primary)",
               }}
             >
-              {subtitle}
-            </p>
-          )}
+              {title}
+            </h3>
+            {subtitle && (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "var(--font-size-xs)",
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.5,
+                }}
+              >
+                {subtitle}
+              </p>
+            )}
+          </div>
+          <CloseBtn onClose={onClose} />
         </div>
-        <CloseBtn onClose={onClose} />
+
+        {/* Scrollable body */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "1.5rem",
+          }}
+        >
+          {children}
+        </div>
+
+        {/* Fixed footer */}
+        {footer && (
+          <div
+            style={{
+              padding: "1rem 1.5rem",
+              borderTop: "1px solid var(--border-muted)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              gap: "8px",
+              flexShrink: 0,
+            }}
+          >
+            {footer}
+          </div>
+        )}
       </div>
-      <div style={{ padding: "1.5rem" }}>{children}</div>
     </ModalOverlay>
   );
 }

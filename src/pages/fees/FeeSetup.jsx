@@ -1,27 +1,26 @@
-import { useEffect, useState, useMemo } from "react";
-import { useRole } from "../../hooks/useRole";
-import { PERMISSIONS } from "../../config/permissions";
-import TableToolbar from "../../components/common/TableToolbar";
-import { Bone } from "../../components/common/Skeleton";
-import { getFees, deleteFee } from "./feesService";
-import { getClasses } from "../classes/classService";
-import { useLocation } from "react-router-dom";
-import { getInventoryItem } from "../inventory/inventoryService";
-import { getSettings } from "../settings/settingService";
+import { useEffect, useMemo, useState } from "react";
 import {
-  HiPencil,
-  HiTrash,
-  HiDuplicate,
-  HiSearch,
   HiChevronDown,
-  HiPlus,
+  HiDuplicate,
   HiOutlineCash,
+  HiPencil,
+  HiPlus,
+  HiSearch,
+  HiTrash,
 } from "react-icons/hi";
 import CustomButton from "../../components/common/CustomButton";
-import { FormModal, ConfirmModal } from "../../components/common/Modal";
+import { ConfirmModal, FormModal } from "../../components/common/Modal";
+import { Bone } from "../../components/common/Skeleton";
+import TableToolbar from "../../components/common/TableToolbar";
 import FeeForm from "../../components/forms/FeeForm";
+import { PERMISSIONS } from "../../config/permissions";
 import { TERMS } from "../../constants";
-import { getClassLevel, getClassOrderNumber, detectGroup, sortClasses } from "../../utils/helpers";
+import { useRole } from "../../hooks/useRole";
+import { getClasses } from "../../services/class/classService";
+import { deleteFee, getFees } from "../../services/fees/feesService";
+import { getInventoryItem } from "../../services/inventory/inventoryService";
+import { getSettings } from "../../services/settings/settingService";
+import { detectGroup, getClassLevel, getClassOrderNumber, sortClasses } from "../../utils/helpers";
 
 export default function FeeSetup() {
   const [classes, setClasses] = useState([]);
@@ -29,6 +28,7 @@ export default function FeeSetup() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingFee, setEditingFee] = useState(null);
+  const [formSaving, setFormSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [filterTerm, setFilterTerm] = useState("");
@@ -225,15 +225,35 @@ export default function FeeSetup() {
 
       {/* ── Form Modal ──────────────────────────────────────────── */}
       {modalOpen && (
-        <FormModal title={editingFee?.id ? "Edit Fee" : "Add Fee"} onClose={closeModal}>
+        <FormModal
+          title={editingFee?.id ? "Edit Fee" : "Add Fee"}
+          onClose={closeModal}
+          footer={
+            <>
+              <CustomButton
+                type='button'
+                variant='cancel'
+                onClick={closeModal}
+                disabled={formSaving}
+              >
+                Cancel
+              </CustomButton>
+              <CustomButton type='submit' form='fee-form' loading={formSaving} icon={<HiPencil />}>
+                {editingFee?.id ? "Update Fee" : "Add Fee"}
+              </CustomButton>
+            </>
+          }
+        >
           <FeeForm
+            formId='fee-form'
             editingFee={editingFee}
             initialItem={window.__initialFeeItem}
             onSaved={async () => {
               await loadData();
               closeModal();
             }}
-            onCancel={closeModal}
+            onCancelEdit={closeModal}
+            onSubmittingChange={setFormSaving}
           />
         </FormModal>
       )}

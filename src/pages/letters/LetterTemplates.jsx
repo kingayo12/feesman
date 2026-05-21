@@ -23,20 +23,20 @@ import {
   HiPhotograph,
   HiArchive,
 } from "react-icons/hi";
-import { getSettings } from "../settings/settingService";
-import { getEnrollmentsByFilter } from "../students/enrollmentService";
+import { getSettings } from "../../services/settings/settingService";
+import { getEnrollmentsByFilter } from "../../services/students/enrollmentService";
 import {
   exportLetterAsDocx,
   exportLetterAsImage,
   exportBulkAsZip,
 } from "../../utils/letterExportUtils";
-import { getAllStudents } from "../students/studentService";
-import { getClasses } from "../classes/classService";
-import { getFamilies } from "../families/familyService";
-import { getFeesByClass } from "../fees/feesService";
-import { getPaymentsByStudent } from "../fees/paymentService";
-import { getStudentFeeOverrides } from "../students/studentFeeOverrideService";
-import { getPreviousBalanceAmount } from "../previous_balance/Previousbalanceservice";
+import { getAllStudents } from "../../services/students/studentService";
+import { getClasses } from "../../services/class/classService";
+import { getFamilies } from "../../services/families/familyService";
+import { getFeesByClass } from "../../services/fees/feesService";
+import { getPaymentsByStudent } from "../../services/payment-history/paymentService";
+import { getStudentFeeOverrides } from "../../services/students/studentFeeOverrideService";
+import { getPreviousBalanceAmount } from "../../services/previous_balance/Previousbalanceservice";
 import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS } from "../../config/permissions";
 import { STORAGE_KEYS } from "../../constants";

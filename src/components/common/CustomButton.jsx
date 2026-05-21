@@ -8,6 +8,7 @@ const CustomButton = ({
   otherClass = "",
   variant = "primary",
   loadingText = "Processing...",
+  ...props
 }) => {
   const isDisabled = disabled || loading;
 
@@ -17,6 +18,7 @@ const CustomButton = ({
       onClick={onClick}
       disabled={isDisabled}
       className={`btn-${variant} ${otherClass} ${isDisabled ? "loading" : ""}`}
+      {...props}
     >
       {loading ? (
         loadingText

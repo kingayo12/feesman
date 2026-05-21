@@ -1,9 +1,4 @@
-﻿/**
- * ReceiptToolbar.jsx
- * Complete export action bar for receipt modals.
- */
-
-import {
+﻿import {
   HiX,
   HiPrinter,
   HiShare,
@@ -39,17 +34,32 @@ export default function ReceiptToolbar({
         <span className='rtb-title'>{title}</span>
 
         <div className='rtb-actions'>
-          <button className='rtb-btn rtb-pdf' onClick={exportPDF} disabled={exporting} title='Download PDF'>
+          <button
+            className='rtb-btn rtb-pdf'
+            onClick={exportPDF}
+            disabled={exporting}
+            title='Download PDF'
+          >
             {exporting ? <Spinner /> : <HiDownload />}
             <span>PDF</span>
           </button>
 
-          <button className='rtb-btn rtb-img' onClick={exportImage} disabled={exporting} title='Download as image'>
+          <button
+            className='rtb-btn rtb-img'
+            onClick={exportImage}
+            disabled={exporting}
+            title='Download as image'
+          >
             {exporting ? <Spinner /> : <HiPhotograph />}
             <span>Image</span>
           </button>
 
-          <button className='rtb-btn rtb-wa' onClick={shareWhatsApp} disabled={exporting} title='Share on WhatsApp'>
+          <button
+            className='rtb-btn rtb-wa'
+            onClick={shareWhatsApp}
+            disabled={exporting}
+            title='Share on WhatsApp'
+          >
             {exporting ? <Spinner /> : <WhatsAppIcon />}
             <span>WhatsApp</span>
           </button>
@@ -64,7 +74,12 @@ export default function ReceiptToolbar({
             <span>{canShare ? "Share" : "Copy"}</span>
           </button>
 
-          <button className='rtb-btn rtb-print' onClick={() => window.print()} disabled={exporting} title='Print / Save as PDF'>
+          <button
+            className='rtb-btn rtb-print'
+            onClick={() => window.print()}
+            disabled={exporting}
+            title='Print / Save as PDF'
+          >
             <HiPrinter />
             <span>Print</span>
           </button>

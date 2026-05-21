@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
-import { getClasses } from "../classes/classService";
-import { getAllStudents } from "../students/studentService";
-import { getEnrollmentsByFilter } from "../students/enrollmentService";
+import { getClasses } from "../../services/class/classService";
+import { getAllStudents } from "../../services/students/studentService";
+import { getEnrollmentsByFilter } from "../../services/students/enrollmentService";
 import { useSettings } from "../../hooks/Usesettings";
 import { calculateStudentBalance } from "../../hooks/Usestudentbalance";
 import { useRole } from "../../hooks/useRole";
@@ -40,9 +40,9 @@ import {
   Filler,
 } from "chart.js";
 import { Bar, Doughnut, Pie, Radar } from "react-chartjs-2";
-import { MetricCard, Bone } from "./DashboardWidgets";
+import { MetricCard, Bone } from "../dashboard/DashboardWidgets";
 import { InlineBar, Donut, MilestoneTracker, InsightCard } from "./ReportComponents";
-import { getTodayPayments } from "./dashboardService";
+import { getTodayPayments } from "../../services/dashboard/dashboardService";
 
 ChartJS.register(
   CategoryScale,

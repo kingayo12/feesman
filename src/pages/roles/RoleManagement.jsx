@@ -14,7 +14,7 @@ import {
   seedDefaultRoles,
   subscribeToRoles,
   subscribeToUsers,
-} from "./userService";
+} from "../../services/roles/userService";
 import { useRole } from "../../hooks/useRole";
 import { useAuth } from "../../context/AuthContext";
 import {

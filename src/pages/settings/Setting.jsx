@@ -1,14 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
-import { getSettings, updateSettings } from "./settingService";
+import { getSettings, updateSettings } from "../../services/settings/settingService";
 import { useAuth } from "../../context/AuthContext";
 import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS } from "../../config/permissions";
 import { Bone } from "../../components/common/Skeleton";
 import { collection, getDocs, deleteDoc, writeBatch, doc } from "firebase/firestore";
 import { db } from "../../firebase/firestore";
-import { getAllStudents } from "../students/studentService";
-import { getFamilies } from "../families/familyService";
-import { getClasses } from "../classes/classService";
+import { getAllStudents } from "../../services/students/studentService";
+import { getFamilies } from "../../services/families/familyService";
+import { getClasses } from "../../services/class/classService";
 import {
   HiOfficeBuilding,
   HiCalendar,

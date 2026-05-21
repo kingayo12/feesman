@@ -1,19 +1,16 @@
 import { useState } from "react";
-import { createClass } from "../../pages/classes/classService";
-import { HiPresentationChartBar, HiCollection, HiCalendar, HiPlus } from "react-icons/hi";
+import { HiCalendar, HiCollection, HiPresentationChartBar } from "react-icons/hi";
+import { createClass } from "../../services/class/classService";
 import CustomInput from "../common/Input";
 import CustomSelect from "../common/SelectInput";
-import CustomButton from "../common/CustomButton";
 
-export default function ClassForm({ onSuccess }) {
+export default function ClassForm({ onSuccess, formId = "class-form", onSubmittingChange }) {
   const [form, setForm] = useState({
     name: "",
     section: "",
     session: "",
     term: "1st Term", // ✅ FIXED: was "Second Term" — now matches settings/payments convention
   });
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const detectSection = (className) => {
     const name = className.toLowerCase();
@@ -47,7 +44,7 @@ export default function ClassForm({ onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    onSubmittingChange?.(true);
     try {
       await createClass(form);
       setForm({ name: "", section: "", session: "", term: "1st Term" });
@@ -55,86 +52,61 @@ export default function ClassForm({ onSuccess }) {
     } catch (error) {
       console.error("Error creating class:", error);
     } finally {
-      setIsSubmitting(false);
+      onSubmittingChange?.(false);
     }
   };
 
   return (
-    <div>
-      <div className='form-header'>
-        <p>Define a class, academic session and current term.</p>
+    <form id={formId} className='modern-form' onSubmit={handleSubmit}>
+      <div className='form-grid'>
+        <CustomInput
+          name='name'
+          value={form.name}
+          placeholder='e.g. Primary 3A'
+          onChange={handleChange}
+          labelName='Class Name'
+          icon={<HiPresentationChartBar />}
+          variant='default'
+          required={true}
+        />
+
+        <CustomInput
+          name='section'
+          value={form.section || "Auto-detected"}
+          placeholder='e.g. Primary 3A'
+          onChange={handleChange}
+          labelName='Academic Section'
+          icon={<HiCollection />}
+          variant='default'
+          required={true}
+          disabled={true}
+          hint='Detected from class name'
+        />
+
+        <CustomSelect
+          name='session'
+          value={form.session}
+          onChange={handleChange}
+          options={generateSessions()}
+          icon={<HiCalendar />}
+          labelName='Academic Year'
+          placeholder='Select Year'
+          variant='default'
+          required={true}
+        />
+
+        <CustomSelect
+          name='term'
+          value={form.term}
+          onChange={handleChange}
+          options={["1st Term", "2nd Term", "3rd Term"]}
+          icon={<HiCalendar />}
+          labelName='Current Term'
+          placeholder='Select term'
+          variant='default'
+          required={true}
+        />
       </div>
-
-      <form className='modern-form' onSubmit={handleSubmit}>
-        <div className='form-grid'>
-          <CustomInput
-            name='name'
-            value={form.name}
-            placeholder='e.g. Primary 3A'
-            onChange={handleChange}
-            labelName='Class Name'
-            icon=<HiPresentationChartBar />
-            variant='default'
-            required={true}
-          />
-
-          <CustomInput
-            name='name'
-            value={form.section || "Auto-detected"}
-            placeholder='e.g. Primary 3A'
-            onChange={handleChange}
-            labelName='Academic Section'
-            icon=<HiCollection />
-            variant='default'
-            required={true}
-            disabled={true}
-            hint='Detected from class name'
-          />
-
-          <CustomSelect
-            name='session'
-            value={form.session}
-            onChange={handleChange}
-            options={generateSessions()}
-            icon=<HiCalendar />
-            labelName='Academic Year'
-            placeholder=' Select Year'
-            variant='default'
-            required={true}
-          />
-
-          <CustomSelect
-            name='term'
-            value={form.term}
-            onChange={handleChange}
-            options={["1st Term", "2nd Term", "3rd Term"]}
-            icon=<HiCalendar />
-            labelName='Current Term'
-            placeholder=' Select Year'
-            variant='default'
-            required={true}
-          />
-        </div>
-
-        <CustomButton
-          type='submit'
-          variant='primary'
-          otherClass='submit-btn'
-          loading={isSubmitting}
-          icon={<HiPlus />}
-        >
-          Create Class Record
-        </CustomButton>
-        {/* <button type='submit' className='submit-btn' disabled={isSubmitting}>
-          {isSubmitting ? (
-            "Processing..."
-          ) : (
-            <>
-              <HiPlus /> Create Class Record
-            </>
-          )}
-        </button> */}
-      </form>
-    </div>
+    </form>
   );
 }

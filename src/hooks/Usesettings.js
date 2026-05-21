@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { getSettings } from "../pages/settings/settingService";
+import { getSettings } from "../services/settings/settingService";
 
 /**
  * Shared hook for school settings.

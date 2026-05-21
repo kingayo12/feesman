@@ -1,20 +1,27 @@
 import { useEffect, useState } from "react";
-import { createFamily, updateFamily } from "../../pages/families/familyService";
-import { HiUserGroup, HiPhone, HiMail, HiLocationMarker, HiPlus, HiPencil } from "react-icons/hi";
-import CustomInput from "../common/Input";
-import CustomButton from "../common/CustomButton";
+import { HiLocationMarker, HiMail, HiPhone, HiUser, HiUserGroup } from "react-icons/hi";
 import useToast from "../../hooks/UseToast";
+import { createFamily, updateFamily } from "../../services/families/familyService";
+import CustomInput from "../common/Input";
 
 const EMPTY_FORM = {
   familyName: "",
+  parentName: "",
   phone: "",
+  altPhone: "",
   email: "",
   address: "",
 };
 
-export default function FamilyForm({ onSuccess, initialData, onCancel }) {
+export default function FamilyForm({
+  onSuccess,
+  initialData,
+  onCancel,
+  formId = "family-form",
+  onSubmittingChange,
+}) {
   const [form, setForm] = useState(EMPTY_FORM);
-  const [errors, setErrors] = useState({}); // ✅ THIS WAS MISSING
+  const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { showToast, ToastComponent } = useToast();
 
@@ -22,7 +29,9 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
     if (initialData) {
       setForm({
         familyName: initialData.familyName || "",
+        parentName: initialData.parentName || initialData.headName || "",
         phone: initialData.phone || "",
+        altPhone: initialData.altPhone || "",
         email: initialData.email || "",
         address: initialData.address || "",
       });
@@ -43,10 +52,18 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
       newErrors.familyName = "Family name is required";
     }
 
+    if (!form.parentName.trim()) {
+      newErrors.parentName = "Parent/Guardian name is required";
+    }
+
     if (!form.phone.trim()) {
       newErrors.phone = "Phone number is required";
     } else if (!/^\d{10,15}$/.test(form.phone.replace(/\s/g, ""))) {
       newErrors.phone = "Invalid phone number";
+    }
+
+    if (form.altPhone.trim() && !/^\d{10,15}$/.test(form.altPhone.replace(/\s/g, ""))) {
+      newErrors.altPhone = "Invalid alternate phone number";
     }
 
     if (!form.email.trim()) {
@@ -60,7 +77,6 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
     }
 
     setErrors(newErrors);
-
     return Object.keys(newErrors).length === 0;
   };
 
@@ -72,11 +88,14 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
     if (!isValid) return;
 
     setIsSubmitting(true);
+    onSubmittingChange?.(true);
 
     try {
       const submissionData = {
         ...form,
         familyName: form.familyName.trim(),
+        parentName: form.parentName.trim(),
+        altPhone: form.altPhone.trim(),
         email: form.email.trim().toLowerCase(),
       };
 
@@ -94,18 +113,14 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
       alert("Failed to save family details. Please try again.");
     } finally {
       setIsSubmitting(false);
+      onSubmittingChange?.(false);
     }
   };
 
   return (
-    <div className=''>
+    <>
       <ToastComponent />
-      <div className='form-header'>
-        {/* <h3>{initialData ? "Edit Family Profile" : "Register New Family"}</h3> */}
-        <p>Fill in the details below to update the system records.</p>
-      </div>
-
-      <form className='modern-form' onSubmit={handleSubmit}>
+      <form id={formId} className='modern-form' onSubmit={handleSubmit}>
         <div className='form-grid'>
           <CustomInput
             name='familyName'
@@ -114,10 +129,21 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
             onChange={handleChange}
             labelName='Family Name'
             icon={<HiUserGroup />}
-            variant='default'
-            required={true}
+            required
             autoComplete='off'
-            error={errors.familyName} // ✅ Wire up error display
+            error={errors.familyName}
+          />
+
+          <CustomInput
+            name='parentName'
+            value={form.parentName}
+            placeholder='e.g. Mr. Olalekan Adewumi'
+            onChange={handleChange}
+            labelName='Parent / Guardian Name'
+            icon={<HiUser />}
+            required
+            autoComplete='off'
+            error={errors.parentName}
           />
 
           <CustomInput
@@ -125,25 +151,35 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
             value={form.phone}
             placeholder='e.g. 0800 000 0000'
             onChange={handleChange}
-            labelName='Phone Number'
+            labelName='Primary Phone Number'
             icon={<HiPhone />}
-            variant='default'
-            required={true}
+            required
             autoComplete='off'
-            error={errors.phone} // ✅ Wire up error display
+            error={errors.phone}
+          />
+
+          <CustomInput
+            name='altPhone'
+            value={form.altPhone}
+            placeholder='e.g. 0800 000 0001'
+            onChange={handleChange}
+            labelName='Alternate Phone'
+            icon={<HiPhone />}
+            autoComplete='off'
+            error={errors.altPhone}
           />
 
           <CustomInput
             name='email'
+            type='email'
             value={form.email}
-            placeholder='family@example.com'
+            placeholder='e.g. family@example.com'
             onChange={handleChange}
             labelName='Email Address'
             icon={<HiMail />}
-            variant='default'
-            required={true}
+            required
             autoComplete='off'
-            error={errors.email} // ✅ Wire up error display
+            error={errors.email}
           />
 
           <CustomInput
@@ -153,39 +189,12 @@ export default function FamilyForm({ onSuccess, initialData, onCancel }) {
             onChange={handleChange}
             labelName='Residential Address'
             icon={<HiLocationMarker />}
-            variant='default'
-            required={true}
+            required
             autoComplete='off'
-            error={errors.address} // ✅ Wire up error display
+            error={errors.address}
           />
         </div>
-
-        <div className='form-actions'>
-          <CustomButton
-            type='submit'
-            loading={isSubmitting}
-            loadingText='Saving...'
-            otherClass='submit-btn'
-            icon={initialData ? <HiPencil /> : <HiPlus />}
-          >
-            {initialData ? "Update Family" : "Add Family Profile"}
-          </CustomButton>
-
-          {(initialData || form.familyName) && (
-            <CustomButton
-              type='button'
-              variant='cancel'
-              onClick={() => {
-                setForm(EMPTY_FORM);
-                setErrors({});
-                if (onCancel) onCancel();
-              }}
-            >
-              Cancel
-            </CustomButton>
-          )}
-        </div>
       </form>
-    </div>
+    </>
   );
 }

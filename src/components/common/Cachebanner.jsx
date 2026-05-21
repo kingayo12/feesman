@@ -1,9 +1,4 @@
-﻿/**
- * CacheBanner.jsx
- * Shows a consent banner on first visit and an update-ready toast.
- */
-
-export default function CacheBanner({
+﻿export default function CacheBanner({
   showBanner,
   updateReady,
   acceptCache,

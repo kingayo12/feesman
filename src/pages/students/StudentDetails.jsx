@@ -1,47 +1,50 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { getStudentById, getStudentsByFamily } from "./studentService";
-import { getFeesByClass } from "../fees/feesService";
-import { getPaymentsByStudent, recordPayment } from "../fees/paymentService";
-import { getClasses } from "../classes/classService";
-import { getCurrentEnrollment } from "./enrollmentService";
+import {
+  HiArrowLeft,
+  HiCalendar,
+  HiCheckCircle,
+  HiClock,
+  HiCreditCard,
+  HiCurrencyDollar,
+  HiDocumentText,
+  HiExclamationCircle,
+  HiMinusCircle,
+  HiReceiptTax,
+  HiTag,
+  HiUserCircle,
+} from "react-icons/hi";
+import { HiArchiveBox } from "react-icons/hi2";
+import { useNavigate, useParams } from "react-router-dom";
+import CustomButton from "../../components/common/CustomButton";
+import { FormModal } from "../../components/common/Modal";
+import { StudentDetailsSkeleton } from "../../components/common/Skeleton";
 import PaymentForm from "../../components/forms/PaymentForm";
-import StudentReceipt from "./StudentReciept";
-import { formatDate } from "../../utils/helpers";
-import { getSettings } from "../settings/settingService";
-import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS } from "../../config/permissions";
+import { useRole } from "../../hooks/useRole";
+import { getClasses } from "../../services/class/classService";
+import {
+  computeStudentDiscount,
+  getActiveDiscounts,
+  getAssignmentsForFamily,
+  getAssignmentsForStudent,
+} from "../../services/discount/Discountservice";
+import { getFeesByClass } from "../../services/fees/feesService";
+import {
+  getStudentAssignments,
+  markAssignmentPaid,
+} from "../../services/inventory/inventoryService";
+import { getPaymentsByStudent, recordPayment } from "../../services/payment-history/paymentService";
+import { getPreviousBalance } from "../../services/previous_balance/Previousbalanceservice";
+import { getSettings } from "../../services/settings/settingService";
+import { getCurrentEnrollment } from "../../services/students/enrollmentService";
 import {
   disableStudentFee,
   enableStudentFee,
   getStudentFeeOverrides,
-} from "./studentFeeOverrideService";
-import { getPreviousBalance } from "../previous_balance/Previousbalanceservice";
-import {
-  getActiveDiscounts,
-  getAssignmentsForFamily,
-  getAssignmentsForStudent,
-  computeStudentDiscount,
-} from "../discount/Discountservice";
-import { StudentDetailsSkeleton } from "../../components/common/Skeleton";
-import {
-  HiArrowLeft,
-  HiCurrencyDollar,
-  HiCreditCard,
-  HiReceiptTax,
-  HiCalendar,
-  HiUserCircle,
-  HiClock,
-  HiCheckCircle,
-  HiMinusCircle,
-  HiExclamationCircle,
-  HiTag,
-  HiDocumentText,
-} from "react-icons/hi";
-import { HiArchiveBox } from "react-icons/hi2";
-import CustomButton from "../../components/common/CustomButton";
-import { FormModal } from "../../components/common/Modal";
-import { getStudentAssignments, markAssignmentPaid } from "../inventory/inventoryService";
+} from "../../services/students/studentFeeOverrideService";
+import { getStudentById, getStudentsByFamily } from "../../services/students/studentService";
+import { formatDate } from "../../utils/helpers";
+import StudentReceipt from "./StudentReciept";
 
 // ─── Inventory payment form — rendered inside FormModal ───────────────────
 function InventoryPaymentForm({ assignment, student, session, onClose, onSuccess }) {
@@ -226,6 +229,7 @@ export default function StudentDetails() {
   const [payments, setPayments] = useState([]);
   const [classes, setClasses] = useState([]);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [inventoryPaySaving, setInventoryPaySaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [overrides, setOverrides] = useState([]);
   const [settings, setSettings] = useState({ academicYear: "", currentTerm: "" });
@@ -286,7 +290,8 @@ export default function StudentDetails() {
       if (existing) await enableStudentFee(existing.id);
       else await disableStudentFee(id, feeId);
       await refreshOverrides();
-    } catch (e) {
+    } catch (err) {
+      console.error("Failed to update fee status.", err);
       alert("Failed to update fee status.");
     }
   };
@@ -963,6 +968,7 @@ export default function StudentDetails() {
           allPayments={payments}
           prevBalance={prevBalance}
           discountBreakdown={discountData.breakdown}
+          inventoryAssignments={termInventory}
           onClose={() => setReceiptPayment(null)}
         />
       )}
@@ -974,8 +980,29 @@ export default function StudentDetails() {
           subtitle={`${inventoryPayModal.itemName} · ${inventoryPayModal.quantity} ${inventoryPayModal.unit}`}
           onClose={() => setInventoryPayModal(null)}
           maxWidth='420px'
+          footer={
+            <>
+              <button
+                type='button'
+                className='btn btn-secondary'
+                onClick={() => setInventoryPayModal(null)}
+                disabled={inventoryPaySaving}
+              >
+                Cancel
+              </button>
+              <button
+                type='submit'
+                form='inventory-payment-form'
+                className='btn btn-primary'
+                disabled={inventoryPaySaving}
+              >
+                {inventoryPaySaving ? "Saving…" : "Record Payment"}
+              </button>
+            </>
+          }
         >
           <InventoryPaymentForm
+            formId='inventory-payment-form'
             assignment={inventoryPayModal}
             student={student}
             session={session}
@@ -985,6 +1012,7 @@ export default function StudentDetails() {
               loadInventory();
               loadPayments();
             }}
+            onSubmittingChange={setInventoryPaySaving}
           />
         </FormModal>
       )}

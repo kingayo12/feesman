@@ -4,6 +4,7 @@
  */
 
 import { useRef } from "react";
+import { formatDate } from "../../utils/helpers";
 import Logo from "../../assets/logo.png";
 import ReceiptToolbar from "../../components/common/ReceiptToolbar";
 import { useReceiptExport } from "../../hooks/UseReceipt";
@@ -16,6 +17,7 @@ export default function FamilyReceipt({
   feesByStudent, // { studentId: termFee + prevBal (pre-discount total) }
   prevByStudent = {}, // { studentId: prevBalanceAmount }
   discountByStudent = {}, // { studentId: totalDiscountAmount }
+  inventoryAssignments = [],
   onClose,
 }) {
   const receiptRef = useRef(null);
@@ -32,27 +34,25 @@ export default function FamilyReceipt({
   const netByStudent = (id) => Math.max((feesByStudent[id] || 0) - (discountByStudent[id] || 0), 0);
 
   const totalFees = students.reduce((s, st) => s + netByStudent(st.id), 0);
+  const totalInventory = inventoryAssignments.reduce(
+    (sum, assignment) => sum + Number(assignment.totalAmount || 0),
+    0,
+  );
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
   const totalArrears = students.reduce((s, st) => s + (prevByStudent[st.id] || 0), 0);
   const totalDiscount = students.reduce((s, st) => s + (discountByStudent[st.id] || 0), 0);
-  const balance = totalFees - totalPaid;
+  const balance = totalFees + totalInventory - totalPaid;
+  const totalBilled = totalFees + totalInventory;
   const isPaid = balance <= 0;
 
-  const refNo = `FAM-${family.id?.slice(0, 6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
   const today = new Date().toLocaleDateString("en-NG", {
     day: "2-digit",
     month: "long",
     year: "numeric",
   });
-
-  const fmtDate = (d) =>
-    d
-      ? (d.toDate ? d.toDate() : new Date(d)).toLocaleDateString("en-NG", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      : "—";
+  const refNo = `FAM-${family.id?.slice(0, 6).toUpperCase()}-${
+    (settings?.currentTerm || "").replace(/\s+/g, "").toUpperCase() || "TERM"
+  }`;
 
   const hasDiscounts = totalDiscount > 0;
   const hasArrears = totalArrears > 0;
@@ -149,12 +149,16 @@ export default function FamilyReceipt({
                     <span>₦{totalDiscount.toLocaleString()}</span>
                   </div>
                 )}
-                {(hasArrears || hasDiscounts) && (
-                  <div className='fr-sr fr-sr-net'>
-                    <span>Net amount due</span>
-                    <span>₦{totalFees.toLocaleString()}</span>
+                {totalInventory > 0 && (
+                  <div className='fr-sr fr-inventory-row'>
+                    <span>Inventory total</span>
+                    <span>₦{totalInventory.toLocaleString()}</span>
                   </div>
                 )}
+                <div className='fr-sr fr-sr-net'>
+                  <span>Total billed</span>
+                  <span>₦{totalBilled.toLocaleString()}</span>
+                </div>
                 <div className='fr-sr g'>
                   <span>Total paid</span>
                   <span>₦{totalPaid.toLocaleString()}</span>
@@ -257,6 +261,55 @@ export default function FamilyReceipt({
               </tfoot>
             </table>
 
+            {inventoryAssignments.length > 0 && (
+              <>
+                <p className='fr-cap-label' style={{ marginTop: "2rem", marginBottom: "0.6rem" }}>
+                  Inventory Breakdown — {settings?.currentTerm}
+                </p>
+                <table className='fr-table fr-sm'>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Student</th>
+                      <th>Item</th>
+                      <th>Category</th>
+                      <th className='n'>Qty</th>
+                      <th className='n'>Price</th>
+                      <th className='n'>Amount</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventoryAssignments.map((assignment, index) => {
+                      const student = students.find((s) => s.id === assignment.studentId);
+                      return (
+                        <tr key={assignment.id} className={index % 2 === 0 ? "alt" : ""}>
+                          <td className='idx'>{index + 1}</td>
+                          <td>
+                            <strong>
+                              {student ? `${student.firstName} ${student.lastName}` : "—"}
+                            </strong>
+                          </td>
+                          <td>{assignment.itemName}</td>
+                          <td>{assignment.category || "—"}</td>
+                          <td className='n'>{assignment.quantity || 1}</td>
+                          <td className='n'>
+                            ₦{Number(assignment.priceSnapshot || 0).toLocaleString()}
+                          </td>
+                          <td className='n'>
+                            ₦{Number(assignment.totalAmount || 0).toLocaleString()}
+                          </td>
+                          <td className={assignment.isPaid ? "g" : "r"}>
+                            {assignment.isPaid ? "Paid" : "Pending"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </>
+            )}
+
             {/* ── Payment history ───────────────────────────────── */}
             {payments.length > 0 && (
               <>
@@ -280,7 +333,7 @@ export default function FamilyReceipt({
                         <tr key={p.id} className={i % 2 === 0 ? "alt" : ""}>
                           <td className='idx'>{i + 1}</td>
                           <td>{stu ? `${stu.firstName} ${stu.lastName}` : "—"}</td>
-                          <td>{fmtDate(p.date)}</td>
+                          <td>{formatDate(p.date)}</td>
                           <td>
                             <span className='fr-method'>{p.method}</span>
                           </td>

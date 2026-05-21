@@ -13,7 +13,10 @@
  */
 
 import { useState } from "react";
-import { migrateToEnrollments, cleanUpOldStudentFields } from "../students/migrateToEnrollments";
+import {
+  migrateToEnrollments,
+  cleanUpOldStudentFields,
+} from "../../services/students/migrateToEnrollments";
 
 export default function MigrationPage() {
   const [step1Result, setStep1Result] = useState(null);

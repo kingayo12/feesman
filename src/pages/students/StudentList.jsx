@@ -1,65 +1,40 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { getAllStudents, deleteStudentWithEnrollments } from "./studentService";
-import { getEnrollmentsByFilter } from "./enrollmentService";
-import { calculateStudentBalance } from "../../hooks/Usestudentbalance";
-import SetTermButton from "./Settermbutton";
 import {
-  HiSearch,
-  HiOutlineAcademicCap,
-  HiEye,
-  HiTrash,
-  HiPlus,
-  HiPencilAlt,
+  HiAcademicCap,
   HiChevronLeft,
   HiChevronRight,
-  HiUpload, // ← NEW
+  HiEye,
+  HiOutlineAcademicCap,
+  HiPencilAlt,
+  HiPlus,
+  HiSearch,
+  HiTrash,
+  HiUpload,
 } from "react-icons/hi";
-import { filterData } from "../../utils/helpers";
-import { useRole } from "../../hooks/useRole";
-import { PERMISSIONS } from "../../config/permissions";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import BulkEnrolmentModal from "../../components/common/BulkEnrolmentModal";
+import CustomButton from "../../components/common/CustomButton";
+import { ConfirmModal, FormModal } from "../../components/common/Modal";
+import CustomSelect from "../../components/common/SelectInput";
+import { StudentListSkeleton } from "../../components/common/Skeleton";
 import TableToolbar from "../../components/common/TableToolbar";
 import StudentForm from "../../components/forms/StudentForm";
-import { getClasses } from "../classes/classService";
-import { getFamilies } from "../families/familyService";
-import { getSettings } from "../settings/settingService";
-import { getItemAssignments, getInventoryItem } from "../inventory/inventoryService";
-import { StudentListSkeleton } from "../../components/common/Skeleton";
-import CustomButton from "../../components/common/CustomButton";
-import CustomSelect from "../../components/common/SelectInput";
-import { FormModal, ConfirmModal } from "../../components/common/Modal";
-import BulkEnrolmentModal from "../../components/common/BulkEnrolmentModal";
+import { PERMISSIONS } from "../../config/permissions";
 import { TERMS } from "../../constants";
+import { useRole } from "../../hooks/useRole";
+import { getClasses } from "../../services/class/classService";
+import { getFamilies } from "../../services/families/familyService";
+import { getInventoryItem, getItemAssignments } from "../../services/inventory/inventoryService";
+import { getSettings } from "../../services/settings/settingService";
+import { getEnrollmentsByFilter } from "../../services/students/enrollmentService";
+import {
+  deleteStudentWithEnrollments,
+  getAllStudents,
+} from "../../services/students/studentService";
+import { filterData, sortClasses } from "../../utils/helpers";
+import SetTermButton from "./Settermbutton";
 
 const ITEMS_PER_PAGE = 10;
-
-// ─── Sort helpers ──────────────────────────────────────────────────────────
-function parseClassName(name = "") {
-  const m = name.trim().match(/^(.*?)(\d+)\s*([A-Za-z]?)$/);
-  if (!m) return { prefix: name.trim(), level: Infinity, arm: "" };
-  return { prefix: m[1].trim(), level: parseInt(m[2], 10), arm: m[3].toUpperCase() };
-}
-function getGroupOrder(prefix = "") {
-  const p = prefix.toLowerCase();
-  if (p.includes("creche") || p.includes("daycare")) return 0;
-  if (p.includes("kg") || p.includes("kindergarten")) return 1;
-  if (p.includes("nursery")) return 2;
-  if (p.includes("primary")) return 3;
-  if (p.includes("jss") || p.includes("junior")) return 4;
-  if (p.includes("ss") || p.includes("senior") || p.includes("secondary")) return 5;
-  return 6;
-}
-function sortClasses(list = []) {
-  return [...list].sort((a, b) => {
-    const pa = parseClassName(a.name);
-    const pb = parseClassName(b.name);
-    const go = getGroupOrder(pa.prefix) - getGroupOrder(pb.prefix);
-    if (go !== 0) return go;
-    if (pa.prefix !== pb.prefix) return pa.prefix.localeCompare(pb.prefix);
-    if (pa.level !== pb.level) return pa.level - pb.level;
-    return pa.arm.localeCompare(pb.arm);
-  });
-}
 
 export default function StudentList() {
   const location = useLocation();
@@ -75,8 +50,7 @@ export default function StudentList() {
   const [editStudent, setEditStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
-  const [showAddStudent, setShowAddStudent] = useState(false);
-  const [showBulkUpload, setShowBulkUpload] = useState(false); // ← NEW
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -85,8 +59,25 @@ export default function StudentList() {
   const [allSessions, setAllSessions] = useState([]);
   const [itemAssignments, setItemAssignments] = useState(null);
   const [itemForAssignments, setItemForAssignments] = useState(null);
-  const [balances, setBalances] = useState({});
+  const [studentSaving, setStudentSaving] = useState(false);
   const { can } = useRole();
+
+  // ── Modal helpers ──────────────────────────────────────────────────────
+  const openAddModal = () => {
+    setEditStudent(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (student) => {
+    setEditStudent(student);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditStudent(null);
+    setStudentSaving(false);
+  };
 
   // ── Load ───────────────────────────────────────────────────────────────
   const loadAllData = async () => {
@@ -209,6 +200,7 @@ export default function StudentList() {
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
+
   const paginatedStudents = finalFilteredStudents.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
@@ -314,57 +306,60 @@ export default function StudentList() {
         {can(PERMISSIONS.CREATE_STUDENT) && (
           <>
             <CustomButton
-              onClick={() => {
-                setEditStudent(null);
-                if (showAddStudent) {
-                  setModalOpen(false);
-                  setShowAddStudent(false);
-                } else {
-                  setModalOpen(true);
-                  setShowAddStudent(true);
-                }
-              }}
-              icon={!showAddStudent && <HiPlus />}
-              variant={showAddStudent ? "cancel" : "primary"}
+              onClick={openAddModal}
+              icon={<HiPlus />}
+              variant='primary'
               otherClass='rounded-full'
             >
-              {showAddStudent ? "Cancel" : "Add Student"}
+              Add Student
             </CustomButton>
 
-            {/* ── NEW: Bulk Upload button ── */}
             <CustomButton
               onClick={() => setShowBulkUpload(true)}
               icon={<HiUpload />}
-              variant='secondary'
+              variant='outline'
+              children='Bulk Upload'
               otherClass='rounded-full'
-            >
-              Bulk Upload
-            </CustomButton>
+            />
           </>
         )}
       </div>
 
+      {/* ── Student modal ── */}
       {modalOpen && (
         <FormModal
           title={editStudent ? "Edit Student" : "Add Student"}
-          onClose={() => {
-            setModalOpen(false);
-            setEditStudent(null);
-            setShowAddStudent(false);
-          }}
+          subtitle={
+            editStudent
+              ? "Update student information"
+              : "Fill in the details below to enrol a new student"
+          }
+          onClose={closeModal}
+          footer={
+            <>
+              <CustomButton type='button' variant='cancel' onClick={closeModal}>
+                Cancel
+              </CustomButton>
+              <CustomButton
+                type='submit'
+                form='student-form'
+                loading={studentSaving}
+                loadingText='Saving...'
+                icon={<HiAcademicCap />}
+                otherClass='submit-btn'
+              >
+                {editStudent ? "Update Student" : "Add Student"}
+              </CustomButton>
+            </>
+          }
         >
           <StudentForm
+            formId='student-form'
             initialData={editStudent}
+            onSubmittingChange={setStudentSaving}
             onSuccess={async () => {
               await loadAllData();
-              setModalOpen(false);
-              setEditStudent(null);
-              setShowAddStudent(false);
-            }}
-            onCancel={() => {
-              setModalOpen(false);
-              setEditStudent(null);
-              setShowAddStudent(false);
+              closeModal();
             }}
           />
         </FormModal>
@@ -546,10 +541,7 @@ export default function StudentList() {
                     {can(PERMISSIONS.EDIT_STUDENT) && (
                       <button
                         className='edit-btn'
-                        onClick={() => {
-                          setEditStudent(student);
-                          setModalOpen(true);
-                        }}
+                        onClick={() => openEditModal(student)}
                         title='Edit Student'
                       >
                         <HiPencilAlt />
@@ -678,7 +670,6 @@ export default function StudentList() {
         </FormModal>
       )}
 
-      {/* ── NEW: Bulk enrolment modal ── */}
       {showBulkUpload && (
         <BulkEnrolmentModal
           classes={classes}

@@ -15,10 +15,10 @@ import {
   removeAssignment,
   getAllAssignmentsForSession,
   getActiveDiscounts,
-} from "./Discountservice";
-import { getFamilies } from "../families/familyService";
-import { getAllStudents } from "../students/studentService";
-import { getSettings } from "../settings/settingService";
+} from "../../services/discount/Discountservice";
+import { getFamilies } from "../../services/families/familyService";
+import { getAllStudents } from "../../services/students/studentService";
+import { getSettings } from "../../services/settings/settingService";
 import { useRole } from "../../hooks/useRole";
 import { PERMISSIONS } from "../../config/permissions";
 import {

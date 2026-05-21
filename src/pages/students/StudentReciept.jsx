@@ -1,17 +1,18 @@
+import { formatDate } from "@/utils/helpers";
 import { useRef } from "react";
 import Logo from "../../assets/logo.png";
 import ReceiptToolbar from "../../components/common/ReceiptToolbar";
 import { useReceiptExport } from "../../hooks/UseReceipt";
-import { fmt } from "../../constants";
 
 export default function StudentReceipt({
   payment,
   student,
   settings,
-  fees = [], // This will now contain either school fees or inventory items
+  fees = [], // school fees line items
   allPayments = [],
   prevBalance = 0,
   discountBreakdown = [],
+  inventoryAssignments = [],
   onClose,
 }) {
   const receiptRef = useRef(null);
@@ -32,8 +33,8 @@ export default function StudentReceipt({
 
   // ── Calculations ──────────────────────────────────────────────────────────
   const receiptNo = `STU-${payment?.id?.slice(0, 8).toUpperCase() || "N/A"}`;
-  const payDate = fmt(payment?.date);
-  const today = fmt(new Date());
+  const payDate = formatDate(payment?.date);
+  const today = formatDate(new Date());
 
   // Filter and sort payments for this term to calculate "Paid so Far"
   const termPayments = allPayments.filter((p) => p.term === payment?.term);
@@ -43,15 +44,21 @@ export default function StudentReceipt({
   const paidSoFar = sorted.slice(0, currentIdx + 1).reduce((s, p) => s + Number(p.amount || 0), 0);
 
   const currentTermFees = fees.reduce((s, f) => s + Number(f.amount || 0), 0);
-  const totalDiscount = isInventory
-    ? 0
-    : discountBreakdown.reduce((s, b) => s + Number(b.amount || 0), 0);
+  const inventoryTotal = inventoryAssignments.reduce((s, a) => s + Number(a.totalAmount || 0), 0);
+  const totalDiscount = discountBreakdown.reduce((s, b) => s + Number(b.amount || 0), 0);
 
-  const termTotal = Math.max(currentTermFees + Number(prevBalance || 0) - totalDiscount, 0);
+  const termTotal = Math.max(
+    currentTermFees + inventoryTotal + Number(prevBalance || 0) - totalDiscount,
+    0,
+  );
   const balance = Math.max(termTotal - paidSoFar, 0);
   const isPaid = balance <= 0;
 
-  const hasBreakdown = fees.length > 0 || prevBalance > 0 || discountBreakdown.length > 0;
+  const hasBreakdown =
+    fees.length > 0 ||
+    prevBalance > 0 ||
+    discountBreakdown.length > 0 ||
+    inventoryAssignments.length > 0;
 
   return (
     <div className='sr-overlay'>
@@ -143,76 +150,124 @@ export default function StudentReceipt({
           {hasBreakdown && (
             <>
               <p className='sr-cap-label' style={{ marginTop: "1.5rem", marginBottom: "0.5rem" }}>
-                {isInventory ? "Purchased Items" : `Fee Breakdown — ${payment?.term}`}
+                Receipt Breakdown — {payment?.term}
               </p>
-              <table className='sr-table'>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Description</th>
-                    <th className='n'>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Previous Arrears (Only for Fees) */}
-                  {!isInventory && prevBalance > 0 && (
-                    <tr className='sr-arrears-row'>
-                      <td className='idx'>—</td>
-                      <td>
-                        <span style={{ fontWeight: 600, color: "#92400e" }}>
-                          Previous Balance (Arrears)
-                        </span>
-                      </td>
-                      <td className='n' style={{ color: "#b45309", fontWeight: 700 }}>
-                        ₦{Number(prevBalance).toLocaleString()}
-                      </td>
-                    </tr>
-                  )}
 
-                  {/* Line Items (Either Fees or Inventory Items) */}
-                  {fees.map((f, i) => (
-                    <tr key={f.id || i} className={i % 2 === 0 ? "alt" : ""}>
-                      <td className='idx'>{i + 1}</td>
-                      <td>{f.feeType || f.note || "Item"}</td>
-                      <td className='n'>₦{Number(f.amount || 0).toLocaleString()}</td>
-                    </tr>
-                  ))}
+              {fees.length > 0 && (
+                <>
+                  <p className='sr-sub-label'>Fee Items</p>
+                  <table className='sr-table'>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Description</th>
+                        <th className='n'>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {!isInventory && prevBalance > 0 && (
+                        <tr className='sr-arrears-row'>
+                          <td className='idx'>—</td>
+                          <td>
+                            <span style={{ fontWeight: 600, color: "#92400e" }}>
+                              Previous Balance (Arrears)
+                            </span>
+                          </td>
+                          <td className='n' style={{ color: "#b45309", fontWeight: 700 }}>
+                            ₦{Number(prevBalance).toLocaleString()}
+                          </td>
+                        </tr>
+                      )}
 
-                  {/* Discounts (Only for Fees) */}
-                  {!isInventory &&
-                    discountBreakdown.map((b) => (
-                      <tr key={b.discountId} className='sr-discount-row'>
-                        <td className='idx'>—</td>
-                        <td>
-                          <span style={{ fontWeight: 600, color: "#166534" }}>
-                            {b.discountName}
-                          </span>
+                      {fees.map((f, i) => (
+                        <tr key={f.id || i} className={i % 2 === 0 ? "alt" : ""}>
+                          <td className='idx'>{i + 1}</td>
+                          <td>{f.feeType || f.note || "Item"}</td>
+                          <td className='n'>₦{Number(f.amount || 0).toLocaleString()}</td>
+                        </tr>
+                      ))}
+
+                      {!isInventory &&
+                        discountBreakdown.map((b) => (
+                          <tr key={b.discountId} className='sr-discount-row'>
+                            <td className='idx'>—</td>
+                            <td>
+                              <span style={{ fontWeight: 600, color: "#166534" }}>
+                                {b.discountName}
+                              </span>
+                            </td>
+                            <td className='n' style={{ color: "#16a34a", fontWeight: 700 }}>
+                              −₦{Number(b.amount || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className='tf'>
+                        <td colSpan='2'>
+                          <strong>Fee Subtotal</strong>
                         </td>
-                        <td className='n' style={{ color: "#16a34a", fontWeight: 700 }}>
-                          −₦{Number(b.amount || 0).toLocaleString()}
+                        <td className='n'>
+                          <strong>₦{currentTermFees.toLocaleString()}</strong>
                         </td>
                       </tr>
-                    ))}
-                </tbody>
-                <tfoot>
-                  <tr className='tf'>
-                    <td colSpan='2'>
-                      <strong>Net Total</strong>
-                    </td>
-                    <td className='n'>
-                      <strong>₦{termTotal.toLocaleString()}</strong>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                    </tfoot>
+                  </table>
+                </>
+              )}
+
+              {inventoryAssignments.length > 0 && (
+                <>
+                  <p className='sr-sub-label'>Inventory Assigned</p>
+                  <table className='sr-table'>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th className='n'>Unit Price</th>
+                        <th className='n'>Amount</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {inventoryAssignments.map((a, i) => (
+                        <tr key={a.id || i} className={i % 2 === 0 ? "alt" : ""}>
+                          <td className='idx'>{i + 1}</td>
+                          <td>{a.itemName}</td>
+                          <td className='n'>{a.quantity || 1}</td>
+                          <td className='n'>₦{Number(a.priceSnapshot || 0).toLocaleString()}</td>
+                          <td className='n'>₦{Number(a.totalAmount || 0).toLocaleString()}</td>
+                          <td className={a.isPaid ? "g" : "r"}>{a.isPaid ? "Paid" : "Pending"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className='tf'>
+                        <td colSpan='4'>
+                          <strong>Inventory Total</strong>
+                        </td>
+                        <td className='n'>
+                          <strong>₦{inventoryTotal.toLocaleString()}</strong>
+                        </td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </>
+              )}
             </>
           )}
 
           {/* ── Summary ────────────────────────────────────────── */}
           <div className='sr-summary'>
             <div className='sr-srow'>
-              <span>{isInventory ? "Items Total" : "Term Fees"}</span>
+              <span>Fee Total</span>
               <span>₦{currentTermFees.toLocaleString()}</span>
+            </div>
+            <div className='sr-srow'>
+              <span>Inventory Total</span>
+              <span>₦{inventoryTotal.toLocaleString()}</span>
             </div>
             {!isInventory && prevBalance > 0 && (
               <div className='sr-srow' style={{ color: "#b45309" }}>
@@ -220,13 +275,21 @@ export default function StudentReceipt({
                 <span>₦{Number(prevBalance).toLocaleString()}</span>
               </div>
             )}
-            {!isInventory && totalDiscount > 0 && (
+            {totalDiscount > 0 && (
               <div className='sr-srow' style={{ color: "#16a34a" }}>
                 <span>− Discounts</span>
                 <span>₦{totalDiscount.toLocaleString()}</span>
               </div>
             )}
             <div className='sr-sdiv' />
+            <div className='sr-srow'>
+              <span>
+                <strong>Total Billed</strong>
+              </span>
+              <span>
+                <strong>₦{termTotal.toLocaleString()}</strong>
+              </span>
+            </div>
             <div className='sr-srow g'>
               <span>
                 <strong>This Payment</strong>

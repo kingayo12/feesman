@@ -1,9 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { getClassById, getClasses } from "./classService";
-import { getAllStudents } from "../students/studentService";
-import { promoteStudents } from "../students/enrollmentService";
-import { getSettings } from "../settings/settingService";
+import { getClassById, getClasses } from "../../services/class/classService";
+import { getAllStudents } from "../../services/students/studentService";
+import { promoteStudents } from "../../services/students/enrollmentService";
+import { getSettings } from "../../services/settings/settingService";
 import { ClassDetailsSkeleton } from "../../components/common/Skeleton";
 import {
   HiCollection,
@@ -21,19 +21,6 @@ import {
   HiStar,
 } from "react-icons/hi";
 
-/* ─────────────────────────────────────────────────────────────
-   HELPERS
-───────────────────────────────────────────────────────────── */
-
-/**
- * Given a class name like "Primary 1A" or "JSS 2B", extract the
- * numeric level and the arm letter so we can suggest the next class.
- *
- * Returns { level: number|null, arm: string, prefix: string }
- * e.g. "Primary 1A" → { prefix: "Primary", level: 1, arm: "A" }
- *      "JSS 2B"     → { prefix: "JSS",     level: 2, arm: "B" }
- *      "Nursery 1"  → { prefix: "Nursery",  level: 1, arm: ""  }
- */
 function parseClassName(name = "") {
   const trimmed = name.trim();
   // Match: <word(s)> <digit(s)> <optional arm letter>

@@ -1,46 +1,41 @@
+import "datatables.net";
+import $ from "jquery";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getCacheItem, setCacheItem, SETTINGS_CACHE_KEY } from "../../utils/cache";
-import { getFamilies, deleteFamily } from "./familyService";
+import { createRoot } from "react-dom/client";
+import { HiEye, HiFilter, HiOutlineUsers, HiPencilAlt, HiSearch, HiTrash } from "react-icons/hi";
+import { useNavigate } from "react-router-dom";
 import CustomButton from "../../components/common/CustomButton";
-import { filterData } from "../../utils/helpers";
+import { ConfirmModal, FormModal } from "../../components/common/Modal";
 import CustomSelect from "../../components/common/SelectInput";
-import { computeStudentDiscount } from "../discount/Discountservice";
-import { getSettings } from "../settings/settingService";
-import FamilyForm from "../../components/forms/FamilyForm";
 import { FamilyListSkeleton } from "../../components/common/Skeleton";
-import { useRole } from "../../hooks/useRole";
+import TableToolbar from "../../components/common/TableToolbar";
+import FamilyForm from "../../components/forms/FamilyForm";
 import { PERMISSIONS } from "../../config/permissions";
+import { useRole } from "../../hooks/useRole";
+import { computeStudentDiscount } from "../../services/discount/Discountservice";
+import { deleteFamily, getFamilies } from "../../services/families/familyService";
+import { getSettings } from "../../services/settings/settingService";
+import { getCacheItem, setCacheItem, SETTINGS_CACHE_KEY } from "../../utils/cache";
+import { filterData } from "../../utils/helpers";
 import {
-  preCacheFamilyData,
-  getCachedStudentsByFamily,
-  getCachedPaymentsByFamily,
-  getCachedFeesByClass,
-  getCachedDiscounts,
-  getCachedStudentFeeOverrides,
-  getCachedPreviousBalanceAmount,
+  clearMemoryCache,
   getCachedAssignmentsForFamily,
   getCachedAssignmentsForStudent,
-  clearMemoryCache,
+  getCachedDiscounts,
+  getCachedFeesByClass,
+  getCachedPaymentsByFamily,
+  getCachedPreviousBalanceAmount,
+  getCachedStudentFeeOverrides,
+  getCachedStudentsByFamily,
+  preCacheFamilyData,
 } from "../../utils/offlineDataManager";
-import {
-  HiOutlineUsers,
-  HiPencilAlt,
-  HiTrash,
-  HiFilter,
-  HiSearch,
-  HiArrowRight,
-} from "react-icons/hi";
-import TableToolbar from "../../components/common/TableToolbar";
-import $ from "jquery";
-import "datatables.net";
-import { ConfirmModal, FormModal } from "../../components/common/Modal";
-import { createRoot } from "react-dom/client";
 
 export default function FamilyList() {
   const [families, setFamilies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingFamily, setEditingFamily] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [formSaving, setFormSaving] = useState(false);
   const [currentTerm, setCurrentTerm] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -48,6 +43,7 @@ export default function FamilyList() {
   const [statusFilter, setStatusFilter] = useState("");
   const tableRef = useRef(null);
   const dataTableRef = useRef(null);
+  const navigate = useNavigate();
   const actionRootsRef = useRef([]);
   const { can } = useRole();
 
@@ -57,23 +53,28 @@ export default function FamilyList() {
     return d.toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" });
   };
 
+  // ── Modal helpers ─────────────────────────────────────────────────────────
+  const openAddModal = () => {
+    setEditingFamily(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (family) => {
+    setEditingFamily(family);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingFamily(null);
+    setFormSaving(false);
+  };
+
   // ── Financial calculation per family ──────────────────────────────────────
-  //
-  // getCachedStudentsByFamily(familyId, academicYear) returns students already
-  // enriched with classId/session/term from studentEnrollments — so we never
-  // read student.classId from the identity doc directly.
-  //
-  // We still pass currentTerm when picking classId so we only use the enrollment
-  // that matches the term being displayed.
-  //
   const calculateFamilyFinancials = useCallback(async (familyId, settings, activeDiscounts) => {
     const { academicYear, currentTerm } = settings;
-
     try {
-      // Returns students enriched with classId/session/term from enrollments
-      // The cache key includes academicYear so data is session-scoped
       const students = await getCachedStudentsByFamily(familyId, academicYear);
-
       if (!students?.length) {
         return { totalAmount: 0, totalPaid: 0, outstanding: 0, status: "Unpaid" };
       }
@@ -87,8 +88,6 @@ export default function FamilyList() {
 
       for (const student of students) {
         try {
-          // classId comes from the enrollment doc (already enriched by cache)
-          // Only use it if the enrollment term matches the current term
           const classId = student.classId && student.term === currentTerm ? student.classId : null;
 
           const [classFees, overrides, prevBal, stuAssignments] = await Promise.all([
@@ -116,7 +115,9 @@ export default function FamilyList() {
           });
 
           totalAssessed += Math.max(termFees + (prevBal || 0) - (totalDiscount || 0), 0);
-        } catch (studentErr) {}
+        } catch (studentErr) {
+          console.error(`Financials failed for student ${student.id}:`, studentErr);
+        }
       }
 
       const totalPaid = (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
@@ -138,18 +139,32 @@ export default function FamilyList() {
     setLoading(true);
     try {
       const cachedSettings = getCacheItem(SETTINGS_CACHE_KEY);
-      const [basicFamilyData, rawSettings] = await Promise.all([
-        getFamilies(),
-        getSettings().catch(() => cachedSettings || null),
-      ]);
+
+      let basicFamilyData = [];
+      let rawSettings = null;
+
+      try {
+        [basicFamilyData, rawSettings] = await Promise.all([getFamilies(), getSettings()]);
+      } catch (fetchErr) {
+        console.error("Error fetching families or settings:", fetchErr);
+        rawSettings = cachedSettings;
+        // If getFamilies failed, basicFamilyData stays []
+        // but we still want to stop loading, not hang
+      }
 
       const settings = rawSettings || cachedSettings;
+
       if (settings?.academicYear && settings?.currentTerm) {
         setCurrentTerm(settings.currentTerm);
         setCacheItem(SETTINGS_CACHE_KEY, {
           academicYear: settings.academicYear,
           currentTerm: settings.currentTerm,
         });
+      }
+
+      if (!basicFamilyData.length) {
+        setFamilies([]);
+        return;
       }
 
       if (!settings?.academicYear || !settings?.currentTerm) {
@@ -165,20 +180,15 @@ export default function FamilyList() {
         return;
       }
 
-      setCurrentTerm(settings.currentTerm);
-
-      // Pre-cache all family data concurrently
+      // Pre-cache all family data concurrently — failures are silent
       await Promise.allSettled(
         basicFamilyData.map((f) =>
-          preCacheFamilyData(f.id, settings.academicYear, settings.currentTerm).catch((e) => {
-            return { success: false };
-          }),
+          preCacheFamilyData(f.id, settings.academicYear, settings.currentTerm),
         ),
       );
 
-      const activeDiscounts = await getCachedDiscounts(settings.academicYear);
+      const activeDiscounts = await getCachedDiscounts(settings.academicYear).catch(() => []);
 
-      // Calculate financials for all families concurrently
       const fullData = await Promise.all(
         basicFamilyData.map(async (family) => {
           try {
@@ -196,23 +206,21 @@ export default function FamilyList() {
       setFamilies(fullData);
     } catch (err) {
       console.error("Error loading families:", err);
+      setFamilies([]);
     } finally {
       setLoading(false);
     }
   }, [calculateFamilyFinancials]);
 
+  // ── Run once on mount ─────────────────────────────────────────────────────
+  // Deliberately NOT including loadFamilies in deps to prevent re-runs.
+  // Call loadFamilies() explicitly after mutations instead.
   useEffect(() => {
     loadFamilies();
-    return () => {
-      clearMemoryCache();
-    };
-  }, [loadFamilies]);
+    return () => clearMemoryCache();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── DataTables action root cleanup ────────────────────────────────────────
-  //
-  // root.unmount() must NEVER be called synchronously during a React render
-  // cycle — defer to next macrotask via setTimeout.
-  //
   const cleanupActionRoots = () => {
     const roots = actionRootsRef.current;
     actionRootsRef.current = [];
@@ -239,7 +247,6 @@ export default function FamilyList() {
   useEffect(() => {
     if (loading || !tableRef.current) return;
 
-    // Destroy existing instance before rebuilding
     if ($.fn.DataTable.isDataTable(tableRef.current)) {
       cleanupActionRoots();
       $(tableRef.current).DataTable().destroy();
@@ -279,7 +286,6 @@ export default function FamilyList() {
 
     dataTableRef.current = dt;
 
-    // Mount React action buttons into each row's placeholder div
     const mountActionButtons = () => {
       cleanupActionRoots();
       $(tableRef.current)
@@ -294,22 +300,24 @@ export default function FamilyList() {
 
           root.render(
             <>
-              <a href={`/families/${family.id}`} className='view-btn'>
-                <HiArrowRight /> View
-              </a>
+              <button className='view-btn' onClick={() => navigate(`/families/${family.id}`)}>
+                <HiEye />
+              </button>
               {can(PERMISSIONS.EDIT_FAMILY) && (
                 <button
-                  onClick={() => {
-                    setEditingFamily(family);
-                    setModalOpen(true);
-                  }}
+                  onClick={() => openEditModal(family)}
                   className='edit-btn'
+                  title='Edit Family'
                 >
                   <HiPencilAlt />
                 </button>
               )}
               {can(PERMISSIONS.DELETE_FAMILY) && (
-                <button className='delete-btn' onClick={() => setDeleteTarget(family)}>
+                <button
+                  className='delete-btn'
+                  onClick={() => setDeleteTarget(family)}
+                  title='Delete Family'
+                >
                   <HiTrash />
                 </button>
               )}
@@ -326,8 +334,7 @@ export default function FamilyList() {
       cleanupActionRoots();
       try {
         if ($.fn.DataTable.isDataTable(tableRef.current)) dt.destroy();
-      } catch (err) {
-      }
+      } catch (err) {}
     };
   }, [families, searchQuery, statusFilter, loading, can]);
 
@@ -372,10 +379,7 @@ export default function FamilyList() {
       <div className='add_button'>
         {can(PERMISSIONS.CREATE_FAMILY) && (
           <CustomButton
-            onClick={() => {
-              setEditingFamily(null);
-              setModalOpen(true);
-            }}
+            onClick={openAddModal}
             icon={<HiOutlineUsers />}
             variant='primary'
             otherClass='rounded-full'
@@ -389,22 +393,37 @@ export default function FamilyList() {
       {modalOpen && (
         <FormModal
           title={editingFamily ? "Edit Family Profile" : "Register New Family"}
-          onClose={() => {
-            setModalOpen(false);
-            setEditingFamily(null);
-          }}
+          onClose={closeModal}
+          footer={
+            <>
+              <CustomButton
+                type='button'
+                variant='cancel'
+                onClick={closeModal}
+                disabled={formSaving}
+              >
+                Cancel
+              </CustomButton>
+              <CustomButton
+                type='submit'
+                form='family-form'
+                loading={formSaving}
+                loadingText='Saving...'
+                icon={editingFamily ? <HiPencilAlt /> : undefined}
+              >
+                {editingFamily ? "Update Family" : "Add Family Profile"}
+              </CustomButton>
+            </>
+          }
         >
           <FamilyForm
+            formId='family-form'
             initialData={editingFamily}
             onSuccess={async () => {
               await loadFamilies();
-              setModalOpen(false);
-              setEditingFamily(null);
+              closeModal();
             }}
-            onCancel={() => {
-              setModalOpen(false);
-              setEditingFamily(null);
-            }}
+            onSubmittingChange={setFormSaving}
           />
         </FormModal>
       )}
@@ -449,11 +468,6 @@ export default function FamilyList() {
 
         <TableToolbar fileName='families' headers={exportHeaders} rows={exportRows} />
 
-        {/*
-          tbody is intentionally left empty.
-          DataTables fully owns row rendering via the `data` option.
-          React only mounts action buttons into placeholder divs after each draw.
-        */}
         <table ref={tableRef} className='data-table display'>
           <thead>
             <tr>
@@ -464,13 +478,12 @@ export default function FamilyList() {
               <th>Outstanding</th>
               <th>Status</th>
               <th>Created</th>
-              <th className='align-center'>Actions</th>
+              <th className='text-center'>Actions</th>
             </tr>
           </thead>
           <tbody />
         </table>
 
-        {/* ── Delete Confirm ── */}
         {deleteTarget && (
           <ConfirmModal
             entityName={`family (${deleteTarget?.familyName})`}

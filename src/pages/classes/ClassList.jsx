@@ -1,28 +1,29 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  HiClipboardList,
+  HiCollection,
+  HiExclamationCircle,
+  HiEye,
+  HiLightningBolt,
+  HiPlus,
+  HiPlusCircle,
+  HiTrash,
+  HiUserGroup,
+  HiViewGrid,
+} from "react-icons/hi";
 import { Link } from "react-router-dom";
-import { useEffect, useState, useMemo } from "react";
-import { getClasses, deleteClass } from "./classService";
-import { getAllStudents } from "../students/studentService";
-import { getEnrollmentsByFilter } from "../students/enrollmentService";
-import { getSettings } from "../settings/settingService";
-import { useRole } from "../../hooks/useRole";
-import { PERMISSIONS } from "../../config/permissions";
-import TableToolbar from "../../components/common/TableToolbar";
-import ClassForm from "../../components/forms/ClassForm";
-import { ClassListSkeleton } from "../../components/common/Skeleton";
 import CustomButton from "../../components/common/CustomButton";
 import { FormModal } from "../../components/common/Modal";
-import {MetricCard} from "../dashboard/DashboardWidgets";
-import {
-  HiCollection,
-  HiViewGrid,
-  HiClipboardList,
-  HiPlusCircle,
-  HiUserGroup,
-  HiEye,
-  HiTrash,
-  HiLightningBolt,
-  HiExclamationCircle,
-} from "react-icons/hi";
+import { ClassListSkeleton } from "../../components/common/Skeleton";
+import TableToolbar from "../../components/common/TableToolbar";
+import ClassForm from "../../components/forms/ClassForm";
+import { PERMISSIONS } from "../../config/permissions";
+import { useRole } from "../../hooks/useRole";
+import { deleteClass, getClasses } from "../../services/class/classService";
+import { getSettings } from "../../services/settings/settingService";
+import { getEnrollmentsByFilter } from "../../services/students/enrollmentService";
+import { getAllStudents } from "../../services/students/studentService";
+import { MetricCard } from "../dashboard/DashboardWidgets";
 
 /* ─────────────────────────────────────────────────────────────
    HELPER — parse "Primary 1A" → { prefix:"Primary", level:1, arm:"A" }
@@ -52,6 +53,7 @@ export default function ClassList() {
   const [currentTerm, setCurrentTerm] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [formSaving, setFormSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const { can } = useRole();
@@ -228,13 +230,27 @@ export default function ClassList() {
 
       {/* ── Form Modal ── */}
       {modalOpen && (
-        <FormModal title='Add New Class' onClose={() => setModalOpen(false)}>
+        <FormModal
+          title='Add New Class'
+          onClose={() => setModalOpen(false)}
+          footer={
+            <>
+              <CustomButton type='button' variant='cancel' onClick={() => setModalOpen(false)}>
+                Cancel
+              </CustomButton>
+              <CustomButton type='submit' form='class-form' loading={formSaving} icon={<HiPlus />}>
+                Create Class Record
+              </CustomButton>
+            </>
+          }
+        >
           <ClassForm
+            formId='class-form'
             onSuccess={async () => {
               await loadAll();
               setModalOpen(false);
             }}
-            onCancel={() => setModalOpen(false)}
+            onSubmittingChange={setFormSaving}
           />
         </FormModal>
       )}
@@ -242,20 +258,20 @@ export default function ClassList() {
       {/* ── Stats ── */}
       <div className='finance-grid'>
         <MetricCard
-          label="Total Classes"
+          label='Total Classes'
           value={classes.length}
-          sub="All classes"
+          sub='All classes'
           icon={<HiViewGrid />}
-          iconBg="var(--color-primary-light, #e0e7ff)"
-          iconColor="var(--color-primary, #4338ca)"
+          iconBg='var(--color-primary-light, #e0e7ff)'
+          iconColor='var(--color-primary, #4338ca)'
         />
         <MetricCard
-          label="Total Students"
+          label='Total Students'
           value={totalStudentsShown}
           sub={`${currentTerm} (current term)`}
           icon={<HiUserGroup />}
-          iconBg="var(--color-primary-light, #e0e7ff)"
-          iconColor="var(--color-primary, #4338ca)"
+          iconBg='var(--color-primary-light, #e0e7ff)'
+          iconColor='var(--color-primary, #4338ca)'
         />
       </div>
 

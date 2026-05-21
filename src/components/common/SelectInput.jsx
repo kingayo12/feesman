@@ -1,14 +1,4 @@
 import React from "react";
-
-/**
- * CustomSelect
- *
- * Supports two modes:
- *  - Flat list:  pass `options={[{ value, label }, ...]}`
- *  - Grouped:    pass `groups={[{ label, options: [{ value, label }] }, ...]}`
- *
- * If both are passed, `groups` takes precedence.
- */
 const CustomSelect = ({
   name,
   value,
@@ -52,11 +42,8 @@ const CustomSelect = ({
           <option value=''>{placeholder}</option>
 
           {isGrouped
-            ? /* ── Grouped mode ── */
-              groups.map((group, gi) => {
-                // Skip empty groups so no blank <optgroup> appears
+            ? groups.map((group, gi) => {
                 if (!group.options?.length) return null;
-
                 return (
                   <optgroup key={gi} label={group.label}>
                     {group.options.map((opt, oi) => {

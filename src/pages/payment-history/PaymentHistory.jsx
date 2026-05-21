@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo } from "react";
-import { getPaymentsByTerm } from "./paymentService";
-import { getAllStudents } from "../students/studentService";
+import { getPaymentsByTerm } from "../../services/payment-history/paymentService";
+import { getAllStudents } from "../../services/students/studentService";
 import { useSettings } from "../../hooks/Usesettings";
 import { formatDate } from "../../utils/helpers";
 import TableToolbar from "../../components/common/TableToolbar";
-import  {MetricCard } from "../dashboard/DashboardWidgets";
+import { MetricCard } from "../dashboard/DashboardWidgets";
 import {
   HiCash,
   HiSearch,
@@ -264,33 +264,31 @@ export default function PaymentHistory() {
         ))}
       </div>
 
-   
+      <div className='finance-grid' style={{ marginBottom: "1.5rem" }}>
+        {Object.entries(methodBreakdown).map(([method, amount]) => (
+          <MetricCard
+            key={method}
+            label={method}
+            value={`₦${Number(amount).toLocaleString()}`}
+            sub='Payment method total'
+            icon={<HiCreditCard />}
+            iconBg='var(--color-primary-light, #e0e7ff)'
+            iconColor='var(--color-primary, #4338ca)'
+          />
+        ))}
 
-<div className='finance-grid' style={{ marginBottom: "1.5rem" }}>
-  {Object.entries(methodBreakdown).map(([method, amount]) => (
-    <MetricCard
-      key={method}
-      label={method}
-      value={`₦${Number(amount).toLocaleString()}`}
-      sub="Payment method total"
-      icon={<HiCreditCard />}
-      iconBg="var(--color-primary-light, #e0e7ff)"
-      iconColor="var(--color-primary, #4338ca)"
-    />
-  ))}
-
-  {/* 2. Add the Grand Total card */}
-  <MetricCard
-    label="Grand Total"
-    value={`₦${totalCollected.toLocaleString()}`}
-    sub={`${filtered.length} transactions`}
-    pill="Total Collected"
-    pillClass="pill-success" // Assuming you have a green pill class
-    icon={<HiCurrencyDollar />}
-    iconBg="var(--color-success-light, #dcfce7)"
-    iconColor="var(--color-success, #15803d)"
-  />
-</div>
+        {/* 2. Add the Grand Total card */}
+        <MetricCard
+          label='Grand Total'
+          value={`₦${totalCollected.toLocaleString()}`}
+          sub={`${filtered.length} transactions`}
+          pill='Total Collected'
+          pillClass='pill-success' // Assuming you have a green pill class
+          icon={<HiCurrencyDollar />}
+          iconBg='var(--color-success-light, #dcfce7)'
+          iconColor='var(--color-success, #15803d)'
+        />
+      </div>
 
       {/* Table */}
       <div className='table-card'>

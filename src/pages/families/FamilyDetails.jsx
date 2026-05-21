@@ -1,34 +1,41 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { getCacheItem, setCacheItem, SETTINGS_CACHE_KEY } from "../../utils/cache";
-import { getFamilyById } from "./familyService";
-import { getStudentsByFamily } from "../students/studentService";
-import { getEnrollmentsByFilter } from "../students/enrollmentService";
-import { getPaymentsByFamily } from "../fees/paymentService";
-import { getClasses } from "../classes/classService";
-import StudentForm from "../../components/forms/StudentForm";
-import { Bone } from "../../components/common/Skeleton";
-import { getSettings } from "../settings/settingService";
-import FamilyReceipt from "./FamilyReciept";
-import { formatDate } from "../../utils/helpers";
-import { getFeesByClass } from "../fees/feesService";
-import { getStudentFeeOverrides } from "../students/studentFeeOverrideService";
-import { getPreviousBalanceAmount } from "../previous_balance/Previousbalanceservice";
-import { useRole } from "../../hooks/useRole";
-import { PERMISSIONS } from "../../config/permissions";
-import Logo from "../../assets/logo.png";
 import {
-  HiArrowLeft,
-  HiPhone,
-  HiMail,
-  HiUserAdd,
   HiAcademicCap,
-  HiIdentification,
+  HiArrowLeft,
   HiCurrencyDollar,
-  HiPrinter,
   HiDocumentText,
+  HiIdentification,
+  HiMail,
+  HiPhone,
+  HiPrinter,
+  HiUserAdd,
   HiX,
 } from "react-icons/hi";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import Logo from "../../assets/logo.png";
+import { Bone } from "../../components/common/Skeleton";
+import StudentForm from "../../components/forms/StudentForm";
+import { PERMISSIONS } from "../../config/permissions";
+import { useRole } from "../../hooks/useRole";
+import { getClasses } from "../../services/class/classService";
+import { computeStudentDiscount } from "../../services/discount/Discountservice";
+import { getFamilyById } from "../../services/families/familyService";
+import { getFeesByClass } from "../../services/fees/feesService";
+import { getStudentAssignments } from "../../services/inventory/inventoryService";
+import { getPaymentsByFamily } from "../../services/payment-history/paymentService";
+import { getPreviousBalanceAmount } from "../../services/previous_balance/Previousbalanceservice";
+import { getSettings } from "../../services/settings/settingService";
+import { getEnrollmentsByFilter } from "../../services/students/enrollmentService";
+import { getStudentFeeOverrides } from "../../services/students/studentFeeOverrideService";
+import { getStudentsByFamily } from "../../services/students/studentService";
+import { getCacheItem, setCacheItem, SETTINGS_CACHE_KEY } from "../../utils/cache";
+import { formatDate } from "../../utils/helpers";
+import {
+  getCachedAssignmentsForFamily,
+  getCachedAssignmentsForStudent,
+  getCachedDiscounts,
+} from "../../utils/offlineDataManager";
+import FamilyReceipt from "./FamilyReciept";
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 function FamilyDetailsSkeleton() {
@@ -109,6 +116,8 @@ export default function FamilyDetails() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [feesByStudent, setFeesByStudent] = useState({});
   const [prevByStudent, setPrevByStudent] = useState({});
+  const [discountByStudent, setDiscountByStudent] = useState({});
+  const [inventoryAssignments, setInventoryAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // ── Load ──────────────────────────────────────────────────────────────────
@@ -183,14 +192,43 @@ export default function FamilyDetails() {
         ]);
 
         const disabledFeeIds = new Set(overrides.map((o) => o.feeId));
-        const termTotal = (studentFees || []).reduce(
-          (sum, fee) => (disabledFeeIds.has(fee.id) ? sum : sum + Number(fee.amount)),
-          0,
-        );
+        const effectiveFees = (studentFees || []).filter((fee) => !disabledFeeIds.has(fee.id));
+        const termTotal = effectiveFees.reduce((sum, fee) => sum + Number(fee.amount || 0), 0);
 
         feeMap[student.id] = termTotal + prevBal;
         prevMap[student.id] = prevBal;
+        student.effectiveFees = effectiveFees;
       }
+
+      const activeDiscounts = await getCachedDiscounts(session).catch(() => []);
+      const familyAssignments = await getCachedAssignmentsForFamily(id, session).catch(() => []);
+      const studentDiscountAssignments = await Promise.all(
+        enrichedStudents.map((student) =>
+          getCachedAssignmentsForStudent(student.id, session).catch(() => []),
+        ),
+      );
+
+      const discountMap = {};
+      enrichedStudents.forEach((student, index) => {
+        const result = computeStudentDiscount({
+          studentId: student.id,
+          familyId: id,
+          session,
+          fees: student.effectiveFees || [],
+          siblingCount: enrichedStudents.length,
+          activeDiscounts,
+          familyAssignments,
+          studentAssignments: studentDiscountAssignments[index] || [],
+        });
+        discountMap[student.id] = result.totalDiscount || 0;
+      });
+
+      const inventoryResults = await Promise.all(
+        enrichedStudents.map((student) =>
+          getStudentAssignments(student.id, { academicYear: session, term }).catch(() => []),
+        ),
+      );
+      const flatInventory = inventoryResults.flat();
 
       setFamily(fam);
       setStudents(enrichedStudents);
@@ -199,12 +237,14 @@ export default function FamilyDetails() {
       setSettings(settingsToUse);
       setFeesByStudent(feeMap);
       setPrevByStudent(prevMap);
+      setDiscountByStudent(discountMap);
+      setInventoryAssignments(flatInventory);
     } catch (error) {
       console.error("Failed to load family details:", error);
     } finally {
       setLoading(false);
     }
-  },[id]);
+  }, [id]);
 
   useEffect(() => {
     loadAll();
@@ -425,6 +465,8 @@ export default function FamilyDetails() {
                   settings={settings}
                   feesByStudent={feesByStudent}
                   prevByStudent={prevByStudent}
+                  discountByStudent={discountByStudent}
+                  inventoryAssignments={inventoryAssignments}
                   Logo={Logo}
                   onClose={() => setShowReceipt(false)}
                 />
